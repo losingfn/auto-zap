@@ -93,7 +93,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section id="about" className="section-shell section-deep border-t border-white/10 pb-10 pt-12 sm:pb-[52px] sm:pt-16 lg:pb-16 lg:pt-20">
+      <section id="about" className="section-shell section-deep scroll-mt-28 border-t border-white/10 pb-10 pt-12 sm:scroll-mt-24 sm:pb-[52px] sm:pt-16 lg:pb-16 lg:pt-20">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[0.96fr_1.04fr] lg:items-start lg:px-8">
           <div className="scroll-reveal">
             <SectionIntro
@@ -131,7 +131,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section id="catalog" className="section-shell section-soft py-11 sm:py-16 lg:py-20">
+      <section id="catalog" className="section-shell section-soft scroll-mt-28 py-11 sm:scroll-mt-24 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <SectionIntro
             eyebrow={content.home.catalog.eyebrow}
@@ -144,7 +144,7 @@ export default async function Home() {
 
       <ShopGallerySection />
 
-      <section id="vacancies" className="section-shell section-soft scroll-mt-24 py-11 sm:py-16 lg:py-20">
+      <section id="vacancies" className="section-shell section-soft scroll-mt-28 py-11 sm:scroll-mt-24 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <SectionIntro
             eyebrow={content.home.vacancies.eyebrow}
@@ -207,7 +207,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section id="contacts" className="section-shell section-deep scroll-mt-24 py-11 sm:py-16 lg:py-20">
+      <section id="contacts" className="section-shell section-deep scroll-mt-28 py-11 sm:scroll-mt-24 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="scroll-reveal rounded-card border border-white/10 bg-[#111827] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.26)] sm:p-6 lg:p-8">
             <div>

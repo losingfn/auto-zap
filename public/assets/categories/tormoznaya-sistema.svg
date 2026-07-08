@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" fill="none" role="img" aria-hidden="true">
+  <g stroke-linecap="round" stroke-linejoin="round" stroke-width="5">
+    <circle cx="78" cy="91" r="55" stroke="#FFFFFF"/>
+    <circle cx="78" cy="91" r="28" stroke="#FFFFFF"/>
+    <circle cx="78" cy="91" r="9" stroke="#FFFFFF"/>
+    <circle cx="78" cy="58" r="3" stroke="#FFFFFF"/>
+    <circle cx="111" cy="91" r="3" stroke="#FFFFFF"/>
+    <circle cx="78" cy="124" r="3" stroke="#FFFFFF"/>
+    <circle cx="45" cy="91" r="3" stroke="#FFFFFF"/>
+    <circle cx="101" cy="67" r="3" stroke="#FFFFFF"/>
+    <circle cx="101" cy="115" r="3" stroke="#FFFFFF"/>
+    <circle cx="55" cy="67" r="3" stroke="#FFFFFF"/>
+    <circle cx="55" cy="115" r="3" stroke="#FFFFFF"/>
+    <path stroke="#FFFFFF" d="M132 53c17 7 27 23 27 42 0 21-12 37-29 44"/>
+    <path stroke="#FFFFFF" d="M139 68c8 6 12 15 12 27 0 13-5 23-14 30"/>
+    <path stroke="#2563EB" d="M135 58c7 11 11 24 11 38 0 14-4 27-12 39"/>
+    <path stroke="#2563EB" d="M145 76c4 6 6 13 6 20"/>
+  </g>
+</svg>

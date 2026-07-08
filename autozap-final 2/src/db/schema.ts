@@ -1,0 +1,437 @@
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  numeric,
+  pgEnum,
+  pgTable,
+  smallint,
+  text,
+  time,
+  timestamp,
+  unique,
+  uuid,
+  varchar
+} from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+
+export const adminRole = pgEnum("admin_role", ["owner", "manager"]);
+export const assetKind = pgEnum("asset_kind", [
+  "logo",
+  "favicon",
+  "og_image",
+  "store_photo",
+  "category_icon",
+  "vacancy_image"
+]);
+export const catalogVersionStatus = pgEnum("catalog_version_status", [
+  "draft",
+  "active",
+  "archived",
+  "rolled_back"
+]);
+export const productStatus = pgEnum("product_status", [
+  "active",
+  "archived",
+  "needs_review",
+  "invalid"
+]);
+export const importStatus = pgEnum("import_status", [
+  "uploaded",
+  "analyzed",
+  "published",
+  "cancelled",
+  "failed"
+]);
+export const reviewStatus = pgEnum("review_status", ["open", "resolved", "ignored"]);
+export const ruleMatchType = pgEnum("rule_match_type", [
+  "contains",
+  "starts_with",
+  "exact",
+  "regex"
+]);
+
+const timestamps = {
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+};
+
+export const adminUsers = pgTable("admin_users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  fullName: varchar("full_name", { length: 255 }),
+  passwordHash: text("password_hash").notNull(),
+  role: adminRole("role").notNull().default("owner"),
+  isActive: boolean("is_active").notNull().default(true),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }),
+  ...timestamps
+});
+
+export const adminSessions = pgTable(
+  "admin_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    adminUserId: uuid("admin_user_id")
+      .notNull()
+      .references(() => adminUsers.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    ipAddress: varchar("ip_address", { length: 64 }),
+    userAgent: text("user_agent"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    adminUserIdx: index("admin_sessions_admin_user_idx").on(table.adminUserId),
+    expiresIdx: index("admin_sessions_expires_idx").on(table.expiresAt)
+  })
+);
+
+export const assets = pgTable(
+  "assets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kind: assetKind("kind").notNull(),
+    originalFilename: varchar("original_filename", { length: 255 }).notNull(),
+    publicPath: text("public_path").notNull(),
+    mimeType: varchar("mime_type", { length: 120 }).notNull(),
+    width: integer("width"),
+    height: integer("height"),
+    sizeBytes: integer("size_bytes"),
+    altText: text("alt_text"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    ...timestamps
+  },
+  (table) => ({
+    kindIdx: index("assets_kind_idx").on(table.kind),
+    activeIdx: index("assets_active_idx").on(table.isActive)
+  })
+);
+
+export const categories = pgTable(
+  "categories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: varchar("slug", { length: 160 }).notNull().unique(),
+    name: varchar("name", { length: 160 }).notNull().unique(),
+    description: text("description"),
+    iconAssetId: uuid("icon_asset_id").references(() => assets.id, { onDelete: "set null" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isAllAssortment: boolean("is_all_assortment").notNull().default(false),
+    isActive: boolean("is_active").notNull().default(true),
+    seoTitle: text("seo_title"),
+    seoDescription: text("seo_description"),
+    ...timestamps
+  },
+  (table) => ({
+    activeSortIdx: index("categories_active_sort_idx").on(table.isActive, table.sortOrder)
+  })
+);
+
+export const subcategories = pgTable(
+  "subcategories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => categories.id, { onDelete: "cascade" }),
+    slug: varchar("slug", { length: 160 }).notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    description: text("description"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    seoTitle: text("seo_title"),
+    seoDescription: text("seo_description"),
+    ...timestamps
+  },
+  (table) => ({
+    categorySlugUnique: unique("subcategories_category_slug_unique").on(
+      table.categoryId,
+      table.slug
+    ),
+    categoryNameUnique: unique("subcategories_category_name_unique").on(
+      table.categoryId,
+      table.name
+    ),
+    categorySortIdx: index("subcategories_category_sort_idx").on(
+      table.categoryId,
+      table.isActive,
+      table.sortOrder
+    )
+  })
+);
+
+export const catalogVersions = pgTable(
+  "catalog_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    status: catalogVersionStatus("status").notNull().default("draft"),
+    sourceFileName: varchar("source_file_name", { length: 255 }),
+    sourceFileHash: varchar("source_file_hash", { length: 128 }),
+    totalRows: integer("total_rows").notNull().default(0),
+    parsedRows: integer("parsed_rows").notNull().default(0),
+    addedCount: integer("added_count").notNull().default(0),
+    updatedCount: integer("updated_count").notNull().default(0),
+    archivedCount: integer("archived_count").notNull().default(0),
+    reviewCount: integer("review_count").notNull().default(0),
+    errorCount: integer("error_count").notNull().default(0),
+    notes: text("notes"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdBy: uuid("created_by").references(() => adminUsers.id, { onDelete: "set null" }),
+    ...timestamps
+  },
+  (table) => ({
+    statusIdx: index("catalog_versions_status_idx").on(table.status),
+    publishedIdx: index("catalog_versions_published_idx").on(table.publishedAt)
+  })
+);
+
+export const products = pgTable(
+  "products",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    catalogVersionId: uuid("catalog_version_id")
+      .notNull()
+      .references(() => catalogVersions.id, { onDelete: "cascade" }),
+    shopCode: varchar("shop_code", { length: 64 }).notNull(),
+    rawName: text("raw_name").notNull(),
+    name: text("name").notNull(),
+    slug: varchar("slug", { length: 220 }).notNull(),
+    price: numeric("price", { precision: 12, scale: 2 }).notNull(),
+    stockQuantity: numeric("stock_quantity", { precision: 14, scale: 3 }),
+    stockSum: numeric("stock_sum", { precision: 14, scale: 2 }),
+    categoryId: uuid("category_id").references(() => categories.id, { onDelete: "set null" }),
+    subcategoryId: uuid("subcategory_id").references(() => subcategories.id, {
+      onDelete: "set null"
+    }),
+    status: productStatus("status").notNull().default("active"),
+    reviewReason: text("review_reason"),
+    searchText: text("search_text").notNull().default(""),
+    ...timestamps
+  },
+  (table) => ({
+    versionCodeUnique: unique("products_version_code_unique").on(
+      table.catalogVersionId,
+      table.shopCode
+    ),
+    versionStatusIdx: index("products_version_status_idx").on(
+      table.catalogVersionId,
+      table.status
+    ),
+    codeIdx: index("products_shop_code_idx").on(table.shopCode),
+    categoryIdx: index("products_category_idx").on(table.categoryId, table.subcategoryId)
+  })
+);
+
+export const importBatches = pgTable(
+  "import_batches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    catalogVersionId: uuid("catalog_version_id").references(() => catalogVersions.id, {
+      onDelete: "set null"
+    }),
+    status: importStatus("status").notNull().default("uploaded"),
+    sourceFileName: varchar("source_file_name", { length: 255 }).notNull(),
+    storagePath: text("storage_path"),
+    fileHash: varchar("file_hash", { length: 128 }),
+    uploadedBy: uuid("uploaded_by").references(() => adminUsers.id, { onDelete: "set null" }),
+    report: jsonb("report").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    analyzedAt: timestamp("analyzed_at", { withTimezone: true }),
+    publishedAt: timestamp("published_at", { withTimezone: true })
+  },
+  (table) => ({
+    statusIdx: index("import_batches_status_idx").on(table.status),
+    createdIdx: index("import_batches_created_idx").on(table.createdAt)
+  })
+);
+
+export const importRows = pgTable(
+  "import_rows",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    importBatchId: uuid("import_batch_id")
+      .notNull()
+      .references(() => importBatches.id, { onDelete: "cascade" }),
+    rowNumber: integer("row_number").notNull(),
+    rawName: text("raw_name"),
+    parsedShopCode: varchar("parsed_shop_code", { length: 64 }),
+    parsedName: text("parsed_name"),
+    stockQuantity: numeric("stock_quantity", { precision: 14, scale: 3 }),
+    price: numeric("price", { precision: 12, scale: 2 }),
+    stockSum: numeric("stock_sum", { precision: 14, scale: 2 }),
+    validationStatus: varchar("validation_status", { length: 64 }).notNull(),
+    errorMessages: jsonb("error_messages").notNull().default(sql`'[]'::jsonb`)
+  },
+  (table) => ({
+    batchRowUnique: unique("import_rows_batch_row_unique").on(
+      table.importBatchId,
+      table.rowNumber
+    ),
+    batchStatusIdx: index("import_rows_batch_status_idx").on(
+      table.importBatchId,
+      table.validationStatus
+    )
+  })
+);
+
+export const importErrors = pgTable(
+  "import_errors",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    importBatchId: uuid("import_batch_id")
+      .notNull()
+      .references(() => importBatches.id, { onDelete: "cascade" }),
+    rowNumber: integer("row_number"),
+    fieldName: varchar("field_name", { length: 120 }),
+    code: varchar("code", { length: 120 }).notNull(),
+    message: text("message").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    batchIdx: index("import_errors_batch_idx").on(table.importBatchId)
+  })
+);
+
+export const categorizationRules = pgTable(
+  "categorization_rules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    pattern: varchar("pattern", { length: 255 }).notNull(),
+    matchType: ruleMatchType("match_type").notNull().default("contains"),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => categories.id, { onDelete: "cascade" }),
+    subcategoryId: uuid("subcategory_id").references(() => subcategories.id, {
+      onDelete: "set null"
+    }),
+    priority: integer("priority").notNull().default(100),
+    isActive: boolean("is_active").notNull().default(true),
+    createdBy: uuid("created_by").references(() => adminUsers.id, { onDelete: "set null" }),
+    ...timestamps
+  },
+  (table) => ({
+    rulePriorityIdx: index("categorization_rules_priority_idx").on(
+      table.isActive,
+      table.priority
+    ),
+    patternUnique: unique("categorization_rules_pattern_unique").on(
+      table.pattern,
+      table.matchType,
+      table.categoryId,
+      table.subcategoryId
+    )
+  })
+);
+
+export const synonyms = pgTable(
+  "synonyms",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sourceTerm: varchar("source_term", { length: 160 }).notNull(),
+    targetTerms: text("target_terms").array().notNull(),
+    isBidirectional: boolean("is_bidirectional").notNull().default(true),
+    isActive: boolean("is_active").notNull().default(true),
+    createdBy: uuid("created_by").references(() => adminUsers.id, { onDelete: "set null" }),
+    ...timestamps
+  },
+  (table) => ({
+    sourceUnique: unique("synonyms_source_unique").on(table.sourceTerm),
+    activeIdx: index("synonyms_active_idx").on(table.isActive)
+  })
+);
+
+export const reviewQueue = pgTable(
+  "review_queue",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    catalogVersionId: uuid("catalog_version_id").references(() => catalogVersions.id, {
+      onDelete: "cascade"
+    }),
+    productId: uuid("product_id").references(() => products.id, { onDelete: "cascade" }),
+    importRowId: uuid("import_row_id").references(() => importRows.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    status: reviewStatus("status").notNull().default("open"),
+    suggestedCategoryId: uuid("suggested_category_id").references(() => categories.id, {
+      onDelete: "set null"
+    }),
+    suggestedSubcategoryId: uuid("suggested_subcategory_id").references(() => subcategories.id, {
+      onDelete: "set null"
+    }),
+    resolvedBy: uuid("resolved_by").references(() => adminUsers.id, { onDelete: "set null" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    ...timestamps
+  },
+  (table) => ({
+    statusIdx: index("review_queue_status_idx").on(table.status),
+    versionIdx: index("review_queue_version_idx").on(table.catalogVersionId)
+  })
+);
+
+export const contacts = pgTable("contacts", {
+  id: smallint("id").primaryKey().default(1),
+  name: varchar("name", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 64 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  address: text("address").notNull(),
+  latitude: numeric("latitude", { precision: 10, scale: 6 }).notNull(),
+  longitude: numeric("longitude", { precision: 10, scale: 6 }).notNull(),
+  yandexMapsUrl: text("yandex_maps_url").notNull(),
+  ...timestamps
+});
+
+export const businessHours = pgTable(
+  "business_hours",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    dayOfWeek: smallint("day_of_week").notNull(),
+    opensAt: time("opens_at").notNull(),
+    closesAt: time("closes_at").notNull(),
+    isClosed: boolean("is_closed").notNull().default(false),
+    ...timestamps
+  },
+  (table) => ({
+    dayUnique: unique("business_hours_day_unique").on(table.dayOfWeek)
+  })
+);
+
+export const vacancies = pgTable("vacancies", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  imageAssetId: uuid("image_asset_id").references(() => assets.id, { onDelete: "set null" }),
+  isPublished: boolean("is_published").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  ...timestamps
+});
+
+export const siteSettings = pgTable("site_settings", {
+  key: varchar("key", { length: 120 }).primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedBy: uuid("updated_by").references(() => adminUsers.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    adminUserId: uuid("admin_user_id").references(() => adminUsers.id, {
+      onDelete: "set null"
+    }),
+    action: varchar("action", { length: 160 }).notNull(),
+    entityType: varchar("entity_type", { length: 120 }),
+    entityId: uuid("entity_id"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    ipAddress: varchar("ip_address", { length: 64 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    createdIdx: index("audit_logs_created_idx").on(table.createdAt),
+    adminIdx: index("audit_logs_admin_idx").on(table.adminUserId)
+  })
+);

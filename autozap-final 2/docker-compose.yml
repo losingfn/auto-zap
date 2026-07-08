@@ -1,0 +1,55 @@
+services:
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://autozap:autozap@postgres:5432/autozap
+      MEILI_HOST: http://meilisearch:7700
+    ports:
+      - "3000:3000"
+    volumes:
+      - app_uploads:/app/public/uploads
+      - import_uploads:/app/data/imports/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      meilisearch:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: autozap
+      POSTGRES_USER: autozap
+      POSTGRES_PASSWORD: autozap
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autozap -d autozap"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1
+    restart: unless-stopped
+    environment:
+      MEILI_ENV: production
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+      MEILI_NO_ANALYTICS: "true"
+    ports:
+      - "127.0.0.1:7700:7700"
+    volumes:
+      - meili_data:/meili_data
+
+volumes:
+  postgres_data:
+  meili_data:
+  app_uploads:
+  import_uploads:

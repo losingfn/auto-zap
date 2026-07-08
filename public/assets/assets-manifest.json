@@ -1,0 +1,126 @@
+{
+  "generated_by": "scripts/prepare-assets.py",
+  "principle": "Use only approved archive materials; optimize and crop without replacing visual style.",
+  "brand": {
+    "source": "public/assets/source/logo.jpg",
+    "logo": "public/assets/brand/logo.webp",
+    "logo_avif": "public/assets/brand/logo.avif",
+    "mark": "public/assets/brand/logo-mark.png",
+    "favicon": "public/favicon.ico",
+    "favicon_svg": "public/assets/brand/favicon.svg",
+    "note": "favicon.svg is a bitmap wrapper because the approved source is JPG, not vector SVG."
+  },
+  "store_photos": {
+    "facade": {
+      "source": "public/assets/source/facade.jpg",
+      "optimized": {
+        "webp": "public/assets/store/facade.webp",
+        "avif": "public/assets/store/facade.avif"
+      },
+      "sizes": {
+        "640": "public/assets/store/facade-640.webp",
+        "960": "public/assets/store/facade-960.webp"
+      }
+    },
+    "building": {
+      "source": "public/assets/source/building.jpg",
+      "optimized": {
+        "webp": "public/assets/store/building.webp",
+        "avif": "public/assets/store/building.avif"
+      },
+      "sizes": {
+        "640": "public/assets/store/building-640.webp",
+        "960": "public/assets/store/building-960.webp"
+      }
+    },
+    "entrance": {
+      "source": "public/assets/source/entrance.jpg",
+      "optimized": {
+        "webp": "public/assets/store/entrance.webp",
+        "avif": "public/assets/store/entrance.avif"
+      },
+      "sizes": {
+        "640": "public/assets/store/entrance-640.webp",
+        "960": "public/assets/store/entrance-960.webp"
+      }
+    }
+  },
+  "vacancy": {
+    "source": "public/assets/source/seller_consultant.jpg",
+    "optimized": {
+      "webp": "public/assets/vacancy/seller-consultant.webp",
+      "avif": "public/assets/vacancy/seller-consultant.avif"
+    }
+  },
+  "categories": {
+    "podveska": {
+      "name": "Подвеска",
+      "source": "public/assets/source/category_icons.jpg",
+      "png": "public/assets/categories/podveska.png",
+      "webp": "public/assets/categories/podveska.webp",
+      "svg": "public/assets/categories/podveska.svg",
+      "note": "Pure SVG icon redrawn to match the approved JPG mockup and logo style."
+    },
+    "elektrika": {
+      "name": "Электрика",
+      "source": "public/assets/source/category_icons.jpg",
+      "png": "public/assets/categories/elektrika.png",
+      "webp": "public/assets/categories/elektrika.webp",
+      "svg": "public/assets/categories/elektrika.svg",
+      "note": "Pure SVG icon redrawn to match the approved JPG mockup and logo style."
+    },
+    "filtry-i-masla": {
+      "name": "Фильтры и масла",
+      "source": "public/assets/source/category_icons.jpg",
+      "png": "public/assets/categories/filtry-i-masla.png",
+      "webp": "public/assets/categories/filtry-i-masla.webp",
+      "svg": "public/assets/categories/filtry-i-masla.svg",
+      "note": "Pure SVG icon redrawn to match the approved JPG mockup and logo style."
+    },
+    "tormoznaya-sistema": {
+      "name": "Тормозная система",
+      "source": "public/assets/source/category_icons.jpg",
+      "png": "public/assets/categories/tormoznaya-sistema.png",
+      "webp": "public/assets/categories/tormoznaya-sistema.webp",
+      "svg": "public/assets/categories/tormoznaya-sistema.svg",
+      "note": "Pure SVG icon redrawn to match the approved JPG mockup and logo style."
+    },
+    "kuzov-i-optika": {
+      "name": "Кузов и оптика",
+      "source": "public/assets/source/category_icons.jpg",
+      "png": "public/assets/categories/kuzov-i-optika.png",
+      "webp": "public/assets/categories/kuzov-i-optika.webp",
+      "svg": "public/assets/categories/kuzov-i-optika.svg",
+      "note": "Pure SVG icon redrawn to match the approved JPG mockup and logo style."
+    },
+    "dvigatel-i-transmissiya": {
+      "name": "Двигатель и трансмиссия",
+      "source": "public/assets/source/category_icons.jpg",
+      "png": "public/assets/categories/dvigatel-i-transmissiya.png",
+      "webp": "public/assets/categories/dvigatel-i-transmissiya.webp",
+      "svg": "public/assets/categories/dvigatel-i-transmissiya.svg",
+      "note": "Pure SVG icon redrawn to match the approved JPG mockup and logo style."
+    },
+    "aksessuary": {
+      "name": "Аксессуары",
+      "source": "public/assets/source/category_icons.jpg",
+      "png": "public/assets/categories/aksessuary.png",
+      "webp": "public/assets/categories/aksessuary.webp",
+      "svg": "public/assets/categories/aksessuary.svg",
+      "note": "Pure SVG icon redrawn to match the approved JPG mockup and logo style."
+    },
+    "ves-assortiment": {
+      "name": "Весь ассортимент",
+      "source": "public/assets/source/category_icons.jpg",
+      "png": "public/assets/categories/ves-assortiment.png",
+      "webp": "public/assets/categories/ves-assortiment.webp",
+      "svg": "public/assets/categories/ves-assortiment.svg",
+      "note": "Pure SVG icon redrawn to match the approved JPG mockup and logo style."
+    }
+  },
+  "open_graph": {
+    "image": "public/og/store-front.webp",
+    "fallback_jpeg": "public/og/store-front.jpg",
+    "source": "public/assets/source/facade.jpg"
+  }
+}

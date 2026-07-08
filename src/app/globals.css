@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --background: #111827;
+  --surface: #1f2937;
+  --accent: #2563eb;
+  --text: #ffffff;
+  --muted: #d1d5db;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  font-family: var(--font-inter), Inter, Manrope, Arial, sans-serif;
+  letter-spacing: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.premium-page {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(37, 99, 235, 0.2), transparent 34rem),
+    linear-gradient(180deg, #111827 0%, #0b1220 44%, #111827 100%);
+}
+
+.premium-page::before {
+  pointer-events: none;
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.16;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, transparent, black 12%, black 80%, transparent);
+}
+
+.premium-page > * {
+  position: relative;
+  z-index: 1;
+}
+
+.section-shell {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(17, 24, 39, 0.94), rgba(11, 18, 32, 0.96)),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.1), transparent 32%, transparent 68%, rgba(37, 99, 235, 0.08));
+}
+
+.section-soft {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(37, 99, 235, 0.08), transparent 28rem),
+    linear-gradient(180deg, rgba(20, 28, 42, 0.96), rgba(14, 21, 34, 0.98));
+}
+
+.section-deep {
+  background:
+    radial-gradient(circle at 82% 0%, rgba(37, 99, 235, 0.06), transparent 26rem),
+    linear-gradient(180deg, rgba(11, 18, 32, 0.99), rgba(8, 13, 24, 0.98));
+}
+
+.section-cta {
+  background:
+    linear-gradient(180deg, rgba(8, 13, 24, 0.98), rgba(11, 18, 32, 1));
+}
+
+.scroll-reveal {
+  animation: reveal-up 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--stagger, 0ms);
+}
+
+@supports (animation-timeline: view()) {
+  .scroll-reveal {
+    animation-timeline: view();
+    animation-range: entry 0% cover 28%;
+  }
+}
+
+.stagger-card {
+  animation-delay: var(--stagger, 0ms);
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes content-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

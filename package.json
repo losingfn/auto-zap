@@ -1,0 +1,52 @@
+{
+  "name": "autozap",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "WATCHPACK_POLLING=true next dev",
+    "build": "next build",
+    "start": "next start",
+    "start:prod": "next start -p 3000 -H 127.0.0.1",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "assets:prepare": "python3 scripts/prepare-assets.py",
+    "import:check": "node --import tsx scripts/check-import.ts",
+    "categorization:check": "node --import tsx scripts/check-categorization.ts",
+    "categorization:gaps": "node --import tsx scripts/analyze-categorization-gaps.ts",
+    "taxonomy:sync-seed": "node --import tsx scripts/sync-taxonomy-seed.ts",
+    "search:sync": "scripts/with-env.sh node --import tsx scripts/sync-search-index.ts",
+    "search:check": "scripts/with-env.sh node --import tsx scripts/check-search.ts",
+    "search:fixture": "node --import tsx scripts/check-search-fixture.ts",
+    "search:sync-synonyms-seed": "node --import tsx scripts/sync-search-synonyms-seed.ts",
+    "admin:create": "scripts/with-env.sh node --import tsx scripts/create-admin.ts",
+    "db:migrate": "scripts/with-env.sh node --import tsx scripts/migrate.ts",
+    "db:seed": "scripts/with-env.sh sh -c 'psql \"$DATABASE_URL\" -f db/seeds/001_categories.sql && psql \"$DATABASE_URL\" -f db/seeds/002_taxonomy_rules.sql && psql \"$DATABASE_URL\" -f db/seeds/003_search_synonyms.sql'"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^1.8.0",
+    "clsx": "^2.1.1",
+    "drizzle-orm": "^0.44.0",
+    "meilisearch": "^0.50.0",
+    "next": "^15.4.0",
+    "postgres": "^3.4.7",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "xlsx": "^0.18.5",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@next/eslint-plugin-next": "^15.5.19",
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@typescript-eslint/eslint-plugin": "^8.61.1",
+    "@typescript-eslint/parser": "^8.61.1",
+    "drizzle-kit": "^0.31.0",
+    "eslint": "^9.25.0",
+    "tailwindcss": "^4.1.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

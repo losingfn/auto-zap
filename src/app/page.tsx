@@ -2,6 +2,7 @@ import Image from "next/image";
 import type { CSSProperties, ReactNode } from "react";
 import { HomeCategoryGrid } from "@/components/home/home-category-grid";
 import { HomeSearch } from "@/components/home/home-search";
+import { CustomerReviewsSection } from "@/components/home/customer-reviews";
 import { ShopGallerySection } from "@/components/home/shop-gallery";
 import { SiteHeader } from "@/components/home/site-header";
 import { StoreGallery } from "@/components/home/store-gallery";
@@ -93,6 +94,17 @@ export default async function Home() {
         </div>
       </section>
 
+      <section id="catalog" className="section-shell section-soft scroll-mt-28 py-11 sm:scroll-mt-24 sm:py-16 lg:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <SectionIntro
+            eyebrow={content.home.catalog.eyebrow}
+            title={content.home.catalog.title}
+            text={content.home.catalog.text}
+          />
+          <HomeCategoryGrid categories={content.categories} />
+        </div>
+      </section>
+
       <section id="about" className="section-shell section-deep scroll-mt-28 border-t border-white/10 pb-10 pt-12 sm:scroll-mt-24 sm:pb-[52px] sm:pt-16 lg:pb-16 lg:pt-20">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[0.96fr_1.04fr] lg:items-start lg:px-8">
           <div className="scroll-reveal">
@@ -131,18 +143,9 @@ export default async function Home() {
         </div>
       </section>
 
-      <section id="catalog" className="section-shell section-soft scroll-mt-28 py-11 sm:scroll-mt-24 sm:py-16 lg:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionIntro
-            eyebrow={content.home.catalog.eyebrow}
-            title={content.home.catalog.title}
-            text={content.home.catalog.text}
-          />
-          <HomeCategoryGrid categories={content.categories} />
-        </div>
-      </section>
-
       <ShopGallerySection />
+
+      <CustomerReviewsSection />
 
       <section id="vacancies" className="section-shell section-soft scroll-mt-28 py-11 sm:scroll-mt-24 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

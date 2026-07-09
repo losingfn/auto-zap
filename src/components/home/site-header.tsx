@@ -4,6 +4,7 @@ import Link from "next/link";
 const navigationItems = [
   { href: "#catalog", label: "Каталог" },
   { href: "#about", label: "О магазине" },
+  { href: "#reviews", label: "Отзывы" },
   { href: "#vacancies", label: "Вакансии" },
   { href: "#contacts", label: "Контакты" }
 ];
@@ -36,7 +37,7 @@ export function SiteHeader({
           <nav className="hidden items-center gap-2 rounded-card border border-white/10 bg-[#111827]/[0.58] p-1 text-sm font-medium text-[#D6DEE9] shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-md lg:flex">
             {navigationItems.map((item) => (
               <Link key={item.href} href={item.href} className="transition hover:text-white">
-                <span className="block rounded-card px-3 py-2 transition hover:bg-white/10">
+                <span className="block whitespace-nowrap rounded-card px-3 py-2 transition hover:bg-white/10">
                   {item.label}
                 </span>
               </Link>
@@ -44,12 +45,15 @@ export function SiteHeader({
           </nav>
         </div>
 
-        <nav className="mt-3 grid grid-cols-2 gap-2 text-sm font-medium text-[#D6DEE9] sm:grid-cols-4 lg:hidden">
-          {navigationItems.map((item) => (
+        <nav className="mt-3 grid grid-cols-6 gap-1.5 text-[0.72rem] font-medium text-[#D6DEE9] sm:grid-cols-5 sm:gap-2 sm:text-sm lg:hidden">
+          {navigationItems.map((item, index) => (
             <Link
               key={item.href}
               href={item.href}
-              className="flex min-h-9 min-w-0 items-center justify-center whitespace-nowrap rounded-card border border-white/10 bg-white/[0.06] px-2.5 py-2 leading-5 transition hover:border-[#2563EB]/60 hover:bg-white/[0.1] hover:text-white"
+              className={[
+                "flex min-h-9 min-w-0 items-center justify-center whitespace-nowrap rounded-card border border-white/10 bg-white/[0.06] px-1.5 py-2 leading-5 transition hover:border-[#2563EB]/60 hover:bg-white/[0.1] hover:text-white sm:col-span-1 sm:px-2.5",
+                index < 3 ? "col-span-2" : "col-span-3"
+              ].join(" ")}
             >
               {item.label}
             </Link>

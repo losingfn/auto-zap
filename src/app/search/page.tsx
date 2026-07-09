@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SearchPageForm } from "@/components/search/search-page-form";
 import { PublicFooter } from "@/components/site/public-footer";
 import { searchProducts } from "@/features/search/service";
 
@@ -35,18 +36,7 @@ export default async function SearchPage({
           <h1 className="mt-4 text-3xl font-semibold">Поиск по каталогу</h1>
         </div>
 
-        <form action="/search" className="scroll-reveal flex flex-col gap-3 sm:flex-row">
-          <input
-            type="search"
-            name="q"
-            defaultValue={q}
-            placeholder="Название товара или бренд"
-            className="min-h-12 flex-1 rounded-card border border-white/10 bg-[#111827] px-4 text-base shadow-[0_14px_42px_rgba(0,0,0,0.18)] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#2563EB]"
-          />
-          <button className="min-h-12 rounded-card bg-[#2563EB] px-5 font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] transition duration-300 hover:-translate-y-0.5 hover:bg-[#1D4ED8]">
-            Найти
-          </button>
-        </form>
+        <SearchPageForm initialQuery={q} />
 
         {searchError ? (
           <div className="rounded-card border border-white/10 bg-[#111827] p-5 text-[#CBD5E1] shadow-[0_18px_60px_rgba(0,0,0,0.2)]">

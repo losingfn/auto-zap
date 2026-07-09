@@ -1,45 +1,60 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { siteConfig } from "@/config/site";
-import { getPublicHomeContent } from "@/features/content/public-home";
 import { publicAbsoluteUrl } from "@/features/seo/structured-data";
 
+const metadataTitle = "Автозапчасти в Талдоме — Салтыкова-Щедрина";
+const metadataDescription =
+  "Каталог автозапчастей магазина на улице Салтыкова-Щедрина в Талдоме: поиск по товарам, цены, контакты и маршрут.";
+const ogImagePath = "/og-image.png";
+
+export const viewport: Viewport = {
+  themeColor: "#07111F"
+};
+
 export async function generateMetadata(): Promise<Metadata> {
-  const content = await getPublicHomeContent();
   const publicUrl = publicAbsoluteUrl("/");
-  const ogImageUrl = publicAbsoluteUrl(content.brand.ogImageSrc);
+  const ogImageUrl = publicAbsoluteUrl(ogImagePath) ?? ogImagePath;
 
   return {
     metadataBase: siteConfig.url ? new URL(siteConfig.url) : undefined,
     title: {
-      default: siteConfig.name,
-      template: `%s | ${siteConfig.name}`
+      default: metadataTitle,
+      template: `%s | ${metadataTitle}`
     },
-    description:
-      "Каталог автозапчастей магазина на улице Салтыкова-Щедрина в Талдоме: поиск по товарам, цены, контакты и маршрут.",
+    description: metadataDescription,
+    manifest: "/site.webmanifest",
     openGraph: {
-      title: siteConfig.name,
-      description: "Более 30 000 товаров на собственном складе в Талдоме.",
+      title: metadataTitle,
+      description: metadataDescription,
       ...(publicUrl ? { url: publicUrl } : {}),
       siteName: siteConfig.name,
       locale: "ru_RU",
       type: "website",
-      ...(ogImageUrl
-        ? {
-            images: [
-              {
-                url: ogImageUrl,
-                width: 1200,
-                height: 630,
-                alt: "Магазин автозапчастей на Салтыкова-Щедрина"
-              }
-            ]
-          }
-        : {})
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: "Автозапчасти в Талдоме"
+        }
+      ]
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: metadataTitle,
+      description: metadataDescription,
+      images: [ogImageUrl]
     },
     icons: {
-      icon: [{ url: content.brand.faviconSrc }],
-      apple: [{ url: "/assets/brand/apple-touch-icon.png" }]
+      icon: [
+        { url: "/favicon.ico" },
+        { url: "/favicon.svg", type: "image/svg+xml" },
+        { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+        { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" }
+      ],
+      apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+      shortcut: "/favicon.ico"
     },
     robots: {
       index: true,

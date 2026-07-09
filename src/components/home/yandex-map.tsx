@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { MouseEvent } from "react";
 
 declare global {
   interface Window {
@@ -23,6 +22,8 @@ declare global {
     };
   }
 }
+
+const YANDEX_PROFILE_URL = "https://yandex.ru/profile/1112244739?lang=ru";
 
 interface YandexMapInstance {
   geoObjects: {
@@ -161,47 +162,21 @@ function MapActions({
     yandexMapsUrl: string;
   };
 }) {
-  const destination = `${contact.latitude}%2C${contact.longitude}`;
-  const routeUrl = `https://yandex.ru/maps/?rtext=~${destination}&rtt=auto`;
-
-  function handleRouteClick(event: MouseEvent<HTMLAnchorElement>) {
-    if (!navigator.geolocation) {
-      return;
-    }
-
-    event.preventDefault();
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const origin = `${position.coords.latitude}%2C${position.coords.longitude}`;
-        window.open(
-          `https://yandex.ru/maps/?rtext=${origin}~${destination}&rtt=auto`,
-          "_blank",
-          "noopener,noreferrer"
-        );
-      },
-      () => {
-        window.open(routeUrl, "_blank", "noopener,noreferrer");
-      },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
-    );
-  }
-
   return (
-    <div className="grid gap-3 border-t border-white/10 bg-[#0B1220] p-4 sm:grid-cols-2">
+    <div className="relative z-10 grid gap-3 border-t border-white/10 bg-[#0B1220] p-4 sm:grid-cols-2">
       <a
-        href={routeUrl}
+        href={YANDEX_PROFILE_URL}
         target="_blank"
-        rel="noreferrer"
-        onClick={handleRouteClick}
-        className="rounded-card border border-[#2563EB]/[0.55] px-4 py-3 text-center text-sm font-semibold text-white transition duration-300 hover:border-[#93C5FD] hover:bg-[#1A2740]"
+        rel="noopener noreferrer"
+        className="relative z-10 rounded-card border border-[#2563EB]/[0.55] px-4 py-3 text-center text-sm font-semibold text-white transition duration-300 hover:border-[#93C5FD] hover:bg-[#1A2740]"
       >
         Как добраться
       </a>
       <a
-        href={contact.yandexMapsUrl}
+        href={contact.yandexMapsUrl || YANDEX_PROFILE_URL}
         target="_blank"
-        rel="noreferrer"
-        className="rounded-card bg-[#2563EB] px-4 py-3 text-center text-sm font-semibold text-white shadow-[0_0_30px_rgba(37,99,235,0.32)] transition duration-300 hover:bg-[#1D4ED8]"
+        rel="noopener noreferrer"
+        className="relative z-10 rounded-card bg-[#2563EB] px-4 py-3 text-center text-sm font-semibold text-white shadow-[0_0_30px_rgba(37,99,235,0.32)] transition duration-300 hover:bg-[#1D4ED8]"
       >
         Открыть в Яндекс Картах
       </a>

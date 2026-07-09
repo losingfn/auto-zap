@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   ChevronLeftIcon,
@@ -46,15 +46,31 @@ export function ShopGallerySection() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
+  const mobileGalleryRef = useRef<HTMLDivElement | null>(null);
   const activeItem = activeIndex === null ? null : galleryItems[activeIndex];
-  const currentItem = galleryItems[currentIndex];
+
+  function scrollMobileGallery(index: number) {
+    const gallery = mobileGalleryRef.current;
+    if (!gallery) {
+      return;
+    }
+
+    gallery.scrollTo({
+      left: gallery.clientWidth * index,
+      behavior: "smooth"
+    });
+  }
 
   function showPrevious() {
-    setCurrentIndex((index) => previousIndex(index));
+    const index = previousIndex(currentIndex);
+    setCurrentIndex(index);
+    scrollMobileGallery(index);
   }
 
   function showNext() {
-    setCurrentIndex((index) => nextIndex(index));
+    const index = nextIndex(currentIndex);
+    setCurrentIndex(index);
+    scrollMobileGallery(index);
   }
 
   function openLightbox(index: number) {
@@ -95,24 +111,18 @@ export function ShopGallerySection() {
     };
   }, [activeIndex]);
 
-  function handleTouchEnd(position: number) {
-    if (touchStart === null) {
+  function handleMobileGalleryScroll() {
+    const gallery = mobileGalleryRef.current;
+    if (!gallery) {
       return;
     }
 
-    const delta = touchStart - position;
-    setTouchStart(null);
-
-    if (Math.abs(delta) < 36) {
+    const next = Math.round(gallery.scrollLeft / gallery.clientWidth);
+    if (next < 0 || next >= galleryItems.length || next === currentIndex) {
       return;
     }
 
-    if (delta > 0) {
-      showNext();
-      return;
-    }
-
-    showPrevious();
+    setCurrentIndex(next);
   }
 
   function handleLightboxTouchEnd(position: number) {
@@ -174,31 +184,36 @@ export function ShopGallerySection() {
           ))}
         </div>
 
-        <div
-          className="sm:hidden"
-          onTouchStart={(event) => setTouchStart(event.touches[0]?.clientX ?? null)}
-          onTouchEnd={(event) => handleTouchEnd(event.changedTouches[0]?.clientX ?? 0)}
-        >
-          <button
-            type="button"
-            onClick={() => openLightbox(currentIndex)}
-            className="group w-full overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.96),rgba(17,24,39,1))] text-left shadow-[0_18px_58px_rgba(0,0,0,0.24)]"
-            aria-label={`Открыть фото: ${currentItem.caption}`}
+        <div className="sm:hidden">
+          <div
+            ref={mobileGalleryRef}
+            className="photo-snap-scroll -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1"
+            onScroll={handleMobileGalleryScroll}
           >
-            <span className="relative block aspect-[16/10] overflow-hidden bg-[#0B1220]">
-              <Image
-                src={currentItem.src}
-                alt={currentItem.alt}
-                fill
-                sizes="100vw"
-                className="object-cover transition duration-300 group-hover:scale-[1.025]"
-              />
-              <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0B1220]/45 via-transparent to-transparent" />
-            </span>
-            <span className="block px-4 py-3 text-sm font-semibold text-white">
-              {currentItem.caption}
-            </span>
-          </button>
+            {galleryItems.map((item, index) => (
+              <button
+                key={item.src}
+                type="button"
+                onClick={() => openLightbox(index)}
+                className="group min-w-full snap-center overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.96),rgba(17,24,39,1))] text-left shadow-[0_18px_58px_rgba(0,0,0,0.24)]"
+                aria-label={`Открыть фото: ${item.caption}`}
+              >
+                <span className="relative block aspect-[16/10] overflow-hidden bg-[#0B1220]">
+                  <Image
+                    src={item.src}
+                    alt={item.alt}
+                    fill
+                    sizes="100vw"
+                    className="object-cover transition duration-300 group-hover:scale-[1.025]"
+                  />
+                  <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0B1220]/45 via-transparent to-transparent" />
+                </span>
+                <span className="block px-4 py-3 text-sm font-semibold text-white">
+                  {item.caption}
+                </span>
+              </button>
+            ))}
+          </div>
 
           <div className="mt-3 flex items-center justify-between gap-3">
             <button
@@ -214,7 +229,10 @@ export function ShopGallerySection() {
                 <button
                   key={item.src}
                   type="button"
-                  onClick={() => setCurrentIndex(index)}
+                  onClick={() => {
+                    setCurrentIndex(index);
+                    scrollMobileGallery(index);
+                  }}
                   className={[
                     "h-2 rounded-full transition duration-300",
                     index === currentIndex ? "w-5 bg-[#93C5FD]" : "w-2 bg-white/35"

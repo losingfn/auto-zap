@@ -2,6 +2,7 @@ import { siteConfig } from "@/config/site";
 import type { PublicBusinessHour, PublicHomeContent } from "@/features/content/public-home";
 
 const baseUrl = siteConfig.url;
+const yandexProfileUrl = "https://yandex.ru/profile/1112244739?lang=ru";
 
 export function absoluteUrl(path: string) {
   if (path.startsWith("http://") || path.startsWith("https://")) {
@@ -58,7 +59,7 @@ export function buildLocalBusinessJsonLd(content: PublicHomeContent) {
       longitude: content.contact.longitude
     },
     openingHoursSpecification: content.workingHours.map(toOpeningHoursSpecification),
-    sameAs: [content.contact.yandexMapsUrl]
+    sameAs: [yandexProfileUrl]
   };
 }
 

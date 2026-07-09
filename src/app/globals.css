@@ -37,6 +37,27 @@ select {
   font: inherit;
 }
 
+a,
+button,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.photo-snap-scroll,
+.reviews-carousel {
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.photo-snap-scroll::-webkit-scrollbar,
+.reviews-carousel::-webkit-scrollbar {
+  display: none;
+}
+
 .premium-page {
   position: relative;
   overflow: hidden;
@@ -138,6 +159,20 @@ select {
   }
 }
 
+@media (hover: none) and (pointer: coarse) {
+  a,
+  button,
+  [role="button"] {
+    transition-duration: 160ms;
+  }
+
+  a:active,
+  button:active,
+  [role="button"]:active {
+    transform: scale(0.98);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -150,5 +185,11 @@ select {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+
+  a:active,
+  button:active,
+  [role="button"]:active {
+    transform: none !important;
   }
 }

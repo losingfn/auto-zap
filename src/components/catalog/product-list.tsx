@@ -33,7 +33,7 @@ export function ProductList({
             placeholder="Искать в этой подкатегории"
             className="min-h-12 rounded-card border border-white/10 bg-[#0B1220] px-4 text-base text-white outline-none transition placeholder:text-[#9CA3AF] focus:border-[#2563EB]"
           />
-          <button className="min-h-12 rounded-card bg-[#2563EB] px-5 font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] transition duration-300 hover:-translate-y-0.5 hover:bg-[#1D4ED8]">
+          <button className="tap-target min-h-12 rounded-card bg-[#2563EB] px-5 font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8]">
             Найти
           </button>
         </form>
@@ -59,7 +59,7 @@ export function ProductList({
               <Link
                 key={product.id}
                 href={`/catalog/${categorySlug}/${subcategorySlug}/${product.slug}`}
-                className="grid gap-2 p-4 transition duration-300 hover:bg-[#2563EB]/10 sm:grid-cols-[1fr_auto]"
+                className="tap-target grid gap-2 p-4 hover:bg-[#2563EB]/10 sm:grid-cols-[1fr_auto]"
               >
                 <h2 className="text-base font-semibold leading-6">{product.name}</h2>
                 <div className="text-lg font-semibold text-white">
@@ -159,7 +159,7 @@ function PageLink({
     <Link
       href={href}
       className={[
-        "inline-flex h-10 items-center justify-center rounded-card border px-4 text-sm font-semibold shadow-[0_12px_34px_rgba(0,0,0,0.18)] transition duration-300 hover:-translate-y-0.5",
+        "tap-target inline-flex h-10 items-center justify-center rounded-card border px-4 text-sm font-semibold shadow-[0_12px_34px_rgba(0,0,0,0.18)] hover:-translate-y-0.5",
         isActive
           ? "border-[#2563EB] bg-[#2563EB] text-white"
           : "border-white/10 bg-[#111827] text-white hover:border-[#2563EB]/70 hover:bg-[#2563EB]/15"

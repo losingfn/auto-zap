@@ -55,8 +55,13 @@ export function ShopGallerySection() {
       return;
     }
 
+    const slide = gallery.children.item(index) as HTMLElement | null;
+    if (!slide) {
+      return;
+    }
+
     gallery.scrollTo({
-      left: gallery.clientWidth * index,
+      left: slide.offsetLeft - gallery.offsetLeft,
       behavior: "smooth"
     });
   }
@@ -157,13 +162,13 @@ export function ShopGallerySection() {
           </p>
         </div>
 
-        <div className="hidden gap-4 sm:grid sm:grid-cols-2 lg:grid-cols-3">
+        <div className="hidden gap-4 lg:grid lg:grid-cols-3">
           {galleryItems.map((item, index) => (
             <button
               key={item.src}
               type="button"
               onClick={() => openLightbox(index)}
-              className="scroll-reveal stagger-card group overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.96),rgba(17,24,39,1))] text-left shadow-[0_18px_58px_rgba(0,0,0,0.24)] transition duration-300 hover:-translate-y-1 hover:border-[#2563EB]/55 hover:shadow-[0_24px_74px_rgba(0,0,0,0.3)]"
+              className="tap-target photo-tap-target scroll-reveal stagger-card group overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.96),rgba(17,24,39,1))] text-left shadow-[0_18px_58px_rgba(0,0,0,0.24)] hover:-translate-y-1 hover:border-[#2563EB]/55 hover:shadow-[0_24px_74px_rgba(0,0,0,0.3)]"
               style={{ "--stagger": `${index * 55}ms` } as CSSProperties}
               aria-label={`Открыть фото: ${item.caption}`}
             >
@@ -184,10 +189,10 @@ export function ShopGallerySection() {
           ))}
         </div>
 
-        <div className="sm:hidden">
+        <div className="lg:hidden">
           <div
             ref={mobileGalleryRef}
-            className="photo-snap-scroll -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1"
+            className="photo-snap-scroll -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6"
             onScroll={handleMobileGalleryScroll}
           >
             {galleryItems.map((item, index) => (
@@ -195,7 +200,7 @@ export function ShopGallerySection() {
                 key={item.src}
                 type="button"
                 onClick={() => openLightbox(index)}
-                className="group min-w-full snap-center overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.96),rgba(17,24,39,1))] text-left shadow-[0_18px_58px_rgba(0,0,0,0.24)]"
+                className="tap-target photo-tap-target group min-w-full snap-center overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.96),rgba(17,24,39,1))] text-left shadow-[0_18px_58px_rgba(0,0,0,0.24)]"
                 aria-label={`Открыть фото: ${item.caption}`}
               >
                 <span className="relative block aspect-[16/10] overflow-hidden bg-[#0B1220]">
@@ -219,7 +224,7 @@ export function ShopGallerySection() {
             <button
               type="button"
               onClick={showPrevious}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-card border border-white/10 bg-white/[0.06] text-[#DBEAFE] transition duration-300 hover:border-[#93C5FD] hover:bg-white/[0.1]"
+              className="tap-target inline-flex h-11 w-11 items-center justify-center rounded-card border border-white/10 bg-white/[0.06] text-[#DBEAFE] hover:border-[#93C5FD] hover:bg-white/[0.1]"
               aria-label="Предыдущее фото"
             >
               <ChevronLeftIcon className="h-5 w-5" />
@@ -234,7 +239,7 @@ export function ShopGallerySection() {
                     scrollMobileGallery(index);
                   }}
                   className={[
-                    "h-2 rounded-full transition duration-300",
+                    "tap-target h-2 rounded-full",
                     index === currentIndex ? "w-5 bg-[#93C5FD]" : "w-2 bg-white/35"
                   ].join(" ")}
                   aria-label={`Показать фото ${index + 1}`}
@@ -244,7 +249,7 @@ export function ShopGallerySection() {
             <button
               type="button"
               onClick={showNext}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-card border border-white/10 bg-white/[0.06] text-[#DBEAFE] transition duration-300 hover:border-[#93C5FD] hover:bg-white/[0.1]"
+              className="tap-target inline-flex h-11 w-11 items-center justify-center rounded-card border border-white/10 bg-white/[0.06] text-[#DBEAFE] hover:border-[#93C5FD] hover:bg-white/[0.1]"
               aria-label="Следующее фото"
             >
               <ChevronRightIcon className="h-5 w-5" />
@@ -265,7 +270,7 @@ export function ShopGallerySection() {
         >
           <button
             type="button"
-            className="absolute right-4 top-4 z-10 inline-flex h-11 w-11 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white transition hover:bg-white/15"
+            className="tap-target absolute right-4 top-4 z-10 inline-flex h-11 w-11 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white hover:bg-white/15"
             onClick={() => setActiveIndex(null)}
             aria-label="Закрыть"
           >
@@ -273,7 +278,7 @@ export function ShopGallerySection() {
           </button>
           <button
             type="button"
-            className="absolute left-3 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white transition hover:bg-white/15 sm:left-4 sm:h-12 sm:w-12"
+            className="tap-target absolute left-3 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white hover:bg-white/15 sm:left-4 sm:h-12 sm:w-12"
             onClick={(event) => {
               event.stopPropagation();
               showPreviousInLightbox();
@@ -284,7 +289,7 @@ export function ShopGallerySection() {
           </button>
           <button
             type="button"
-            className="absolute right-3 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white transition hover:bg-white/15 sm:right-4 sm:h-12 sm:w-12"
+            className="tap-target absolute right-3 top-1/2 z-10 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white hover:bg-white/15 sm:right-4 sm:h-12 sm:w-12"
             onClick={(event) => {
               event.stopPropagation();
               showNextInLightbox();
@@ -294,6 +299,7 @@ export function ShopGallerySection() {
             <ChevronRightIcon className="h-6 w-6" />
           </button>
           <figure
+            key={activeItem.src}
             className="w-full max-w-5xl animate-[content-rise_0.24s_ease-out] overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_28px_90px_rgba(0,0,0,0.46)]"
             onClick={(event) => event.stopPropagation()}
           >

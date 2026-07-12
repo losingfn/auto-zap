@@ -10,7 +10,7 @@ export function HomeCategoryGrid({ categories }: { categories: PublicCategory[] 
         <Link
           key={category.slug}
           href={`/catalog/${category.slug}`}
-          className="scroll-reveal stagger-card group relative isolate flex min-h-[186px] flex-col overflow-hidden rounded-[8px] border border-[#273142]/90 bg-[linear-gradient(180deg,#171B26_0%,#111721_58%,#0E141D_100%)] px-3 pb-4 pt-4 shadow-[0_22px_70px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.045),inset_0_-1px_0_rgba(0,0,0,0.28)] transition duration-500 hover:-translate-y-2 hover:border-[#365A91] hover:bg-[linear-gradient(180deg,#192131_0%,#111924_58%,#0D131C_100%)] hover:shadow-[0_34px_100px_rgba(0,0,0,0.48),0_0_46px_rgba(37,99,235,0.2),inset_0_1px_0_rgba(255,255,255,0.075)] sm:min-h-[300px] sm:px-5 sm:pb-7 sm:pt-8 lg:min-h-[388px] lg:px-7 lg:pb-10 lg:pt-11"
+          className="tap-target scroll-reveal stagger-card group relative isolate flex min-h-[186px] flex-col overflow-hidden rounded-[8px] border border-[#273142]/90 bg-[linear-gradient(180deg,#171B26_0%,#111721_58%,#0E141D_100%)] px-3 pb-4 pt-4 shadow-[0_22px_70px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.045),inset_0_-1px_0_rgba(0,0,0,0.28)] transition duration-500 hover:-translate-y-2 hover:border-[#365A91] hover:bg-[linear-gradient(180deg,#192131_0%,#111924_58%,#0D131C_100%)] hover:shadow-[0_34px_100px_rgba(0,0,0,0.48),0_0_46px_rgba(37,99,235,0.2),inset_0_1px_0_rgba(255,255,255,0.075)] sm:min-h-[300px] sm:px-5 sm:pb-7 sm:pt-8 lg:min-h-[388px] lg:px-7 lg:pb-10 lg:pt-11"
           style={{ "--stagger": `${index * 60}ms` } as CSSProperties}
         >
           <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/[0.07]" />

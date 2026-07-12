@@ -23,7 +23,8 @@ declare global {
   }
 }
 
-const YANDEX_PROFILE_URL = "https://yandex.ru/profile/1112244739?lang=ru";
+const YANDEX_ORGANIZATION_URL = "https://yandex.ru/maps/org/avtomagazin/1112244739/";
+const YANDEX_ROUTE_URL = "https://yandex.ru/maps/10757/taldom/?mode=routes&rtext=~%D0%9C%D0%BE%D1%81%D0%BA%D0%BE%D0%B2%D1%81%D0%BA%D0%B0%D1%8F%20%D0%BE%D0%B1%D0%BB%D0%B0%D1%81%D1%82%D1%8C%2C%20%D0%A2%D0%B0%D0%BB%D0%B4%D0%BE%D0%BC%2C%20%D1%83%D0%BB%D0%B8%D1%86%D0%B0%20%D0%A1%D0%B0%D0%BB%D1%82%D1%8B%D0%BA%D0%BE%D0%B2%D0%B0-%D0%A9%D0%B5%D0%B4%D1%80%D0%B8%D0%BD%D0%B0%2C%2019&rtt=auto";
 
 interface YandexMapInstance {
   geoObjects: {
@@ -165,18 +166,18 @@ function MapActions({
   return (
     <div className="relative z-10 grid gap-3 border-t border-white/10 bg-[#0B1220] p-4 sm:grid-cols-2">
       <a
-        href={YANDEX_PROFILE_URL}
+        href={YANDEX_ROUTE_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="relative z-10 rounded-card border border-[#2563EB]/[0.55] px-4 py-3 text-center text-sm font-semibold text-white transition duration-300 hover:border-[#93C5FD] hover:bg-[#1A2740]"
+        className="tap-target relative z-10 rounded-card border border-[#2563EB]/[0.55] px-4 py-3 text-center text-sm font-semibold text-white hover:border-[#93C5FD] hover:bg-[#1A2740]"
       >
         Как добраться
       </a>
       <a
-        href={contact.yandexMapsUrl || YANDEX_PROFILE_URL}
+        href={contact.yandexMapsUrl || YANDEX_ORGANIZATION_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="relative z-10 rounded-card bg-[#2563EB] px-4 py-3 text-center text-sm font-semibold text-white shadow-[0_0_30px_rgba(37,99,235,0.32)] transition duration-300 hover:bg-[#1D4ED8]"
+        className="tap-target relative z-10 rounded-card bg-[#2563EB] px-4 py-3 text-center text-sm font-semibold text-white shadow-[0_0_30px_rgba(37,99,235,0.32)] hover:bg-[#1D4ED8]"
       >
         Открыть в Яндекс Картах
       </a>

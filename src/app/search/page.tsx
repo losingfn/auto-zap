@@ -54,7 +54,7 @@ export default async function SearchPage({
                   <Link
                     key={product.id}
                     href={product.url}
-                    className="grid gap-2 p-4 transition duration-300 hover:bg-[#2563EB]/10 sm:grid-cols-[1fr_auto]"
+                    className="tap-target grid gap-2 p-4 hover:bg-[#2563EB]/10 sm:grid-cols-[1fr_auto]"
                   >
                     <div>
                       <h2 className="text-base font-semibold leading-6">{product.name}</h2>

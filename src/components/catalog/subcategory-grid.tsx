@@ -15,7 +15,7 @@ export function SubcategoryGrid({
         <Link
           key={subcategory.slug}
           href={`/catalog/${categorySlug}/${subcategory.slug}`}
-          className="scroll-reveal stagger-card group rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.94),rgba(17,24,39,0.98))] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.2)] transition duration-300 hover:-translate-y-1 hover:border-[#2563EB]/70 hover:shadow-[0_24px_80px_rgba(37,99,235,0.18)]"
+          className="tap-target scroll-reveal stagger-card group rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.94),rgba(17,24,39,0.98))] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.2)] transition duration-300 hover:-translate-y-1 hover:border-[#2563EB]/70 hover:shadow-[0_24px_80px_rgba(37,99,235,0.18)]"
           style={{ "--stagger": `${index * 50}ms` } as CSSProperties}
         >
           <span className="mb-4 block h-1 w-10 rounded-full bg-[#2563EB]" />

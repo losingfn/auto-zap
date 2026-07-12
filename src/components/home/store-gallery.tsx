@@ -105,7 +105,7 @@ export function StoreGallery({
     >
       <button
         type="button"
-        className="fixed right-4 top-4 z-[1001] inline-flex h-11 w-11 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white transition hover:bg-white/15"
+        className="tap-target fixed right-4 top-4 z-[1001] inline-flex h-11 w-11 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white hover:bg-white/15"
         onClick={closeLightbox}
         aria-label="Закрыть"
       >
@@ -113,7 +113,7 @@ export function StoreGallery({
       </button>
       <button
         type="button"
-        className="fixed left-3 top-1/2 z-[1001] inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white transition hover:bg-white/15 sm:left-4 sm:h-12 sm:w-12"
+        className="tap-target fixed left-3 top-1/2 z-[1001] inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white hover:bg-white/15 sm:left-4 sm:h-12 sm:w-12"
         onClick={(event) => {
           event.stopPropagation();
           showPrevious();
@@ -124,7 +124,7 @@ export function StoreGallery({
       </button>
       <button
         type="button"
-        className="fixed right-3 top-1/2 z-[1001] inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white transition hover:bg-white/15 sm:right-4 sm:h-12 sm:w-12"
+        className="tap-target fixed right-3 top-1/2 z-[1001] inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white hover:bg-white/15 sm:right-4 sm:h-12 sm:w-12"
         onClick={(event) => {
           event.stopPropagation();
           showNext();
@@ -134,6 +134,7 @@ export function StoreGallery({
         <ChevronRightIcon className="h-6 w-6" />
       </button>
       <figure
+        key={activePhoto.src}
         className="w-[min(92vw,1100px)] animate-[content-rise_0.24s_ease-out] overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_28px_90px_rgba(0,0,0,0.46)]"
         onClick={(event) => event.stopPropagation()}
       >
@@ -152,14 +153,14 @@ export function StoreGallery({
 
   return (
     <>
-      <div className="photo-snap-scroll -mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0">
+      <div className="grid gap-3 sm:grid-cols-2">
         {visiblePhotos.map((photo, index) => (
           <button
             key={photo.src}
             type="button"
             onClick={() => setActiveIndex(index)}
             className={[
-              "scroll-reveal stagger-card group relative min-h-52 min-w-full snap-center overflow-hidden rounded-card border border-white/10 bg-[#111827] text-left shadow-[0_22px_70px_rgba(0,0,0,0.28)] transition duration-300 hover:-translate-y-1 hover:border-[#2563EB]/55 sm:min-w-0",
+              "tap-target photo-tap-target scroll-reveal stagger-card group relative min-h-52 overflow-hidden rounded-card border border-white/10 bg-[#111827] text-left shadow-[0_22px_70px_rgba(0,0,0,0.28)] hover:-translate-y-1 hover:border-[#2563EB]/55",
               visiblePhotos.length === 1 ? "sm:min-h-72" : "sm:min-h-64 lg:min-h-56 xl:min-h-64"
             ].join(" ")}
             style={{ "--stagger": `${index * 80}ms` } as CSSProperties}

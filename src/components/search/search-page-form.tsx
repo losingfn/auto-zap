@@ -52,14 +52,14 @@ export function SearchPageForm({ initialQuery }: { initialQuery: string }) {
           <button
             type="button"
             onClick={clearSearch}
-            className="absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-card text-[#CBD5E1] transition duration-200 hover:bg-white/10 hover:text-white"
+            className="tap-target absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-card text-[#CBD5E1] hover:bg-white/10 hover:text-white"
             aria-label="Очистить поиск"
           >
             <XIcon className="h-4 w-4" />
           </button>
         ) : null}
       </div>
-      <button className="min-h-12 rounded-card bg-[#2563EB] px-5 font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] transition duration-300 hover:-translate-y-0.5 hover:bg-[#1D4ED8]">
+      <button className="tap-target min-h-12 rounded-card bg-[#2563EB] px-5 font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8]">
         Найти
       </button>
     </form>

@@ -44,6 +44,52 @@ button,
   touch-action: manipulation;
 }
 
+.tap-target {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.tap-target:active {
+  transform: scale(0.985);
+  border-color: rgba(147, 197, 253, 0.78);
+  background-color: rgba(37, 99, 235, 0.13);
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .tap-target {
+    transition:
+      transform 140ms ease,
+      border-color 140ms ease,
+      background-color 140ms ease,
+      box-shadow 140ms ease !important;
+  }
+}
+
+.photo-tap-target {
+  position: relative;
+  isolation: isolate;
+}
+
+.photo-tap-target::after {
+  pointer-events: none;
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: rgba(147, 197, 253, 0.1);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.photo-tap-target:active::after {
+  opacity: 1;
+}
+
 .photo-snap-scroll,
 .reviews-carousel {
   scroll-behavior: smooth;
@@ -51,6 +97,11 @@ button,
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
+}
+
+.photo-snap-scroll > *,
+.reviews-carousel > * {
+  scroll-snap-stop: always;
 }
 
 .photo-snap-scroll::-webkit-scrollbar,
@@ -159,20 +210,6 @@ button,
   }
 }
 
-@media (hover: none) and (pointer: coarse) {
-  a,
-  button,
-  [role="button"] {
-    transition-duration: 160ms;
-  }
-
-  a:active,
-  button:active,
-  [role="button"]:active {
-    transform: scale(0.98);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -187,9 +224,11 @@ button,
     transition-duration: 0.01ms !important;
   }
 
-  a:active,
-  button:active,
-  [role="button"]:active {
+  .tap-target:active {
     transform: none !important;
+  }
+
+  .photo-tap-target::after {
+    transition: none !important;
   }
 }

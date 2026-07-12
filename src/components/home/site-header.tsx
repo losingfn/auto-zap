@@ -36,7 +36,7 @@ export function SiteHeader({
 
           <nav className="hidden items-center gap-2 rounded-card border border-white/10 bg-[#111827]/[0.58] p-1 text-sm font-medium text-[#D6DEE9] shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-md lg:flex">
             {navigationItems.map((item) => (
-              <Link key={item.href} href={item.href} className="transition hover:text-white">
+              <Link key={item.href} href={item.href} className="tap-target transition hover:text-white">
                 <span className="block whitespace-nowrap rounded-card px-3 py-2 transition hover:bg-white/10">
                   {item.label}
                 </span>
@@ -51,7 +51,7 @@ export function SiteHeader({
               key={item.href}
               href={item.href}
               className={[
-                "flex min-h-9 min-w-0 items-center justify-center whitespace-nowrap rounded-card border border-white/10 bg-white/[0.06] px-1.5 py-2 leading-5 transition hover:border-[#2563EB]/60 hover:bg-white/[0.1] hover:text-white sm:col-span-1 sm:px-2.5",
+                "tap-target flex min-h-9 min-w-0 items-center justify-center whitespace-nowrap rounded-card border border-white/10 bg-white/[0.06] px-1.5 py-2 leading-5 hover:border-[#2563EB]/60 hover:bg-white/[0.1] hover:text-white sm:col-span-1 sm:px-2.5",
                 index < 3 ? "col-span-2" : "col-span-3"
               ].join(" ")}
             >

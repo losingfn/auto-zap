@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Автозапчасти Талдом">
+  <rect width="512" height="512" rx="96" fill="#07111F"/>
+  <circle cx="256" cy="256" r="178" fill="none" stroke="#2563EB" stroke-width="46"/>
+  <circle cx="256" cy="256" r="122" fill="none" stroke="#FFFFFF" stroke-width="30" stroke-dasharray="120 42" stroke-linecap="round" transform="rotate(-90 256 256)"/>
+  <path d="M256 142 L352 372 H300 L283 326 H229 L212 372 H160 L256 142 Z M244 283 H268 L256 217 L244 283 Z" fill="#FFFFFF"/>
+</svg>

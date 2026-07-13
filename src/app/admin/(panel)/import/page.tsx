@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getAdminImportPageData, type StoredImportReport } from "@/features/admin/imports";
 import { cancelImportAction, publishImportAction, uploadImportAction } from "./actions";
+import { ImportUploadForm } from "./import-upload-form";
 
 export const metadata: Metadata = {
   title: "Импорт Excel"
@@ -23,6 +24,7 @@ const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
   timeStyle: "short",
   timeZone: "Europe/Moscow"
 });
+const importFormId = "admin-import-upload-form";
 
 const statusLabels: Record<string, string> = {
   uploaded: "Загружен",
@@ -42,20 +44,34 @@ const errorMessages: Record<string, string> = {
   file_too_large: "Файл слишком большой. Максимальный размер — 25 МБ.",
   invalid_extension: "Загрузить можно только .xls или .xlsx.",
   invalid_type: "Тип файла не похож на Excel-документ.",
-  analysis_failed: "Не удалось проанализировать Excel-файл.",
+  analysis_failed: "Не удалось прочитать Excel-файл или подготовить отчёт импорта.",
   publish_failed: "Не удалось опубликовать импорт.",
   cancel_failed: "Не удалось отменить импорт.",
   not_found: "Черновик импорта не найден.",
   not_ready: "Перед публикацией нужен предварительный отчёт.",
-  already_finalized: "Этот импорт уже опубликован или отменён."
+  already_finalized: "Этот импорт уже опубликован или отменён.",
+  upload_failed: "Ошибка загрузки файла. Попробуйте повторить загрузку.",
+  server_error: "Серверная ошибка. Попробуйте повторить действие позже.",
+  unexpected_response: "Неожиданный ответ сервера. Обновите страницу и попробуйте ещё раз."
 };
+
+const uploadErrorCodes = new Set([
+  "missing_file",
+  "empty_file",
+  "file_too_large",
+  "invalid_extension",
+  "invalid_type",
+  "analysis_failed",
+  "upload_failed",
+  "server_error",
+  "unexpected_response"
+]);
 
 const metricDescriptions = {
   addedCount: "Новые артикулы, которых не было в текущем каталоге.",
   updatedCount: "Товары с существующим артикулом и изменёнными данными.",
   archivedCount: "Активные товары, отсутствующие в новом прайсе. Они не удалены окончательно.",
-  reviewRows:
-    "Система не смогла определить категорию или обнаружила проблему в данных.",
+  reviewRows: "Система не смогла определить категорию или обнаружила проблему в данных.",
   errorRows: "Строки, которые не удалось корректно обработать.",
   skippedRows: "Служебные или неподходящие строки, которые не участвуют в импорте.",
   totalRows: "Все строки выбранного листа, которые прошли предварительный анализ.",
@@ -70,6 +86,10 @@ export default async function AdminImportPage({ searchParams }: ImportPageProps)
   const params = await searchParams;
   const data = await getAdminImportPageData(params.batch);
   const report = data.selected?.report ?? null;
+  const uploadErrorMessage =
+    params.error && uploadErrorCodes.has(params.error)
+      ? errorMessages[params.error] ?? errorMessages.unexpected_response
+      : null;
 
   return (
     <div>
@@ -86,34 +106,18 @@ export default async function AdminImportPage({ searchParams }: ImportPageProps)
         </div>
       </div>
 
-      {params.error ? (
+      {params.error && !uploadErrorMessage ? (
         <Notice tone="danger">{errorMessages[params.error] ?? errorMessages.analysis_failed}</Notice>
       ) : null}
       {params.uploaded ? <Notice>Файл загружен, draft-версия и отчёт созданы.</Notice> : null}
       {params.published ? <Notice>Изменения опубликованы, поисковый индекс пересобран.</Notice> : null}
       {params.cancelled ? <Notice>Импорт отменён, draft-версия снята с публикации.</Notice> : null}
 
-      <section id="new-import" className="rounded-card border border-[#243249] bg-[#101827] p-5">
-        <h2 className="text-lg font-semibold">Новый импорт</h2>
-        <form action={uploadImportAction} className="mt-5 grid gap-4 lg:grid-cols-[1fr_auto]">
-          <input
-            type="file"
-            name="file"
-            accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            required
-            className="min-h-12 rounded-card border border-[#2E3A4C] bg-[#0B1220] px-4 py-3 text-sm text-[#C8D1DF] file:mr-4 file:rounded-card file:border-0 file:bg-[#243249] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[#30425F]"
-          />
-          <button
-            type="submit"
-            className="inline-flex h-12 items-center justify-center rounded-card bg-[#73A0F5] px-5 text-sm font-semibold text-[#07101F] transition hover:bg-[#9DBDFB]"
-          >
-            Загрузить и проверить
-          </button>
-        </form>
-        <p className="mt-3 text-sm text-[#8FA1B8]">
-          Проверяются расширение, MIME-тип и размер файла. Максимум — 25 МБ.
-        </p>
-      </section>
+      <ImportUploadForm
+        action={uploadImportAction}
+        formId={importFormId}
+        initialErrorMessage={uploadErrorMessage}
+      />
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[1fr_320px]">
         <section className="space-y-6">
@@ -191,7 +195,9 @@ function ImportHeader({ batch }: { batch: SelectedImportBatch }) {
         </div>
         <div className="flex flex-wrap gap-2 lg:justify-end">
           <Badge>{statusLabels[batch.status] ?? batch.status}</Badge>
-          {batch.versionStatus ? <Badge>{statusLabels[batch.versionStatus] ?? batch.versionStatus}</Badge> : null}
+          {batch.versionStatus ? (
+            <Badge>{statusLabels[batch.versionStatus] ?? batch.versionStatus}</Badge>
+          ) : null}
         </div>
       </div>
     </section>
@@ -209,7 +215,7 @@ function ImportResultSummary({
 
   return (
     <section className="rounded-card border border-[#243249] bg-[#101827]">
-      <div className="border-b border-[#243249] px-5 py-4">
+      <div className="border-b border-[#243249] px-4 py-4 sm:px-5">
         <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#9DBDFB]">
           Импорт проанализирован
         </p>
@@ -219,7 +225,7 @@ function ImportResultSummary({
         </p>
       </div>
 
-      <div className="space-y-5 p-5">
+      <div className="space-y-5 p-4 sm:p-5">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             description={metricDescriptions.addedCount}
@@ -316,7 +322,7 @@ function ResultActions() {
     <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
       <ActionLink href="/admin/review">Перейти к проверке товаров</ActionLink>
       <ActionLink href="/admin/catalog">Открыть каталог</ActionLink>
-      <ActionLink href="/admin/import#new-import">Загрузить другой файл</ActionLink>
+      <ResetFormButton />
     </div>
   );
 }
@@ -329,6 +335,18 @@ function ActionLink({ href, children }: { href: string; children: React.ReactNod
     >
       {children}
     </Link>
+  );
+}
+
+function ResetFormButton() {
+  return (
+    <button
+      type="reset"
+      form={importFormId}
+      className="inline-flex min-h-11 items-center justify-center rounded-card border border-[#4169A8] px-5 text-sm font-semibold text-white transition hover:border-[#73A0F5] hover:bg-[#1A2740] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#93C5FD] active:translate-y-px"
+    >
+      Загрузить другой файл
+    </button>
   );
 }
 
@@ -352,19 +370,23 @@ function TechnicalDetails({
         {hasErrors ? (
           <RowErrors errors={errors} totalErrors={report.errorRows} />
         ) : (
-          <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4 text-sm text-[#C8D1DF]">
-            Ошибок в строках не найдено.
-          </div>
+          <TechnicalEmptyState>Ошибок в строках не найдено.</TechnicalEmptyState>
         )}
         {hasReviewExamples ? (
           <ReviewExamples report={report} />
         ) : (
-          <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4 text-sm text-[#C8D1DF]">
-            Нет примеров строк, требующих ручной проверки.
-          </div>
+          <TechnicalEmptyState>Нет примеров строк, требующих ручной проверки.</TechnicalEmptyState>
         )}
       </div>
     </details>
+  );
+}
+
+function TechnicalEmptyState({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4 text-sm text-[#C8D1DF]">
+      {children}
+    </div>
   );
 }
 
@@ -433,7 +455,9 @@ function SheetSummary({ report }: { report: StoredImportReport }) {
               <tr key={sheet.name}>
                 <td className="px-5 py-3 font-medium">{sheet.name}</td>
                 <td className="px-5 py-3 text-[#C8D1DF]">{sheet.range ?? "пусто"}</td>
-                <td className="px-5 py-3 text-[#C8D1DF]">{numberFormatter.format(sheet.rowCount)}</td>
+                <td className="px-5 py-3 text-[#C8D1DF]">
+                  {numberFormatter.format(sheet.rowCount)}
+                </td>
                 <td className="px-5 py-3 text-[#C8D1DF]">
                   {formatColumn(sheet.detectedColumns.rawNameColumn)}
                 </td>
@@ -497,14 +521,20 @@ function RowErrors({
 function ReviewExamples({ report }: { report: StoredImportReport }) {
   return (
     <section className="rounded-card border border-[#243249] bg-[#101827] p-5">
-      <h2 className="text-lg font-semibold">Требует проверки</h2>
+      <h2 className="text-lg font-semibold">Примеры строк, требующих проверки</h2>
       {report.examples.needsReview.length > 0 ? (
         <div className="mt-4 space-y-3">
           {report.examples.needsReview.map((row) => (
-            <div key={`${row.sheetName}-${row.rowNumber}`} className="rounded-card border border-[#243249] bg-[#0B1220] p-4">
-              <p className="text-sm font-semibold">Строка {row.rowNumber}: {row.rawName}</p>
+            <div
+              key={`${row.sheetName}-${row.rowNumber}`}
+              className="rounded-card border border-[#243249] bg-[#0B1220] p-4"
+            >
+              <p className="text-sm font-semibold">
+                Строка {row.rowNumber}: {row.rawName}
+              </p>
               <p className="mt-1 text-sm text-[#8FA1B8]">
-                {row.issues.map((issue) => issue.message).join("; ") || "Требуется ручная категоризация."}
+                {row.issues.map((issue) => issue.message).join("; ") ||
+                  "Требуется ручная категоризация."}
               </p>
             </div>
           ))}
@@ -543,17 +573,37 @@ function StatCard({
   );
 }
 
-function Notice({ children, tone = "success" }: { children: React.ReactNode; tone?: "success" | "danger" }) {
+function InlineNotice({
+  children,
+  tone = "success"
+}: {
+  children: React.ReactNode;
+  tone?: "success" | "danger" | "warning";
+}) {
+  const toneClass =
+    tone === "danger"
+      ? "border-[#7F1D1D] bg-[#2A1218] text-[#FECACA]"
+      : tone === "warning"
+        ? "border-[#854D0E] bg-[#2A2113] text-[#FDE68A]"
+        : "border-[#1D4E89] bg-[#10233D] text-[#BFDBFE]";
+
   return (
-    <div
-      className={[
-        "mb-5 rounded-card border px-4 py-3 text-sm",
-        tone === "danger"
-          ? "border-[#7F1D1D] bg-[#2A1218] text-[#FECACA]"
-          : "border-[#1D4E89] bg-[#10233D] text-[#BFDBFE]"
-      ].join(" ")}
-    >
+    <div className={`rounded-card border px-4 py-3 text-sm leading-6 ${toneClass}`}>
       {children}
+    </div>
+  );
+}
+
+function Notice({
+  children,
+  tone = "success"
+}: {
+  children: React.ReactNode;
+  tone?: "success" | "danger";
+}) {
+  return (
+    <div className="mb-5">
+      <InlineNotice tone={tone}>{children}</InlineNotice>
     </div>
   );
 }

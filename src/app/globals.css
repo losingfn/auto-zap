@@ -37,6 +37,20 @@ select {
   font: inherit;
 }
 
+input[type="search"] {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-results-button,
+input[type="search"]::-webkit-search-results-decoration {
+  display: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
 a,
 button,
 [role="button"] {
@@ -58,6 +72,11 @@ button,
   transform: scale(0.985);
   border-color: rgba(147, 197, 253, 0.78);
   background-color: rgba(37, 99, 235, 0.13);
+}
+
+.tap-target:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 3px;
 }
 
 @media (hover: none) and (pointer: coarse) {

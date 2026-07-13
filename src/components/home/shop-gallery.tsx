@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { CSSProperties } from "react";
 import {
   ChevronLeftIcon,
@@ -46,8 +47,13 @@ export function ShopGallerySection() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
   const mobileGalleryRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const restoreFocusRef = useRef(false);
   const activeItem = activeIndex === null ? null : galleryItems[activeIndex];
+  const isLightboxOpen = activeIndex !== null;
 
   function scrollMobileGallery(index: number) {
     const gallery = mobileGalleryRef.current;
@@ -78,8 +84,14 @@ export function ShopGallerySection() {
     scrollMobileGallery(index);
   }
 
-  function openLightbox(index: number) {
+  function openLightbox(index: number, trigger: HTMLButtonElement) {
+    triggerRef.current = trigger;
     setActiveIndex(index);
+  }
+
+  function closeLightbox() {
+    restoreFocusRef.current = true;
+    setActiveIndex(null);
   }
 
   function showPreviousInLightbox() {
@@ -91,30 +103,66 @@ export function ShopGallerySection() {
   }
 
   useEffect(() => {
-    if (activeIndex === null) {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (activeIndex !== null || !restoreFocusRef.current) {
+      return;
+    }
+
+    restoreFocusRef.current = false;
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  }, [activeIndex]);
+
+  useEffect(() => {
+    if (!isLightboxOpen) {
+      return;
+    }
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = "hidden";
+
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    closeButtonRef.current?.focus();
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.paddingRight = previousBodyPaddingRight;
+    };
+  }, [isLightboxOpen]);
+
+  useEffect(() => {
+    if (!isLightboxOpen) {
       return;
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setActiveIndex(null);
+        event.preventDefault();
+        closeLightbox();
       }
       if (event.key === "ArrowLeft") {
+        event.preventDefault();
         showPreviousInLightbox();
       }
       if (event.key === "ArrowRight") {
+        event.preventDefault();
         showNextInLightbox();
       }
     }
 
     document.addEventListener("keydown", handleKeyDown);
-    document.body.style.overflow = "hidden";
 
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "";
     };
-  }, [activeIndex]);
+  }, [isLightboxOpen]);
 
   function handleMobileGalleryScroll() {
     const gallery = mobileGalleryRef.current;
@@ -167,7 +215,7 @@ export function ShopGallerySection() {
             <button
               key={item.src}
               type="button"
-              onClick={() => openLightbox(index)}
+              onClick={(event) => openLightbox(index, event.currentTarget)}
               className="tap-target photo-tap-target scroll-reveal stagger-card group overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.96),rgba(17,24,39,1))] text-left shadow-[0_18px_58px_rgba(0,0,0,0.24)] hover:-translate-y-1 hover:border-[#2563EB]/55 hover:shadow-[0_24px_74px_rgba(0,0,0,0.3)]"
               style={{ "--stagger": `${index * 55}ms` } as CSSProperties}
               aria-label={`Открыть фото: ${item.caption}`}
@@ -199,7 +247,7 @@ export function ShopGallerySection() {
               <button
                 key={item.src}
                 type="button"
-                onClick={() => openLightbox(index)}
+                onClick={(event) => openLightbox(index, event.currentTarget)}
                 className="tap-target photo-tap-target group min-w-full snap-center overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.96),rgba(17,24,39,1))] text-left shadow-[0_18px_58px_rgba(0,0,0,0.24)]"
                 aria-label={`Открыть фото: ${item.caption}`}
               >
@@ -258,20 +306,22 @@ export function ShopGallerySection() {
         </div>
       </div>
 
-      {activeItem ? (
-        <div
-          className="fixed inset-0 z-50 flex animate-[fade-in_0.22s_ease-out] items-center justify-center bg-[#020617]/85 px-4 py-6 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-label={activeItem.caption}
-          onClick={() => setActiveIndex(null)}
-          onTouchStart={(event) => setTouchStart(event.touches[0]?.clientX ?? null)}
-          onTouchEnd={(event) => handleLightboxTouchEnd(event.changedTouches[0]?.clientX ?? 0)}
-        >
+      {isMounted && activeItem
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[9999] flex h-[100dvh] min-h-screen w-screen animate-[fade-in_0.22s_ease-out] items-center justify-center bg-[#020617]/85 px-4 py-6 backdrop-blur-[2px]"
+              role="dialog"
+              aria-modal="true"
+              aria-label={activeItem.caption}
+              onClick={closeLightbox}
+              onTouchStart={(event) => setTouchStart(event.touches[0]?.clientX ?? null)}
+              onTouchEnd={(event) => handleLightboxTouchEnd(event.changedTouches[0]?.clientX ?? 0)}
+            >
           <button
             type="button"
+            ref={closeButtonRef}
             className="tap-target absolute right-4 top-4 z-10 inline-flex h-11 w-11 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white hover:bg-white/15"
-            onClick={() => setActiveIndex(null)}
+            onClick={closeLightbox}
             aria-label="Закрыть"
           >
             <XIcon className="h-5 w-5" />
@@ -316,8 +366,10 @@ export function ShopGallerySection() {
               {activeItem.caption}
             </figcaption>
           </figure>
-        </div>
-      ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
     </section>
   );
 }

@@ -33,13 +33,16 @@ export async function PublicFooter({ content }: { content?: PublicHomeContent })
           <p>{data.contact.email}</p>
         </div>
         <nav className="flex flex-col gap-3 font-medium text-white">
-          <Link href="/#catalog" className="transition hover:text-[#93C5FD]">
+          <Link href="/#catalog" className="tap-target transition hover:text-[#93C5FD]">
             Каталог
           </Link>
-          <Link href="/#contacts" className="transition hover:text-[#93C5FD]">
+          <Link href="/#reviews" className="tap-target transition hover:text-[#93C5FD]">
+            Отзывы
+          </Link>
+          <Link href="/#contacts" className="tap-target transition hover:text-[#93C5FD]">
             Контакты
           </Link>
-          <Link href="/#vacancies" className="transition hover:text-[#93C5FD]">
+          <Link href="/#vacancies" className="tap-target transition hover:text-[#93C5FD]">
             Вакансии
           </Link>
         </nav>

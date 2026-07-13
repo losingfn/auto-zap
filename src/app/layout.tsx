@@ -5,8 +5,8 @@ import { publicAbsoluteUrl } from "@/features/seo/structured-data";
 
 const metadataTitle = "Автозапчасти в Талдоме — Салтыкова-Щедрина";
 const metadataDescription =
-  "Каталог автозапчастей магазина на улице Салтыкова-Щедрина в Талдоме: поиск по товарам, цены, контакты и маршрут.";
-const ogImagePath = "/og-image.png";
+  "Оригинальные и аналоговые автозапчасти в Талдоме. Большой ассортимент, помощь в подборе, честные цены, удобное расположение и реальные отзывы покупателей.";
+const ogImagePath = "/og-image-v3.png";
 
 export const viewport: Viewport = {
   themeColor: "#07111F"
@@ -17,18 +17,18 @@ export async function generateMetadata(): Promise<Metadata> {
   const ogImageUrl = publicAbsoluteUrl(ogImagePath) ?? ogImagePath;
 
   return {
-    metadataBase: siteConfig.url ? new URL(siteConfig.url) : undefined,
+    metadataBase: new URL(siteConfig.url),
     title: {
       default: metadataTitle,
       template: `%s | ${metadataTitle}`
     },
     description: metadataDescription,
-    manifest: "/site.webmanifest",
+    manifest: "/site-v2.webmanifest",
     openGraph: {
       title: metadataTitle,
       description: metadataDescription,
       ...(publicUrl ? { url: publicUrl } : {}),
-      siteName: siteConfig.name,
+      siteName: "Автозапчасти в Талдоме",
       locale: "ru_RU",
       type: "website",
       images: [
@@ -48,13 +48,14 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     icons: {
       icon: [
-        { url: "/favicon.ico" },
-        { url: "/favicon.svg", type: "image/svg+xml" },
-        { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-        { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" }
+        { url: "/favicon-v2.ico" },
+        { url: "/favicon-v2.svg", type: "image/svg+xml" },
+        { url: "/favicon-v2-48x48.png", sizes: "48x48", type: "image/png" },
+        { url: "/favicon-v2-32x32.png", sizes: "32x32", type: "image/png" },
+        { url: "/favicon-v2-16x16.png", sizes: "16x16", type: "image/png" }
       ],
-      apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
-      shortcut: "/favicon.ico"
+      apple: [{ url: "/apple-touch-icon-v2.png", sizes: "180x180", type: "image/png" }],
+      shortcut: "/favicon-v2.ico"
     },
     robots: {
       index: true,

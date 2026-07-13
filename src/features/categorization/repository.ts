@@ -19,7 +19,8 @@ export async function getCategorizationContext(): Promise<CategorizationContext>
       categoryName: categories.name,
       subcategoryId: subcategories.id,
       subcategorySlug: subcategories.slug,
-      subcategoryName: subcategories.name
+      subcategoryName: subcategories.name,
+      createdBy: categorizationRules.createdBy
     })
     .from(categorizationRules)
     .innerJoin(categories, eq(categories.id, categorizationRules.categoryId))
@@ -37,7 +38,8 @@ export async function getCategorizationContext(): Promise<CategorizationContext>
     categoryName: row.categoryName,
     subcategoryId: row.subcategoryId,
     subcategorySlug: row.subcategorySlug,
-    subcategoryName: row.subcategoryName
+    subcategoryName: row.subcategoryName,
+    createdBy: row.createdBy
   }));
 
   const fallbackRows = await db

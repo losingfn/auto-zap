@@ -424,7 +424,19 @@ function toAuditReportSummary(report: StoredImportReport | ImportPreviewReport) 
     errorRows: report.errorRows,
     reviewRows: report.reviewRows,
     totalRows: report.totalRows,
-    selectedSheetName: report.selectedSheetName
+    selectedSheetName: report.selectedSheetName,
+    autoCategorizationPreview: report.autoCategorizationPreview
+      ? {
+          totalProducts: report.autoCategorizationPreview.totalProducts,
+          existingCategoryPreserved:
+            report.autoCategorizationPreview.existingCategoryPreserved,
+          highConfidence: report.autoCategorizationPreview.highConfidence,
+          mediumConfidence: report.autoCategorizationPreview.mediumConfidence,
+          lowConfidence: report.autoCategorizationPreview.lowConfidence,
+          needsReview: report.autoCategorizationPreview.needsReview,
+          automationPotential: report.autoCategorizationPreview.automationPotential
+        }
+      : null
   };
 }
 

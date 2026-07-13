@@ -1,7 +1,12 @@
 import path from "node:path";
-import { buildDefaultCategorizationContext, categorizeProductName } from "../src/features/categorization/engine";
+import {
+  buildDefaultCategorizationContext,
+  categorizeProductName,
+  getCategorizationConfidenceBucket,
+  normalizeForCategorization
+} from "../src/features/categorization/engine";
+import type { CategorizationSource } from "../src/features/categorization/types";
 import { analyzeImportFile } from "../src/features/import/analyze";
-import { normalizeForCategorization } from "../src/features/categorization/engine";
 
 const [, , inputPath] = process.argv;
 
@@ -65,9 +70,14 @@ const analysis = analyzeImportFile(path.resolve(inputPath));
 const prefixes = new Map<string, { count: number; examples: string[] }>();
 const tokens = new Map<string, { count: number; examples: string[] }>();
 const bigrams = new Map<string, { count: number; examples: string[] }>();
+const sources = new Map<CategorizationSource, number>();
 const totalCandidates = {
   matched: 0,
-  needsReview: 0
+  needsReview: 0,
+  highConfidence: 0,
+  mediumConfidence: 0,
+  lowConfidence: 0,
+  existingProductCategory: 0
 };
 
 for (const row of analysis.rows) {
@@ -76,8 +86,25 @@ for (const row of analysis.rows) {
   }
 
   const rawTitle = `${row.shopCode} ${row.name || row.rawName}`;
-  const result = categorizeProductName(rawTitle, context);
-  if (result.target) {
+  const result = categorizeProductName(rawTitle, context, {
+    emptyName: !row.name || row.issues.some((issue) => issue.code === "missing_name")
+  });
+  const bucket = getCategorizationConfidenceBucket(result);
+  sources.set(result.source, (sources.get(result.source) ?? 0) + 1);
+
+  if (bucket === "high") {
+    totalCandidates.highConfidence += 1;
+  } else if (bucket === "medium") {
+    totalCandidates.mediumConfidence += 1;
+  } else {
+    totalCandidates.lowConfidence += 1;
+  }
+
+  if (result.source === "existing_product_category") {
+    totalCandidates.existingProductCategory += 1;
+  }
+
+  if (!result.needsReview) {
     totalCandidates.matched += 1;
     continue;
   }
@@ -106,6 +133,9 @@ const report = {
   selectedSheetName: analysis.report.selectedSheetName,
   rules: context.rules.length,
   ...totalCandidates,
+  sources: [...sources.entries()]
+    .map(([source, count]) => ({ source, count }))
+    .sort((a, b) => b.count - a.count || a.source.localeCompare(b.source)),
   topPrefixes: topEntries(prefixes, 40),
   topTokens: topEntries(tokens, 80),
   topBigrams: topEntries(bigrams, 60)

@@ -1,7 +1,7 @@
 export const siteConfig = {
   name: "Автозапчасти Талдом на Салтыкова-Щедрина",
   shortName: "Автозапчасти",
-  url: process.env.APP_URL?.replace(/\/$/, "") ?? "",
+  url: process.env.APP_URL?.replace(/\/$/, "") || "https://autozapchast-taldom.ru",
   phone: "8-496-206-33-04",
   email: "auto-zapchast.taldom@rambler.ru",
   address: {

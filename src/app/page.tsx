@@ -1,4 +1,5 @@
 import Image from "next/image";
+import type { Metadata } from "next";
 import type { CSSProperties, ReactNode } from "react";
 import { HomeCategoryGrid } from "@/components/home/home-category-grid";
 import { HomeSearch } from "@/components/home/home-search";
@@ -17,10 +18,16 @@ import {
 import { JsonLd } from "@/components/seo/json-ld";
 import { PublicFooter } from "@/components/site/public-footer";
 import { getPublicHomeContent, getStoreWorkStatusFromHours } from "@/features/content/public-home";
-import { buildLocalBusinessJsonLd } from "@/features/seo/structured-data";
+import { buildLocalBusinessJsonLd, publicAbsoluteUrl } from "@/features/seo/structured-data";
 import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
+
+const homeUrl = publicAbsoluteUrl("/");
+
+export const metadata: Metadata = {
+  ...(homeUrl ? { alternates: { canonical: homeUrl } } : {})
+};
 
 const aboutFacts = [
   { value: "30 000+", label: "товаров на складе" },

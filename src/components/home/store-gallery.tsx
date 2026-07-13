@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties } from "react";
 import {
@@ -21,6 +21,9 @@ export function StoreGallery({
   const visiblePhotos = photos.slice(0, 2);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const restoreFocusRef = useRef(false);
   const activePhoto = activeIndex === null ? null : visiblePhotos[activeIndex];
   const isLightboxOpen = activeIndex !== null;
 
@@ -44,7 +47,13 @@ export function StoreGallery({
     });
   }
 
+  function openLightbox(index: number, trigger: HTMLButtonElement) {
+    triggerRef.current = trigger;
+    setActiveIndex(index);
+  }
+
   function closeLightbox() {
+    restoreFocusRef.current = true;
     setActiveIndex(null);
   }
 
@@ -53,18 +62,33 @@ export function StoreGallery({
   }, []);
 
   useEffect(() => {
+    if (activeIndex !== null || !restoreFocusRef.current) {
+      return;
+    }
+
+    restoreFocusRef.current = false;
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  }, [activeIndex]);
+
+  useEffect(() => {
     if (!isLightboxOpen) {
       return;
     }
 
     const previousBodyOverflow = document.body.style.overflow;
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
+    const previousBodyPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
     document.body.style.overflow = "hidden";
+
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    closeButtonRef.current?.focus();
 
     return () => {
       document.body.style.overflow = previousBodyOverflow;
-      window.scrollTo(scrollX, scrollY);
+      document.body.style.paddingRight = previousBodyPaddingRight;
     };
   }, [isLightboxOpen]);
 
@@ -97,7 +121,7 @@ export function StoreGallery({
 
   const lightbox = activePhoto ? (
     <div
-      className="fixed inset-0 z-[999] flex animate-[fade-in_0.22s_ease-out] items-center justify-center bg-[#020617]/85 px-4 py-6 backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex h-[100dvh] min-h-screen w-screen animate-[fade-in_0.22s_ease-out] items-center justify-center bg-[#020617]/85 px-4 py-6 backdrop-blur-[2px]"
       role="dialog"
       aria-modal="true"
       aria-label={activePhoto.alt}
@@ -105,7 +129,8 @@ export function StoreGallery({
     >
       <button
         type="button"
-        className="tap-target fixed right-4 top-4 z-[1001] inline-flex h-11 w-11 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white hover:bg-white/15"
+        ref={closeButtonRef}
+        className="tap-target fixed right-4 top-4 z-[10001] inline-flex h-11 w-11 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white hover:bg-white/15"
         onClick={closeLightbox}
         aria-label="Закрыть"
       >
@@ -113,7 +138,7 @@ export function StoreGallery({
       </button>
       <button
         type="button"
-        className="tap-target fixed left-3 top-1/2 z-[1001] inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white hover:bg-white/15 sm:left-4 sm:h-12 sm:w-12"
+        className="tap-target fixed left-3 top-1/2 z-[10001] inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white hover:bg-white/15 sm:left-4 sm:h-12 sm:w-12"
         onClick={(event) => {
           event.stopPropagation();
           showPrevious();
@@ -124,7 +149,7 @@ export function StoreGallery({
       </button>
       <button
         type="button"
-        className="tap-target fixed right-3 top-1/2 z-[1001] inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white hover:bg-white/15 sm:right-4 sm:h-12 sm:w-12"
+        className="tap-target fixed right-3 top-1/2 z-[10001] inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white hover:bg-white/15 sm:right-4 sm:h-12 sm:w-12"
         onClick={(event) => {
           event.stopPropagation();
           showNext();
@@ -158,7 +183,7 @@ export function StoreGallery({
           <button
             key={photo.src}
             type="button"
-            onClick={() => setActiveIndex(index)}
+            onClick={(event) => openLightbox(index, event.currentTarget)}
             className={[
               "tap-target photo-tap-target scroll-reveal stagger-card group relative min-h-52 overflow-hidden rounded-card border border-white/10 bg-[#111827] text-left shadow-[0_22px_70px_rgba(0,0,0,0.28)] hover:-translate-y-1 hover:border-[#2563EB]/55",
               visiblePhotos.length === 1 ? "sm:min-h-72" : "sm:min-h-64 lg:min-h-56 xl:min-h-64"

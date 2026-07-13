@@ -88,8 +88,27 @@ export type AdminReviewActionFilters = Pick<
   "scope" | "issue" | "query" | "reason" | "group"
 >;
 
+export const REVIEW_BULK_DRAFT_ONLY_MESSAGE =
+  "Массовые действия разрешены только для черновика текущего импорта.";
+export const REVIEW_BULK_COUNT_CONFIRMATION_MESSAGE =
+  "Для массового действия больше 100 товаров нужно ввести точное количество.";
+export const REVIEW_BULK_RULE_BLOCKED_MESSAGE =
+  "Правило не создано: шаблон слишком широкий или опасный. Массовое действие не выполнено.";
+
+export class AdminReviewBulkSafetyError extends Error {
+  constructor(
+    readonly code: "scope_forbidden" | "count_confirmation_required" | "rule_blocked",
+    message: string,
+    readonly ruleSkippedReason?: string
+  ) {
+    super(message);
+    this.name = "AdminReviewBulkSafetyError";
+  }
+}
+
 const OTHER_GROUP_KEY = "other";
 const DEFAULT_PAGE_SIZE = 20;
+const LARGE_ACTION_CONFIRMATION_THRESHOLD = 100;
 
 const ISSUE_LABELS: Record<AdminReviewIssueFilter, string> = {
   all: "Все",
@@ -303,13 +322,18 @@ export async function applyReviewGroupCorrection(input: {
   adminUserId: string;
   learnRule: boolean;
   rulePattern?: string;
+  confirmationCount?: number | null;
 }) {
+  assertDraftBulkScope(input.filters);
+
   if (!input.filters.group) {
     throw new Error("Группа не выбрана.");
   }
 
   const versionContext = await getReviewVersionContext();
   const rows = await getReviewRowsForBulkAction(input.filters, versionContext);
+  assertLargeActionConfirmed(rows.length, input.confirmationCount);
+
   return applyBulkCategorizationCorrection({
     rows,
     categoryId: input.categoryId,
@@ -323,19 +347,26 @@ export async function applyReviewGroupCorrection(input: {
 }
 
 export async function applySelectedReviewCorrections(input: {
+  filters: AdminReviewActionFilters;
   reviewQueueIds: string[];
   categoryId: string;
   subcategoryId: string;
   adminUserId: string;
   learnRule: boolean;
   rulePattern?: string;
+  confirmationCount?: number | null;
 }) {
-  const uniqueIds = [...new Set(input.reviewQueueIds.filter(Boolean))].slice(0, 100);
+  assertDraftBulkScope(input.filters);
+
+  const uniqueIds = [...new Set(input.reviewQueueIds.filter(Boolean))];
   if (uniqueIds.length === 0) {
     throw new Error("Не выбраны товары для обработки.");
   }
 
-  const rows = await getReviewRowsByIds(uniqueIds);
+  const versionContext = await getReviewVersionContext();
+  const rows = await getReviewRowsByIds(uniqueIds, versionContext);
+  assertLargeActionConfirmed(rows.length, input.confirmationCount);
+
   return applyBulkCategorizationCorrection({
     rows,
     categoryId: input.categoryId,
@@ -351,9 +382,14 @@ export async function applySelectedReviewCorrections(input: {
 export async function reapplyCategorizationRulesToReviewQueue(input: {
   filters: AdminReviewActionFilters;
   adminUserId: string;
+  confirmationCount?: number | null;
 }) {
+  assertDraftBulkScope(input.filters);
+
   const versionContext = await getReviewVersionContext();
   const before = await countReviewRows(buildReviewConditions(input.filters, versionContext));
+  assertLargeActionConfirmed(before, input.confirmationCount);
+
   const rows = await getReviewRowsForBulkAction(input.filters, versionContext);
   const [categorizationContext, searchSynonyms] = await Promise.all([
     getCategorizationContext(),
@@ -769,8 +805,17 @@ async function getReviewRowsForBulkAction(
   return getReviewRows(buildReviewConditions(filters, versionContext));
 }
 
-async function getReviewRowsByIds(reviewQueueIds: string[]) {
-  return getReviewRows([eq(reviewQueue.status, "open"), inArray(reviewQueue.id, reviewQueueIds)]);
+async function getReviewRowsByIds(
+  reviewQueueIds: string[],
+  versionContext: Awaited<ReturnType<typeof getReviewVersionContext>>
+) {
+  return getReviewRows([
+    eq(reviewQueue.status, "open"),
+    inArray(reviewQueue.id, reviewQueueIds),
+    versionContext.latestDraft
+      ? eq(reviewQueue.catalogVersionId, versionContext.latestDraft.id)
+      : sql`false`
+  ]);
 }
 
 function getReviewRows(conditions: SQL[]) {
@@ -840,6 +885,14 @@ async function applyBulkCategorizationCorrection(input: {
       learnedRuleId = learnedRule.id;
       learnedRulePattern = learnedRule.pattern;
       learnedRuleSkippedReason = learnedRule.skippedReason;
+
+      if (learnedRuleSkippedReason) {
+        throw new AdminReviewBulkSafetyError(
+          "rule_blocked",
+          REVIEW_BULK_RULE_BLOCKED_MESSAGE,
+          learnedRuleSkippedReason
+        );
+      }
     }
 
     for (const row of input.rows) {
@@ -900,6 +953,21 @@ async function applyBulkCategorizationCorrection(input: {
     categoryName: category.name,
     subcategoryName: subcategory.name
   };
+}
+
+function assertDraftBulkScope(filters: AdminReviewActionFilters) {
+  if (filters.scope !== "draft") {
+    throw new AdminReviewBulkSafetyError("scope_forbidden", REVIEW_BULK_DRAFT_ONLY_MESSAGE);
+  }
+}
+
+function assertLargeActionConfirmed(actualCount: number, confirmationCount: number | null | undefined) {
+  if (actualCount > LARGE_ACTION_CONFIRMATION_THRESHOLD && confirmationCount !== actualCount) {
+    throw new AdminReviewBulkSafetyError(
+      "count_confirmation_required",
+      REVIEW_BULK_COUNT_CONFIRMATION_MESSAGE
+    );
+  }
 }
 
 function buildCategoryOptions(

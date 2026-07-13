@@ -155,6 +155,10 @@ export function validateRulePattern(
     return { ok: false as const, reason: "empty" };
   }
 
+  if (words.length === 1 && DANGEROUS_RULE_WORDS.has(words[0])) {
+    return { ok: false as const, reason: "dangerous_rule_word" };
+  }
+
   if (normalized.length < 6 || /^\d+$/.test(normalized) || /^[а-яa-z]-?\d+$/iu.test(normalized)) {
     return { ok: false as const, reason: "too_short" };
   }
@@ -316,6 +320,38 @@ const UNSAFE_RULE_WORDS = new Set([
   "авто",
   "универсальный",
   "универсальная"
+]);
+
+const DANGEROUS_RULE_WORDS = new Set([
+  "комплект",
+  "ремкомплект",
+  "передний",
+  "передняя",
+  "переднее",
+  "задний",
+  "задняя",
+  "заднее",
+  "левый",
+  "левая",
+  "левое",
+  "правый",
+  "правая",
+  "правое",
+  "универсальный",
+  "универсальная",
+  "универсальное",
+  "новый",
+  "новая",
+  "новое",
+  "старый",
+  "старая",
+  "старое",
+  "большой",
+  "большая",
+  "большое",
+  "малый",
+  "малая",
+  "малое"
 ]);
 
 const UNSAFE_SINGLE_WORD_RULES = new Set([

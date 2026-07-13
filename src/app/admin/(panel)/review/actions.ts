@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminSession } from "@/features/admin/auth";
 import {
+  AdminReviewBulkSafetyError,
   applyReviewGroupCorrection,
   applySelectedReviewCorrections,
   normalizeAdminReviewParams,
@@ -65,7 +66,8 @@ export async function applyReviewGroupAction(formData: FormData) {
       subcategoryId: String(formData.get("subcategoryId") ?? ""),
       adminUserId: session.user.id,
       learnRule: formData.get("learnRule") === "1",
-      rulePattern: String(formData.get("rulePattern") ?? "").trim()
+      rulePattern: String(formData.get("rulePattern") ?? "").trim(),
+      confirmationCount: readConfirmationCount(formData)
     });
 
     revalidatePath("/admin/review");
@@ -81,8 +83,8 @@ export async function applyReviewGroupAction(formData: FormData) {
       params.set("ruleSkipped", result.learnedRuleSkippedReason);
     }
     target = `/admin/review?${params.toString()}`;
-  } catch {
-    target = buildReviewRedirect(filters, { error: "bulk_failed" });
+  } catch (error) {
+    target = buildReviewRedirect(filters, errorParamsForBulkFailure(error, "bulk_failed"));
   }
 
   redirect(target);
@@ -95,12 +97,14 @@ export async function applySelectedReviewItemsAction(formData: FormData) {
 
   try {
     const result = await applySelectedReviewCorrections({
+      filters,
       reviewQueueIds: formData.getAll("reviewQueueId").map((value) => String(value)),
       categoryId: String(formData.get("categoryId") ?? ""),
       subcategoryId: String(formData.get("subcategoryId") ?? ""),
       adminUserId: session.user.id,
       learnRule: formData.get("learnRule") === "1",
-      rulePattern: String(formData.get("rulePattern") ?? "").trim()
+      rulePattern: String(formData.get("rulePattern") ?? "").trim(),
+      confirmationCount: readConfirmationCount(formData)
     });
 
     revalidatePath("/admin/review");
@@ -116,8 +120,8 @@ export async function applySelectedReviewItemsAction(formData: FormData) {
       params.set("ruleSkipped", result.learnedRuleSkippedReason);
     }
     target = `/admin/review?${params.toString()}`;
-  } catch {
-    target = buildReviewRedirect(filters, { error: "bulk_failed" });
+  } catch (error) {
+    target = buildReviewRedirect(filters, errorParamsForBulkFailure(error, "bulk_failed"));
   }
 
   redirect(target);
@@ -131,7 +135,8 @@ export async function reapplyReviewRulesAction(formData: FormData) {
   try {
     const result = await reapplyCategorizationRulesToReviewQueue({
       filters,
-      adminUserId: session.user.id
+      adminUserId: session.user.id,
+      confirmationCount: readConfirmationCount(formData)
     });
 
     revalidatePath("/admin/review");
@@ -142,11 +147,42 @@ export async function reapplyReviewRulesAction(formData: FormData) {
     params.set("rulesResolved", String(result.resolved));
     params.set("rulesAfter", String(result.remaining));
     target = `/admin/review?${params.toString()}`;
-  } catch {
-    target = buildReviewRedirect(filters, { error: "rules_failed" });
+  } catch (error) {
+    target = buildReviewRedirect(filters, errorParamsForBulkFailure(error, "rules_failed"));
   }
 
   redirect(target);
+}
+
+function readConfirmationCount(formData: FormData) {
+  const value = String(formData.get("confirmationCount") ?? "").trim();
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function errorParamsForBulkFailure(error: unknown, fallback: string) {
+  if (error instanceof AdminReviewBulkSafetyError) {
+    const params: Record<string, string> = {
+      error:
+        error.code === "scope_forbidden"
+          ? "bulk_scope_forbidden"
+          : error.code === "count_confirmation_required"
+            ? "bulk_confirmation_required"
+            : "bulk_rule_blocked"
+    };
+
+    if (error.ruleSkippedReason) {
+      params.ruleSkipped = error.ruleSkippedReason;
+    }
+
+    return params;
+  }
+
+  return { error: fallback };
 }
 
 function readReviewActionFilters(formData: FormData): AdminReviewActionFilters {

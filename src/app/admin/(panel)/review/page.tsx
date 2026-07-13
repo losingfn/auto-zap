@@ -45,6 +45,7 @@ const ruleSkippedLabels: Record<string, string> = {
   empty: "Правило не создано: шаблон пустой.",
   no_safe_pattern: "Правило не создано: не удалось подобрать достаточно точный шаблон.",
   too_short: "Правило не создано: шаблон слишком короткий.",
+  dangerous_rule_word: "Правило не создано: шаблон слишком широкий или опасный.",
   single_word_too_broad: "Правило не создано: одно слово может быть слишком общим.",
   too_generic: "Правило не создано: шаблон слишком общий.",
   conflicting_rule: "Правило не создано: такой шаблон уже ведёт в другую категорию."
@@ -53,7 +54,10 @@ const ruleSkippedLabels: Record<string, string> = {
 const errorLabels: Record<string, string> = {
   save_failed: "Не удалось сохранить исправление. Проверьте категорию и подкатегорию.",
   bulk_failed: "Не удалось выполнить массовое действие. Проверьте выбранную группу и категорию.",
-  rules_failed: "Не удалось повторно применить правила к очереди."
+  rules_failed: "Не удалось повторно применить правила к очереди.",
+  bulk_scope_forbidden: "Массовые действия разрешены только для черновика текущего импорта.",
+  bulk_confirmation_required: "Для массового действия больше 100 товаров нужно ввести точное количество.",
+  bulk_rule_blocked: "Правило не создано: шаблон слишком широкий или опасный. Массовое действие не выполнено."
 };
 
 export default async function AdminReviewPage({ searchParams }: ReviewPageProps) {
@@ -215,6 +219,7 @@ export default async function AdminReviewPage({ searchParams }: ReviewPageProps)
                   item={item}
                   categories={data.categories}
                   filters={filters}
+                  bulkActionsDisabled={filters.scope !== "draft"}
                   autoFocus={index === 0}
                 />
               ))}
@@ -395,11 +400,13 @@ function ReviewCard({
   item,
   categories,
   filters,
+  bulkActionsDisabled,
   autoFocus
 }: {
   item: AdminReviewItem;
   categories: AdminReviewCategoryOption[];
   filters: AdminReviewActionFilters;
+  bulkActionsDisabled: boolean;
   autoFocus: boolean;
 }) {
   const defaultCategoryId = item.suggestedCategoryId ?? item.currentCategoryId ?? "";
@@ -417,6 +424,7 @@ function ReviewCard({
                 value={item.reviewId}
                 form="review-selected-form"
                 data-review-select
+                disabled={bulkActionsDisabled}
                 className="h-4 w-4 accent-[#73A0F5]"
               />
               Выбрать

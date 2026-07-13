@@ -154,45 +154,51 @@ export default async function AdminReviewPage({ searchParams }: ReviewPageProps)
           </div>
         ) : null}
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-          {data.groups.map((group) => (
-            <article
-              key={group.key}
-              className={`rounded-card border bg-[#101827] p-5 ${
-                group.key === data.params.group ? "border-[#73A0F5]" : "border-[#243249]"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-semibold">{group.label}</h3>
-                  <p className="mt-1 text-sm text-[#8FA1B8]">
-                    {numberFormatter.format(group.count)} товаров
-                  </p>
-                </div>
-                <Badge>{group.suggestedCount > 0 ? "Есть предложение" : "Нет предложения"}</Badge>
-              </div>
-              <p className="mt-4 line-clamp-2 text-sm leading-6 text-[#8FA1B8]">{group.reason}</p>
-              <ul className="mt-4 space-y-2 text-sm text-[#C8D1DF]">
-                {group.examples.map((example) => (
-                  <li key={example} className="truncate">
-                    {example}
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-5 flex flex-wrap items-center gap-2">
-                <Badge>Без категории: {numberFormatter.format(group.missingCategoryCount)}</Badge>
-                <Badge>Без подкатегории: {numberFormatter.format(group.missingSubcategoryCount)}</Badge>
-              </div>
-              {group.ruleWarning ? <p className="mt-4 text-sm text-[#FDE68A]">{group.ruleWarning}</p> : null}
-              <Link
-                href={reviewHref(data.params, { group: group.key, page: 1 })}
-                className="mt-5 inline-flex h-10 items-center justify-center rounded-card bg-[#73A0F5] px-4 text-sm font-semibold text-[#07101F] transition hover:bg-[#9DBDFB]"
+        {data.groupsUnavailable ? (
+          <div className="mt-5 rounded-card border border-[#3A465C] bg-[#101827] p-5 text-sm leading-6 text-[#C8D1DF]">
+            Группы временно недоступны. Можно пользоваться поиском и списком товаров.
+          </div>
+        ) : (
+          <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            {data.groups.map((group) => (
+              <article
+                key={group.key}
+                className={`rounded-card border bg-[#101827] p-5 ${
+                  group.key === data.params.group ? "border-[#73A0F5]" : "border-[#243249]"
+                }`}
               >
-                Открыть группу
-              </Link>
-            </article>
-          ))}
-        </div>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold">{group.label}</h3>
+                    <p className="mt-1 text-sm text-[#8FA1B8]">
+                      {numberFormatter.format(group.count)} товаров
+                    </p>
+                  </div>
+                  <Badge>{group.suggestedCount > 0 ? "Есть предложение" : "Нет предложения"}</Badge>
+                </div>
+                <p className="mt-4 line-clamp-2 text-sm leading-6 text-[#8FA1B8]">{group.reason}</p>
+                <ul className="mt-4 space-y-2 text-sm text-[#C8D1DF]">
+                  {group.examples.map((example) => (
+                    <li key={example} className="truncate">
+                      {example}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-5 flex flex-wrap items-center gap-2">
+                  <Badge>Без категории: {numberFormatter.format(group.missingCategoryCount)}</Badge>
+                  <Badge>Без подкатегории: {numberFormatter.format(group.missingSubcategoryCount)}</Badge>
+                </div>
+                {group.ruleWarning ? <p className="mt-4 text-sm text-[#FDE68A]">{group.ruleWarning}</p> : null}
+                <Link
+                  href={reviewHref(data.params, { group: group.key, page: 1 })}
+                  className="mt-5 inline-flex h-10 items-center justify-center rounded-card bg-[#73A0F5] px-4 text-sm font-semibold text-[#07101F] transition hover:bg-[#9DBDFB]"
+                >
+                  Открыть группу
+                </Link>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="mt-8">

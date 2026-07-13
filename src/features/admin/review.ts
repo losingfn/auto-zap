@@ -219,10 +219,10 @@ export async function getAdminReviewPageData(rawParams: Partial<Record<string, s
   const filteredConditions = buildReviewConditions(params, versionContext);
   const offset = (params.page - 1) * params.pageSize;
 
-  const [summary, reasonOptions, groups, filteredCount, reviewRows] = await Promise.all([
+  const [summary, reasonOptions, groupResult, filteredCount, reviewRows] = await Promise.all([
     getReviewSummary(params, versionContext),
     getReasonOptions(params, versionContext),
-    getReviewGroups(params, versionContext),
+    getReviewGroupsSafely(params, versionContext),
     countReviewRows(filteredConditions),
     db
       .select({
@@ -253,9 +253,9 @@ export async function getAdminReviewPageData(rawParams: Partial<Record<string, s
       .offset(offset)
   ]);
 
-  const selectedGroup = params.group
-    ? await getReviewGroupSummary(params.group, params, versionContext)
-    : null;
+  const selectedGroupResult = params.group
+    ? await getReviewGroupSummarySafely(params.group, params, versionContext)
+    : { group: null, unavailable: false };
 
   return {
     params,
@@ -264,8 +264,9 @@ export async function getAdminReviewPageData(rawParams: Partial<Record<string, s
     summary,
     reasonOptions,
     categories: categoryOptions,
-    groups,
-    selectedGroup,
+    groups: groupResult.groups,
+    groupsUnavailable: groupResult.unavailable || selectedGroupResult.unavailable,
+    selectedGroup: selectedGroupResult.group,
     queueCount: summary.total,
     filteredCount,
     pagination: {
@@ -603,30 +604,42 @@ async function getReasonOptions(params: AdminReviewParams, versionContext: Await
 }
 
 async function getReviewGroups(params: AdminReviewParams, versionContext: Awaited<ReturnType<typeof getReviewVersionContext>>) {
-  const groupKey = reviewGroupKeySql();
-  const conditions = buildReviewConditions(params, versionContext, {
-    includeGroup: false
-  });
+  const groupBase = reviewGroupBaseQuery(params, versionContext, "review_group_base");
 
   const rows = await db
     .select({
-      key: groupKey,
+      key: groupBase.groupKey,
       count: sql<number>`count(*)::int`,
-      examples: sql<string[]>`(array_agg(${products.shopCode} || ' · ' || ${products.name} order by ${products.name}))[1:6]`,
-      reason: sql<string>`min(${reviewQueue.reason})`,
-      suggestedCount: sql<number>`count(*) filter (where ${reviewQueue.suggestedCategoryId} is not null or ${reviewQueue.suggestedSubcategoryId} is not null)::int`,
-      missingCategoryCount: sql<number>`count(*) filter (where ${products.categoryId} is null)::int`,
-      missingSubcategoryCount: sql<number>`count(*) filter (where ${products.subcategoryId} is null)::int`
+      examples: sql<string[]>`(array_agg(${groupBase.shopCode} || ' · ' || ${groupBase.name} order by ${groupBase.name}))[1:6]`,
+      reason: sql<string>`min(${groupBase.reason})`,
+      suggestedCount: sql<number>`count(*) filter (where ${groupBase.suggestedCategoryId} is not null or ${groupBase.suggestedSubcategoryId} is not null)::int`,
+      missingCategoryCount: sql<number>`count(*) filter (where ${groupBase.categoryId} is null)::int`,
+      missingSubcategoryCount: sql<number>`count(*) filter (where ${groupBase.subcategoryId} is null)::int`
     })
-    .from(reviewQueue)
-    .innerJoin(products, eq(products.id, reviewQueue.productId))
-    .innerJoin(catalogVersions, eq(catalogVersions.id, reviewQueue.catalogVersionId))
-    .where(and(...conditions))
-    .groupBy(groupKey)
-    .orderBy(desc(sql`count(*)`), asc(groupKey))
+    .from(groupBase)
+    .groupBy(groupBase.groupKey)
+    .orderBy(desc(sql`count(*)`), asc(groupBase.groupKey))
     .limit(60);
 
   return rows.map(mapReviewGroupRow);
+}
+
+async function getReviewGroupsSafely(
+  params: AdminReviewParams,
+  versionContext: Awaited<ReturnType<typeof getReviewVersionContext>>
+) {
+  try {
+    return {
+      groups: await getReviewGroups(params, versionContext),
+      unavailable: false
+    };
+  } catch (error) {
+    console.error("Admin review groups query failed", error);
+    return {
+      groups: [],
+      unavailable: true
+    };
+  }
 }
 
 async function getReviewGroupSummary(
@@ -634,27 +647,71 @@ async function getReviewGroupSummary(
   params: AdminReviewParams,
   versionContext: Awaited<ReturnType<typeof getReviewVersionContext>>
 ) {
-  const groupKey = reviewGroupKeySql();
-  const conditions = buildReviewConditions({ ...params, group }, versionContext);
+  const groupBase = reviewGroupBaseQuery({ ...params, group: "" }, versionContext, "review_group_summary_base");
 
   const rows = await db
     .select({
-      key: groupKey,
+      key: groupBase.groupKey,
       count: sql<number>`count(*)::int`,
-      examples: sql<string[]>`(array_agg(${products.shopCode} || ' · ' || ${products.name} order by ${products.name}))[1:10]`,
-      reason: sql<string>`min(${reviewQueue.reason})`,
-      suggestedCount: sql<number>`count(*) filter (where ${reviewQueue.suggestedCategoryId} is not null or ${reviewQueue.suggestedSubcategoryId} is not null)::int`,
-      missingCategoryCount: sql<number>`count(*) filter (where ${products.categoryId} is null)::int`,
-      missingSubcategoryCount: sql<number>`count(*) filter (where ${products.subcategoryId} is null)::int`
+      examples: sql<string[]>`(array_agg(${groupBase.shopCode} || ' · ' || ${groupBase.name} order by ${groupBase.name}))[1:10]`,
+      reason: sql<string>`min(${groupBase.reason})`,
+      suggestedCount: sql<number>`count(*) filter (where ${groupBase.suggestedCategoryId} is not null or ${groupBase.suggestedSubcategoryId} is not null)::int`,
+      missingCategoryCount: sql<number>`count(*) filter (where ${groupBase.categoryId} is null)::int`,
+      missingSubcategoryCount: sql<number>`count(*) filter (where ${groupBase.subcategoryId} is null)::int`
+    })
+    .from(groupBase)
+    .where(eq(groupBase.groupKey, group))
+    .groupBy(groupBase.groupKey)
+    .limit(1);
+
+  return rows[0] ? mapReviewGroupRow(rows[0]) : null;
+}
+
+async function getReviewGroupSummarySafely(
+  group: string,
+  params: AdminReviewParams,
+  versionContext: Awaited<ReturnType<typeof getReviewVersionContext>>
+) {
+  try {
+    return {
+      group: await getReviewGroupSummary(group, params, versionContext),
+      unavailable: false
+    };
+  } catch (error) {
+    console.error("Admin review selected group query failed", error);
+    return {
+      group: null,
+      unavailable: true
+    };
+  }
+}
+
+function reviewGroupBaseQuery(
+  params: AdminReviewParams,
+  versionContext: Awaited<ReturnType<typeof getReviewVersionContext>>,
+  alias: string
+) {
+  const conditions = buildReviewConditions(params, versionContext, {
+    includeGroup: false
+  });
+
+  return db
+    .select({
+      groupKey: reviewGroupKeySql().as("group_key"),
+      normalizedName: reviewNormalizedNameSql().as("normalized_name"),
+      shopCode: products.shopCode,
+      name: products.name,
+      reason: reviewQueue.reason,
+      suggestedCategoryId: reviewQueue.suggestedCategoryId,
+      suggestedSubcategoryId: reviewQueue.suggestedSubcategoryId,
+      categoryId: products.categoryId,
+      subcategoryId: products.subcategoryId
     })
     .from(reviewQueue)
     .innerJoin(products, eq(products.id, reviewQueue.productId))
     .innerJoin(catalogVersions, eq(catalogVersions.id, reviewQueue.catalogVersionId))
     .where(and(...conditions))
-    .groupBy(groupKey)
-    .limit(1);
-
-  return rows[0] ? mapReviewGroupRow(rows[0]) : null;
+    .as(alias);
 }
 
 function mapReviewGroupRow(row: {
@@ -775,7 +832,7 @@ function noSuggestionCondition() {
 
 function reviewGroupKeySql() {
   const stopWords = sql.join(GROUP_STOP_WORDS.map((word) => sql`${word}`), sql`, `);
-  const normalizedName = sql<string>`replace(lower(${products.name}), 'ё', 'е')`;
+  const normalizedName = reviewNormalizedNameSql();
   const firstToken = sql<string>`(regexp_split_to_array(${normalizedName}, '[^0-9a-zа-я]+'))[1]`;
 
   return sql<string>`case
@@ -786,6 +843,10 @@ function reviewGroupKeySql() {
     then ${OTHER_GROUP_KEY}
     else ${firstToken}
   end`;
+}
+
+function reviewNormalizedNameSql() {
+  return sql<string>`replace(lower(${products.name}), 'ё', 'е')`;
 }
 
 async function countReviewRows(conditions: SQL[]) {

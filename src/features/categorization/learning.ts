@@ -8,6 +8,8 @@ import {
   reviewQueue,
   subcategories
 } from "@/db/schema";
+import { buildProductSearchText } from "@/features/search/documents";
+import { getSearchSynonyms } from "@/features/search/synonyms";
 import { normalizeForCategorization } from "./engine";
 
 export interface LearnCategorizationRuleInput {
@@ -21,10 +23,13 @@ export interface LearnCategorizationRuleInput {
 }
 
 export async function applyManualCategorizationCorrection(input: LearnCategorizationRuleInput) {
+  const searchSynonyms = await getSearchSynonyms();
+
   return db.transaction(async (tx) => {
     const [product] = await tx
       .select({
         id: products.id,
+        shopCode: products.shopCode,
         name: products.name,
         rawName: products.rawName
       })
@@ -37,13 +42,13 @@ export async function applyManualCategorizationCorrection(input: LearnCategoriza
     }
 
     const [category] = await tx
-      .select({ id: categories.id, slug: categories.slug })
+      .select({ id: categories.id, slug: categories.slug, name: categories.name })
       .from(categories)
       .where(eq(categories.id, input.categoryId))
       .limit(1);
 
     const [subcategory] = await tx
-      .select({ id: subcategories.id, slug: subcategories.slug })
+      .select({ id: subcategories.id, slug: subcategories.slug, name: subcategories.name })
       .from(subcategories)
       .where(and(eq(subcategories.id, input.subcategoryId), eq(subcategories.categoryId, input.categoryId)))
       .limit(1);
@@ -59,6 +64,14 @@ export async function applyManualCategorizationCorrection(input: LearnCategoriza
         subcategoryId: input.subcategoryId,
         status: "active",
         reviewReason: null,
+        searchText: buildProductSearchText({
+          shopCode: product.shopCode,
+          name: product.name,
+          rawName: product.rawName,
+          categoryName: category.name,
+          subcategoryName: subcategory.name,
+          synonyms: searchSynonyms
+        }),
         updatedAt: new Date()
       })
       .where(eq(products.id, input.productId));
@@ -75,7 +88,7 @@ export async function applyManualCategorizationCorrection(input: LearnCategoriza
 
     const learnedRule = input.learnRule === false
       ? { id: null, pattern: null, skippedReason: "disabled" }
-      : await learnSafeRule({
+      : await learnSafeCategorizationRule({
           tx,
           productName: product.name || product.rawName,
           categoryId: input.categoryId,
@@ -131,12 +144,19 @@ export function suggestRulePatternForProduct(name: string) {
   return null;
 }
 
-export function validateRulePattern(pattern: string) {
+export function validateRulePattern(
+  pattern: string,
+  options: { allowProductNounSingleWord?: boolean } = {}
+) {
   const normalized = normalizeForCategorization(pattern);
   const words = normalized.split(" ").filter(Boolean);
 
   if (!normalized) {
     return { ok: false as const, reason: "empty" };
+  }
+
+  if (words.length === 1 && DANGEROUS_RULE_WORDS.has(words[0])) {
+    return { ok: false as const, reason: "dangerous_rule_word" };
   }
 
   if (normalized.length < 6 || /^\d+$/.test(normalized) || /^[а-яa-z]-?\d+$/iu.test(normalized)) {
@@ -145,7 +165,9 @@ export function validateRulePattern(pattern: string) {
 
   if (words.length === 1) {
     const [word] = words;
-    if (!SAFE_SINGLE_WORD_RULES.has(word)) {
+    const isAllowedProductNoun =
+      options.allowProductNounSingleWord === true && PRODUCT_NOUN_SINGLE_WORD_RULES.has(word);
+    if (!SAFE_SINGLE_WORD_RULES.has(word) && !isAllowedProductNoun) {
       return { ok: false as const, reason: "single_word_too_broad" };
     }
   }
@@ -154,7 +176,11 @@ export function validateRulePattern(pattern: string) {
     return { ok: false as const, reason: "too_generic" };
   }
 
-  if (words.some((word) => UNSAFE_SINGLE_WORD_RULES.has(word)) && words.length < 2) {
+  if (
+    words.some((word) => UNSAFE_SINGLE_WORD_RULES.has(word)) &&
+    words.length < 2 &&
+    !(options.allowProductNounSingleWord === true && PRODUCT_NOUN_SINGLE_WORD_RULES.has(words[0]))
+  ) {
     return { ok: false as const, reason: "too_generic" };
   }
 
@@ -164,13 +190,14 @@ export function validateRulePattern(pattern: string) {
   };
 }
 
-async function learnSafeRule({
+export async function learnSafeCategorizationRule({
   tx,
   productName,
   categoryId,
   subcategoryId,
   adminUserId,
-  requestedPattern
+  requestedPattern,
+  allowProductNounSingleWord
 }: {
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0];
   productName: string;
@@ -178,13 +205,14 @@ async function learnSafeRule({
   subcategoryId: string;
   adminUserId: string;
   requestedPattern?: string;
+  allowProductNounSingleWord?: boolean;
 }) {
   const candidate = requestedPattern?.trim() || suggestRulePatternForProduct(productName);
   if (!candidate) {
     return { id: null, pattern: null, skippedReason: "no_safe_pattern" };
   }
 
-  const validation = validateRulePattern(candidate);
+  const validation = validateRulePattern(candidate, { allowProductNounSingleWord });
   if (!validation.ok) {
     return { id: null, pattern: null, skippedReason: validation.reason };
   }
@@ -294,6 +322,38 @@ const UNSAFE_RULE_WORDS = new Set([
   "универсальная"
 ]);
 
+const DANGEROUS_RULE_WORDS = new Set([
+  "комплект",
+  "ремкомплект",
+  "передний",
+  "передняя",
+  "переднее",
+  "задний",
+  "задняя",
+  "заднее",
+  "левый",
+  "левая",
+  "левое",
+  "правый",
+  "правая",
+  "правое",
+  "универсальный",
+  "универсальная",
+  "универсальное",
+  "новый",
+  "новая",
+  "новое",
+  "старый",
+  "старая",
+  "старое",
+  "большой",
+  "большая",
+  "большое",
+  "малый",
+  "малая",
+  "малое"
+]);
+
 const UNSAFE_SINGLE_WORD_RULES = new Set([
   "резина",
   "кольцо",
@@ -323,4 +383,26 @@ const SAFE_SINGLE_WORD_RULES = new Set([
   "катализатор",
   "глушитель",
   "суппорт"
+]);
+
+const PRODUCT_NOUN_SINGLE_WORD_RULES = new Set([
+  "болт",
+  "болты",
+  "гайка",
+  "гайки",
+  "шайба",
+  "шайбы",
+  "штуцер",
+  "штуцеры",
+  "фитинг",
+  "фитинги",
+  "накладка",
+  "накладки",
+  "маска",
+  "маски",
+  "соединитель",
+  "соединители",
+  "крепеж",
+  "кольцо",
+  "кольца"
 ]);

@@ -775,16 +775,17 @@ function noSuggestionCondition() {
 
 function reviewGroupKeySql() {
   const stopWords = sql.join(GROUP_STOP_WORDS.map((word) => sql`${word}`), sql`, `);
+  const normalizedName = sql<string>`replace(lower(${products.name}), 'ё', 'е')`;
+  const firstToken = sql<string>`(regexp_split_to_array(${normalizedName}, '[^0-9a-zа-я]+'))[1]`;
 
-  return sql<string>`coalesce((
-    select token_value
-    from unnest(regexp_split_to_array(replace(lower(${products.name}), 'ё', 'е'), '[^0-9a-zа-я]+')) with ordinality as tokens(token_value, token_order)
-    where char_length(token_value) >= 3
-      and token_value not in (${stopWords})
-      and token_value !~ '^[0-9]+$'
-    order by token_order
-    limit 1
-  ), ${OTHER_GROUP_KEY})`;
+  return sql<string>`case
+    when nullif(${firstToken}, '') is null
+      or char_length(${firstToken}) < 3
+      or ${firstToken} in (${stopWords})
+      or ${firstToken} ~ '^[0-9]+$'
+    then ${OTHER_GROUP_KEY}
+    else ${firstToken}
+  end`;
 }
 
 async function countReviewRows(conditions: SQL[]) {

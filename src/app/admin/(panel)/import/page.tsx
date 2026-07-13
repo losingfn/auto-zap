@@ -50,6 +50,22 @@ const errorMessages: Record<string, string> = {
   already_finalized: "Этот импорт уже опубликован или отменён."
 };
 
+const metricDescriptions = {
+  addedCount: "Новые артикулы, которых не было в текущем каталоге.",
+  updatedCount: "Товары с существующим артикулом и изменёнными данными.",
+  archivedCount: "Активные товары, отсутствующие в новом прайсе. Они не удалены окончательно.",
+  reviewRows:
+    "Система не смогла определить категорию или обнаружила проблему в данных.",
+  errorRows: "Строки, которые не удалось корректно обработать.",
+  skippedRows: "Служебные или неподходящие строки, которые не участвуют в импорте.",
+  totalRows: "Все строки выбранного листа, которые прошли предварительный анализ.",
+  parsedRows: "Строки, где найден внутренний артикул товара."
+};
+
+type SelectedImportBatch = NonNullable<
+  Awaited<ReturnType<typeof getAdminImportPageData>>["selected"]
+>;
+
 export default async function AdminImportPage({ searchParams }: ImportPageProps) {
   const params = await searchParams;
   const data = await getAdminImportPageData(params.batch);
@@ -77,7 +93,7 @@ export default async function AdminImportPage({ searchParams }: ImportPageProps)
       {params.published ? <Notice>Изменения опубликованы, поисковый индекс пересобран.</Notice> : null}
       {params.cancelled ? <Notice>Импорт отменён, draft-версия снята с публикации.</Notice> : null}
 
-      <section className="rounded-card border border-[#243249] bg-[#101827] p-5">
+      <section id="new-import" className="rounded-card border border-[#243249] bg-[#101827] p-5">
         <h2 className="text-lg font-semibold">Новый импорт</h2>
         <form action={uploadImportAction} className="mt-5 grid gap-4 lg:grid-cols-[1fr_auto]">
           <input
@@ -107,15 +123,13 @@ export default async function AdminImportPage({ searchParams }: ImportPageProps)
 
               {report ? (
                 <>
-                  <ReportSummary report={report} />
+                  <ImportResultSummary batch={data.selected} report={report} />
                   <ImportActions
                     batchId={data.selected.id}
                     canPublish={data.selected.canPublish}
                     canCancel={data.selected.canCancel}
                   />
-                  <SheetSummary report={report} />
-                  <RowErrors errors={data.errors} totalErrors={report.errorRows} />
-                  <ReviewExamples report={report} />
+                  <TechnicalDetails errors={data.errors} report={report} />
                 </>
               ) : (
                 <div className="rounded-card border border-[#243249] bg-[#101827] p-5 text-[#C8D1DF]">
@@ -162,7 +176,7 @@ export default async function AdminImportPage({ searchParams }: ImportPageProps)
   );
 }
 
-function ImportHeader({ batch }: { batch: NonNullable<Awaited<ReturnType<typeof getAdminImportPageData>>["selected"]> }) {
+function ImportHeader({ batch }: { batch: SelectedImportBatch }) {
   return (
     <section className="rounded-card border border-[#243249] bg-[#101827] p-5">
       <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
@@ -184,15 +198,173 @@ function ImportHeader({ batch }: { batch: NonNullable<Awaited<ReturnType<typeof 
   );
 }
 
-function ReportSummary({ report }: { report: StoredImportReport }) {
+function ImportResultSummary({
+  batch,
+  report
+}: {
+  batch: SelectedImportBatch;
+  report: StoredImportReport;
+}) {
+  const missingNameCount = report.issueCounts.missing_name ?? 0;
+
   return (
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-      <StatCard label="Добавлено" value={report.addedCount} />
-      <StatCard label="Обновлено" value={report.updatedCount} />
-      <StatCard label="Архивировано" value={report.archivedCount} />
-      <StatCard label="Ошибки" value={report.errorRows} />
-      <StatCard label="Требует проверки" value={report.reviewRows} />
+    <section className="rounded-card border border-[#243249] bg-[#101827]">
+      <div className="border-b border-[#243249] px-5 py-4">
+        <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#9DBDFB]">
+          Импорт проанализирован
+        </p>
+        <h2 className="mt-2 break-words text-2xl font-semibold">{batch.sourceFileName}</h2>
+        <p className="mt-2 text-sm text-[#8FA1B8]">
+          Дата анализа: {formatDate(batch.analyzedAt ?? batch.createdAt)}
+        </p>
+      </div>
+
+      <div className="space-y-5 p-5">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            description={metricDescriptions.addedCount}
+            label="Добавлено"
+            value={report.addedCount}
+          />
+          <StatCard
+            description={metricDescriptions.updatedCount}
+            label="Обновлено"
+            value={report.updatedCount}
+          />
+          <StatCard
+            description={metricDescriptions.archivedCount}
+            label="Архивировано"
+            value={report.archivedCount}
+          />
+          <StatCard
+            description={metricDescriptions.reviewRows}
+            label="Требуют проверки"
+            tone={report.reviewRows > 0 ? "warning" : "default"}
+            value={report.reviewRows}
+          />
+          <StatCard
+            description={metricDescriptions.errorRows}
+            label="Ошибки"
+            tone={report.errorRows > 0 ? "danger" : "default"}
+            value={report.errorRows}
+          />
+          <StatCard
+            description={metricDescriptions.skippedRows}
+            label="Пропущено"
+            value={report.skippedRows}
+          />
+          <StatCard
+            description={metricDescriptions.totalRows}
+            label="Всего строк"
+            value={report.totalRows}
+          />
+          <StatCard
+            description={metricDescriptions.parsedRows}
+            label="Товаров с артикулом"
+            value={report.parsedRows}
+          />
+        </div>
+
+        {report.reviewRows > 0 ? <ReviewWarning count={report.reviewRows} /> : null}
+        {missingNameCount > 0 ? <MissingNameNotice count={missingNameCount} /> : null}
+        {report.errorRows > 0 ? <ErrorSummary count={report.errorRows} /> : null}
+
+        <ResultActions />
+      </div>
     </section>
+  );
+}
+
+function ReviewWarning({ count }: { count: number }) {
+  return (
+    <div className="rounded-card border border-[#854D0E] bg-[#2A2113] p-4 text-[#FDE68A]">
+      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div>
+          <h3 className="text-base font-semibold">Часть товаров требует ручной проверки</h3>
+          <p className="mt-2 text-sm leading-6">
+            Таких товаров: {numberFormatter.format(count)}. Система не смогла определить
+            категорию или обнаружила проблему в данных.
+          </p>
+        </div>
+        <ActionLink href="/admin/review">Перейти к проверке товаров</ActionLink>
+      </div>
+    </div>
+  );
+}
+
+function MissingNameNotice({ count }: { count: number }) {
+  return (
+    <div className="rounded-card border border-[#854D0E] bg-[#2A2113] px-4 py-3 text-sm leading-6 text-[#FDE68A]">
+      В файле найдены строки, где после артикула отсутствует название товара:{" "}
+      {numberFormatter.format(count)}. Такие строки требуют проверки и не должны автоматически
+      попадать в каталог без уточнения.
+    </div>
+  );
+}
+
+function ErrorSummary({ count }: { count: number }) {
+  return (
+    <div className="rounded-card border border-[#7F1D1D] bg-[#2A1218] px-4 py-3 text-sm leading-6 text-[#FECACA]">
+      Найдены строки с ошибками: {numberFormatter.format(count)}. Их технические детали доступны
+      в раскрываемом блоке ниже.
+    </div>
+  );
+}
+
+function ResultActions() {
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+      <ActionLink href="/admin/review">Перейти к проверке товаров</ActionLink>
+      <ActionLink href="/admin/catalog">Открыть каталог</ActionLink>
+      <ActionLink href="/admin/import#new-import">Загрузить другой файл</ActionLink>
+    </div>
+  );
+}
+
+function ActionLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex min-h-11 items-center justify-center rounded-card border border-[#4169A8] px-5 text-sm font-semibold text-white transition hover:border-[#73A0F5] hover:bg-[#1A2740] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#93C5FD] active:translate-y-px"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function TechnicalDetails({
+  errors,
+  report
+}: {
+  errors: Awaited<ReturnType<typeof getAdminImportPageData>>["errors"];
+  report: StoredImportReport;
+}) {
+  const hasReviewExamples = report.examples.needsReview.length > 0;
+  const hasErrors = errors.length > 0;
+
+  return (
+    <details className="rounded-card border border-[#243249] bg-[#101827]">
+      <summary className="cursor-pointer px-5 py-4 text-lg font-semibold transition hover:text-[#9DBDFB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#93C5FD]">
+        Показать технические детали
+      </summary>
+      <div className="space-y-6 border-t border-[#243249] p-5">
+        <SheetSummary report={report} />
+        {hasErrors ? (
+          <RowErrors errors={errors} totalErrors={report.errorRows} />
+        ) : (
+          <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4 text-sm text-[#C8D1DF]">
+            Ошибок в строках не найдено.
+          </div>
+        )}
+        {hasReviewExamples ? (
+          <ReviewExamples report={report} />
+        ) : (
+          <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4 text-sm text-[#C8D1DF]">
+            Нет примеров строк, требующих ручной проверки.
+          </div>
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -344,11 +516,29 @@ function ReviewExamples({ report }: { report: StoredImportReport }) {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function StatCard({
+  description,
+  label,
+  tone = "default",
+  value
+}: {
+  description: string;
+  label: string;
+  tone?: "default" | "warning" | "danger";
+  value: number;
+}) {
+  const toneClass =
+    tone === "danger"
+      ? "border-[#7F1D1D] bg-[#2A1218]"
+      : tone === "warning"
+        ? "border-[#854D0E] bg-[#2A2113]"
+        : "border-[#243249] bg-[#0B1220]";
+
   return (
-    <article className="rounded-card border border-[#243249] bg-[#101827] p-5">
+    <article className={`rounded-card border p-5 ${toneClass}`}>
       <p className="text-sm text-[#8FA1B8]">{label}</p>
       <p className="mt-3 text-3xl font-semibold">{numberFormatter.format(value)}</p>
+      <p className="mt-3 text-sm leading-6 text-[#8FA1B8]">{description}</p>
     </article>
   );
 }

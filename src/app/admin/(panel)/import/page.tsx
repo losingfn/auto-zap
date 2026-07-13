@@ -286,10 +286,13 @@ function ReviewWarning({ count }: { count: number }) {
     <div className="rounded-card border border-[#854D0E] bg-[#2A2113] p-4 text-[#FDE68A]">
       <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
         <div>
-          <h3 className="text-base font-semibold">Часть товаров требует ручной проверки</h3>
+          <h3 className="text-base font-semibold">
+            {numberFormatter.format(count)} товаров требуют проверки
+          </h3>
           <p className="mt-2 text-sm leading-6">
-            Таких товаров: {numberFormatter.format(count)}. Система не смогла определить
-            категорию или обнаружила проблему в данных.
+            Система не смогла уверенно определить категорию или обнаружила проблему в данных.
+            Перейдите в проверку товаров, чтобы распределить их вручную или создать правила для
+            похожих товаров.
           </p>
         </div>
         <ActionLink href="/admin/review">Перейти к проверке товаров</ActionLink>
@@ -366,6 +369,10 @@ function TechnicalDetails({
         Показать технические детали
       </summary>
       <div className="space-y-6 border-t border-[#243249] p-5">
+        <p className="text-sm leading-6 text-[#8FA1B8]">
+          Здесь показаны строки, причины проверки, ошибки и структура Excel. Эти данные скрыты до
+          раскрытия блока, чтобы основной итог импорта оставался компактным.
+        </p>
         <SheetSummary report={report} />
         {hasErrors ? (
           <RowErrors errors={errors} totalErrors={report.errorRows} />

@@ -19,11 +19,11 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isLoginPage && hasValidCookie) {
-    return withNoIndex(NextResponse.redirect(new URL("/admin", request.url)));
+    return withNoIndex(NextResponse.redirect(createAdminRedirectUrl(request, "/admin")));
   }
 
   if (pathname.startsWith("/admin") && !isLoginPage && !hasValidCookie) {
-    const loginUrl = new URL("/admin/login", request.url);
+    const loginUrl = createAdminRedirectUrl(request, "/admin/login");
     loginUrl.searchParams.set("next", `${pathname}${search}`);
     return withNoIndex(NextResponse.redirect(loginUrl));
   }
@@ -34,6 +34,39 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: ["/admin/:path*", "/api/:path*"]
 };
+
+export function createAdminRedirectUrl(request: NextRequest, pathname: string) {
+  return createAdminRedirectUrlFromParts({
+    pathname,
+    requestUrl: request.url,
+    forwardedHost: request.headers.get("x-forwarded-host"),
+    forwardedProto: request.headers.get("x-forwarded-proto")
+  });
+}
+
+export function createAdminRedirectUrlFromParts({
+  forwardedHost,
+  forwardedProto,
+  pathname,
+  requestUrl
+}: {
+  forwardedHost?: string | null;
+  forwardedProto?: string | null;
+  pathname: string;
+  requestUrl: string;
+}) {
+  const url = new URL(pathname, requestUrl);
+  const host = firstForwardedValue(forwardedHost);
+
+  if (host && isLocalhostHost(url.host)) {
+    if (!applyForwardedHost(url, host)) {
+      return url;
+    }
+    url.protocol = `${normalizeForwardedProto(forwardedProto) ?? "https"}:`;
+  }
+
+  return url;
+}
 
 async function hasValidAdminCookie(value?: string | null) {
   const parsed = parseAdminSessionCookie(value);
@@ -83,6 +116,38 @@ function constantTimeEqual(left: string, right: string) {
   }
 
   return mismatch === 0;
+}
+
+function firstForwardedValue(value?: string | null) {
+  return value?.split(",")[0]?.trim() || null;
+}
+
+function normalizeForwardedProto(value?: string | null) {
+  const proto = firstForwardedValue(value)?.replace(/:$/, "").toLowerCase();
+  return proto === "http" || proto === "https" ? proto : null;
+}
+
+function applyForwardedHost(url: URL, host: string) {
+  try {
+    const forwardedUrl = new URL(`http://${host}`);
+    url.hostname = forwardedUrl.hostname;
+    url.port = forwardedUrl.port;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isLocalhostHost(host: string) {
+  const normalizedHost = host.toLowerCase();
+  return (
+    normalizedHost === "localhost" ||
+    normalizedHost.startsWith("localhost:") ||
+    normalizedHost === "127.0.0.1" ||
+    normalizedHost.startsWith("127.0.0.1:") ||
+    normalizedHost === "[::1]" ||
+    normalizedHost.startsWith("[::1]:")
+  );
 }
 
 function withNoIndex(response: NextResponse) {

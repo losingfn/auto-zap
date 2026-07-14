@@ -7,7 +7,8 @@ import type {
   DetectedColumns,
   ExcelCellValue,
   ExcelSheetSummary,
-  ImportRowIssue
+  ImportRowIssue,
+  ImportRowStatus
 } from "./types";
 
 const SERVICE_ROW_HEADERS = new Set(["магазин", "склад", "номенклатура"]);
@@ -210,7 +211,7 @@ function analyzeSheetRows(sheet: SheetRows, columns: DetectedColumns): AnalyzedI
     parseProductIdentity(row[rawNameColumn])
   );
 
-  return sheet.rows.map((row, localIndex) => {
+  const analyzedRows = sheet.rows.map((row, localIndex) => {
     const rowIndex = sheet.startRowIndex + localIndex;
     const rowNumber = rowIndex + 1;
     const rawName = normalizeText(row[rawNameColumn]);
@@ -298,6 +299,11 @@ function analyzeSheetRows(sheet: SheetRows, columns: DetectedColumns): AnalyzedI
     }
 
     const hasBlockingError = issues.some((issue) => issue.code !== "missing_name");
+    const status: ImportRowStatus = hasBlockingError
+      ? "error"
+      : issues.length > 0
+        ? "needs_review"
+        : "valid";
 
     return {
       sheetName: sheet.name,
@@ -309,8 +315,38 @@ function analyzeSheetRows(sheet: SheetRows, columns: DetectedColumns): AnalyzedI
       stockSum,
       shopCode: identity?.shopCode ?? null,
       name: identity?.name ?? null,
-      status: hasBlockingError ? "error" : issues.length > 0 ? "needs_review" : "valid",
+      status,
       issues
+    };
+  });
+
+  return markDuplicateShopCodes(analyzedRows);
+}
+
+function markDuplicateShopCodes(rows: AnalyzedImportRow[]) {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    if (row.shopCode && row.status !== "skipped") {
+      counts.set(row.shopCode, (counts.get(row.shopCode) ?? 0) + 1);
+    }
+  }
+
+  return rows.map((row) => {
+    if (!row.shopCode || (counts.get(row.shopCode) ?? 0) <= 1) {
+      return row;
+    }
+
+    return {
+      ...row,
+      status: "error" as const,
+      issues: [
+        ...row.issues,
+        {
+          code: "duplicate_code" as const,
+          field: "shopCode" as const,
+          message: `Артикул ${row.shopCode} встречается в файле несколько раз.`
+        }
+      ]
     };
   });
 }

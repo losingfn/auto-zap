@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   adminUsers,
@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { createDraftImport } from "@/features/import/draft-service";
 import { publishCatalogVersion } from "@/features/import/publish-service";
+import { ImportSafetyError } from "@/features/import/safety";
 import type { ImportPreviewReport } from "@/features/import/types";
 
 const MAX_IMPORT_FILE_SIZE_BYTES = 25 * 1024 * 1024;
@@ -31,6 +32,9 @@ export type AdminImportErrorCode =
   | "invalid_type"
   | "analysis_failed"
   | "publish_failed"
+  | "safety_blocked"
+  | "duplicate_file"
+  | "import_in_progress"
   | "cancel_failed"
   | "not_found"
   | "not_ready"
@@ -86,6 +90,7 @@ export async function createAdminDraftImportFromUpload({
   adminUserId: string;
 }) {
   const storedFile = await saveUploadedImportFile(file);
+  await assertImportCanStart(storedFile.fileHash);
 
   try {
     const result = await createDraftImport({
@@ -204,8 +209,13 @@ export async function publishAdminImportBatch({
     throw new AdminImportError("already_finalized", "Этот импорт уже нельзя опубликовать.");
   }
 
+  let publishResult: Awaited<ReturnType<typeof publishCatalogVersion>>;
+
   try {
-    await publishCatalogVersion({ catalogVersionId: batch.catalogVersionId });
+    publishResult = await publishCatalogVersion({
+      catalogVersionId: batch.catalogVersionId,
+      report: batch.report
+    });
   } catch (error) {
     await db.insert(auditLogs).values({
       adminUserId,
@@ -215,9 +225,14 @@ export async function publishAdminImportBatch({
       metadata: {
         importBatchId: batch.id,
         sourceFileName: batch.sourceFileName,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
+        safety: error instanceof ImportSafetyError ? error.report : null
       }
     });
+
+    if (error instanceof ImportSafetyError) {
+      throw new AdminImportError("safety_blocked", error.message);
+    }
 
     throw new AdminImportError(
       "publish_failed",
@@ -233,7 +248,13 @@ export async function publishAdminImportBatch({
     metadata: {
       importBatchId: batch.id,
       sourceFileName: batch.sourceFileName,
-      searchIndex: "synced",
+      searchIndex: {
+        status: "synced",
+        indexUid: publishResult.indexUid,
+        indexedCount: publishResult.indexedCount
+      },
+      previousActiveVersionId: publishResult.previousActiveVersionId,
+      safety: publishResult.safety,
       report: toAuditReportSummary(batch.report)
     }
   });
@@ -333,6 +354,40 @@ async function saveUploadedImportFile(file: File | null) {
   };
 }
 
+async function assertImportCanStart(fileHash: string) {
+  const [openDraft] = await db
+    .select({ id: importBatches.id })
+    .from(importBatches)
+    .innerJoin(catalogVersions, eq(catalogVersions.id, importBatches.catalogVersionId))
+    .where(and(eq(importBatches.status, "analyzed"), eq(catalogVersions.status, "draft")))
+    .limit(1);
+
+  if (openDraft) {
+    throw new AdminImportError(
+      "import_in_progress",
+      "Уже есть подготовленный черновик импорта. Опубликуйте или отмените его перед новой загрузкой."
+    );
+  }
+
+  const [sameFile] = await db
+    .select({ id: importBatches.id })
+    .from(importBatches)
+    .where(
+      and(
+        eq(importBatches.fileHash, fileHash),
+        inArray(importBatches.status, ["uploaded", "analyzed", "published"])
+      )
+    )
+    .limit(1);
+
+  if (sameFile) {
+    throw new AdminImportError(
+      "duplicate_file",
+      "Файл с таким содержимым уже загружался. Повторная загрузка заблокирована."
+    );
+  }
+}
+
 async function getImportBatchById(importBatchId: string) {
   const [batch] = await db
     .select({
@@ -392,7 +447,7 @@ function toAdminImportBatchSummary(
   return {
     ...batch,
     report,
-    canPublish: canChange && Boolean(report),
+    canPublish: canChange && report !== null && report.safety?.canPublish !== false,
     canCancel: canChange
   };
 }
@@ -425,6 +480,20 @@ function toAuditReportSummary(report: StoredImportReport | ImportPreviewReport) 
     reviewRows: report.reviewRows,
     totalRows: report.totalRows,
     selectedSheetName: report.selectedSheetName,
+    priceChanges: report.priceChanges,
+    safety: report.safety
+      ? {
+          canPublish: report.safety.canPublish,
+          blockingCount: report.safety.blockingCount,
+          warningCount: report.safety.warningCount,
+          blockedChecks: report.safety.checks
+            .filter((check) => check.status === "blocked")
+            .map((check) => check.code),
+          warningChecks: report.safety.checks
+            .filter((check) => check.status === "warning")
+            .map((check) => check.code)
+        }
+      : null,
     autoCategorizationPreview: report.autoCategorizationPreview
       ? {
           totalProducts: report.autoCategorizationPreview.totalProducts,

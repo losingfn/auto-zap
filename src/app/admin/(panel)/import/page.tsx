@@ -23,6 +23,11 @@ const percentFormatter = new Intl.NumberFormat("ru-RU", {
   style: "percent",
   maximumFractionDigits: 1
 });
+const moneyFormatter = new Intl.NumberFormat("ru-RU", {
+  style: "currency",
+  currency: "RUB",
+  maximumFractionDigits: 2
+});
 const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
   dateStyle: "medium",
   timeStyle: "short",
@@ -50,6 +55,9 @@ const errorMessages: Record<string, string> = {
   invalid_type: "Тип файла не похож на Excel-документ.",
   analysis_failed: "Не удалось прочитать Excel-файл или подготовить отчёт импорта.",
   publish_failed: "Не удалось опубликовать импорт.",
+  safety_blocked: "Публикация заблокирована safety checks. Проверьте отчёт ниже.",
+  duplicate_file: "Файл с таким содержимым уже загружался.",
+  import_in_progress: "Сначала опубликуйте или отмените уже подготовленный черновик импорта.",
   cancel_failed: "Не удалось отменить импорт.",
   not_found: "Черновик импорта не найден.",
   not_ready: "Перед публикацией нужен предварительный отчёт.",
@@ -66,6 +74,8 @@ const uploadErrorCodes = new Set([
   "invalid_extension",
   "invalid_type",
   "analysis_failed",
+  "duplicate_file",
+  "import_in_progress",
   "upload_failed",
   "server_error",
   "unexpected_response"
@@ -79,7 +89,27 @@ const metricDescriptions = {
   errorRows: "Строки, которые не удалось корректно обработать.",
   skippedRows: "Служебные или неподходящие строки, которые не участвуют в импорте.",
   totalRows: "Все строки выбранного листа, которые прошли предварительный анализ.",
-  parsedRows: "Строки, где найден внутренний артикул товара."
+  parsedRows: "Строки, где найден внутренний артикул товара.",
+  priceUpdated: "Существующие товары, у которых новая цена отличается от текущей.",
+  priceIncreased: "Существующие товары с повышением цены.",
+  priceDecreased: "Существующие товары со снижением цены.",
+  priceUnchanged: "Существующие товары, где цена осталась прежней."
+};
+
+const safetyCheckLabels: Record<string, string> = {
+  active_version_exists: "Активная версия",
+  no_parallel_import: "Параллельный импорт",
+  new_active_count: "Активные товары",
+  catalog_shrink_ratio: "Размер каталога",
+  archive_ratio: "Архивация",
+  parse_error_ratio: "Ошибки разбора",
+  missing_price_ratio: "Пропущенные цены",
+  missing_name_ratio: "Пустые названия",
+  duplicate_shop_code: "Дубли артикулов",
+  invalid_category: "Категории",
+  existing_category_loss: "Старые категории",
+  review_items: "Товары на проверку",
+  meilisearch_available: "Meilisearch"
 };
 
 type SelectedImportBatch = NonNullable<
@@ -104,8 +134,8 @@ export default async function AdminImportPage({ searchParams }: ImportPageProps)
           </p>
           <h1 className="mt-2 text-3xl font-semibold">Загрузка каталога</h1>
           <p className="mt-3 max-w-2xl text-[#C8D1DF]">
-            Загрузите .xls или .xlsx, проверьте предварительный отчёт и только потом опубликуйте
-            изменения.
+            Загрузите .xls или .xlsx: система обновит цены, сохранит старые категории,
+            подготовит безопасный черновик и покажет, что можно публиковать.
           </p>
         </div>
       </div>
@@ -113,7 +143,9 @@ export default async function AdminImportPage({ searchParams }: ImportPageProps)
       {params.error && !uploadErrorMessage ? (
         <Notice tone="danger">{errorMessages[params.error] ?? errorMessages.analysis_failed}</Notice>
       ) : null}
-      {params.uploaded ? <Notice>Файл загружен, draft-версия и отчёт созданы.</Notice> : null}
+      {params.uploaded ? (
+        <Notice>Файл загружен, безопасный черновик и итоговый отчёт созданы.</Notice>
+      ) : null}
       {params.published ? <Notice>Изменения опубликованы, поисковый индекс пересобран.</Notice> : null}
       {params.cancelled ? <Notice>Импорт отменён, draft-версия снята с публикации.</Notice> : null}
 
@@ -275,6 +307,8 @@ function ImportResultSummary({
           />
         </div>
 
+        <PriceChangeSummary report={report} />
+        {report.safety ? <SafetySummary safety={report.safety} /> : null}
         {report.autoCategorizationPreview ? <AutoCategorizationSummary report={report} /> : null}
 
         {report.reviewRows > 0 ? <ReviewWarning count={report.reviewRows} /> : null}
@@ -282,6 +316,136 @@ function ImportResultSummary({
         {report.errorRows > 0 ? <ErrorSummary count={report.errorRows} /> : null}
 
         <ResultActions />
+      </div>
+    </section>
+  );
+}
+
+function PriceChangeSummary({ report }: { report: StoredImportReport }) {
+  const priceChanges = report.priceChanges;
+
+  return (
+    <section className="rounded-card border border-[#243249] bg-[#0B1220] p-4 sm:p-5">
+      <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
+        <div>
+          <h3 className="text-lg font-semibold">Обновление цен</h3>
+          <p className="mt-2 text-sm leading-6 text-[#8FA1B8]">
+            Цена обновляется независимо от категоризации. Существующие товары сохраняют старую
+            категорию, если она уже была назначена в активном каталоге.
+          </p>
+        </div>
+        <Badge>{numberFormatter.format(priceChanges.existingWithPriceCount)} существующих</Badge>
+      </div>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          description={metricDescriptions.priceUpdated}
+          label="Цены изменены"
+          value={priceChanges.existingPriceUpdatedCount}
+        />
+        <StatCard
+          description={metricDescriptions.priceIncreased}
+          label="Повышены"
+          value={priceChanges.increasedCount}
+        />
+        <StatCard
+          description={metricDescriptions.priceDecreased}
+          label="Снижены"
+          value={priceChanges.decreasedCount}
+        />
+        <StatCard
+          description={metricDescriptions.priceUnchanged}
+          label="Без изменений"
+          value={priceChanges.unchangedCount}
+        />
+        <StatCard
+          description="Самое большое повышение среди существующих товаров."
+          label="Макс. повышение"
+          value={`${formatMoney(priceChanges.maxIncreaseAmount)} (${formatPercent(
+            priceChanges.maxIncreasePercent
+          )})`}
+        />
+        <StatCard
+          description="Самое большое снижение среди существующих товаров."
+          label="Макс. снижение"
+          value={`${formatMoney(priceChanges.maxDecreaseAmount)} (${formatPercent(
+            priceChanges.maxDecreasePercent
+          )})`}
+        />
+        <StatCard
+          description="Среднее изменение цены по товарам, которые уже были в каталоге."
+          label="Среднее изменение"
+          value={`${formatMoney(priceChanges.averageChangeAmount)} (${formatPercent(
+            priceChanges.averageChangePercent
+          )})`}
+        />
+      </div>
+    </section>
+  );
+}
+
+function SafetySummary({
+  safety
+}: {
+  safety: NonNullable<StoredImportReport["safety"]>;
+}) {
+  return (
+    <section className="rounded-card border border-[#243249] bg-[#0B1220] p-4 sm:p-5">
+      <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
+        <div>
+          <h3 className="text-lg font-semibold">Safety checks</h3>
+          <p className="mt-2 text-sm leading-6 text-[#8FA1B8]">
+            Публикация разрешается только если нет блокирующих проверок. Товары на проверку
+            остаются в draft/review и не попадают в поисковый индекс.
+          </p>
+        </div>
+        <Badge>
+          {safety.canPublish
+            ? "Публикация разрешена"
+            : `${numberFormatter.format(safety.blockingCount)} блокируют`}
+        </Badge>
+      </div>
+
+      <div className="mt-4">
+        {safety.canPublish ? (
+          <InlineNotice>
+            Черновик можно публиковать: активные товары пройдут в каталог, спорные останутся на
+            проверке.
+          </InlineNotice>
+        ) : (
+          <InlineNotice tone="danger">
+            Публикация временно заблокирована. Исправьте файл или отмените черновик и загрузите
+            обновлённый Excel.
+          </InlineNotice>
+        )}
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        {safety.checks.map((check) => (
+          <div
+            key={check.code}
+            className={[
+              "rounded-card border p-4 text-sm",
+              check.status === "blocked"
+                ? "border-[#7F1D1D] bg-[#2A1218]"
+                : check.status === "warning"
+                  ? "border-[#854D0E] bg-[#2A2113]"
+                  : "border-[#243249] bg-[#101827]"
+            ].join(" ")}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h4 className="font-semibold">{safetyCheckLabels[check.code] ?? check.code}</h4>
+              <SafetyStatusBadge status={check.status} />
+            </div>
+            <p className="mt-2 leading-6 text-[#8FA1B8]">{check.message}</p>
+            <p className="mt-2 text-xs text-[#8FA1B8]">
+              Значение: {formatSafetyValue(check.currentValue)}
+              {typeof check.threshold === "number"
+                ? ` · Порог: ${formatSafetyValue(check.threshold)}`
+                : ""}
+            </p>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -299,8 +463,8 @@ function AutoCategorizationSummary({ report }: { report: StoredImportReport }) {
         <div>
           <h3 className="text-lg font-semibold">Автоматическая категоризация</h3>
           <p className="mt-2 text-sm leading-6 text-[#8FA1B8]">
-            Это предварительный расчёт. В этом этапе система показывает, что может распределить
-            автоматически, но логика публикации ещё не изменена.
+            Существующие товары сохраняют старую категорию. Новые товары с высокой уверенностью
+            публикуются активными, а спорные остаются в проверке.
           </p>
         </div>
         <Badge>Порог {formatPercent(preview.threshold)}</Badge>
@@ -636,7 +800,7 @@ function ImportActions({
         </form>
 
         <p className="text-sm text-[#8FA1B8]">
-          Публикация доступна только для draft-версии с предварительным отчётом.
+          Публикация доступна только для draft-версии, которая прошла safety checks.
         </p>
       </div>
     </section>
@@ -829,6 +993,24 @@ function Badge({ children }: { children: React.ReactNode }) {
   );
 }
 
+function SafetyStatusBadge({
+  status
+}: {
+  status: NonNullable<StoredImportReport["safety"]>["checks"][number]["status"];
+}) {
+  const labels = {
+    passed: "OK",
+    warning: "Внимание",
+    blocked: "Блок"
+  } as const;
+
+  return (
+    <span className="inline-flex min-h-7 shrink-0 items-center rounded-card border border-[#4169A8] px-2 text-xs font-semibold text-[#C8D1DF]">
+      {labels[status]}
+    </span>
+  );
+}
+
 function formatColumn(index: number | null) {
   return index === null ? "не найдена" : `колонка ${index + 1}`;
 }
@@ -839,6 +1021,22 @@ function formatDate(date: Date | null) {
 
 function formatPercent(value: number) {
   return percentFormatter.format(value);
+}
+
+function formatMoney(value: number) {
+  return moneyFormatter.format(value);
+}
+
+function formatSafetyValue(value: number | boolean) {
+  if (typeof value === "boolean") {
+    return value ? "да" : "нет";
+  }
+
+  if (Math.abs(value) > 0 && Math.abs(value) < 1) {
+    return formatPercent(value);
+  }
+
+  return numberFormatter.format(value);
 }
 
 function sourceLabel(source: string) {

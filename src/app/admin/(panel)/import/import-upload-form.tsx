@@ -9,7 +9,8 @@ const waitingStages = [
   "Загружаем файл",
   "Проверяем структуру Excel",
   "Сопоставляем товары",
-  "Готовим результат импорта"
+  "Проверяем safety",
+  "Готовим безопасный черновик"
 ];
 
 type ImportUploadFormProps = {
@@ -187,7 +188,7 @@ function ImportUploadFields({
           className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-card bg-[#73A0F5] px-5 text-sm font-semibold text-[#07101F] transition hover:bg-[#9DBDFB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#93C5FD] active:translate-y-px disabled:cursor-not-allowed disabled:bg-[#334155] disabled:text-[#94A3B8] lg:w-auto"
         >
           {busy ? <Spinner /> : null}
-          {busy ? "Загрузка и проверка..." : "Загрузить и проверить"}
+          {busy ? "Обновляем каталог..." : "Обновить каталог"}
         </button>
       </div>
 
@@ -232,7 +233,7 @@ function WaitingStages({ activeStage }: { activeStage: number }) {
           </p>
         </div>
       </div>
-      <ol className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      <ol className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
         {waitingStages.map((stage, index) => (
           <li
             key={stage}

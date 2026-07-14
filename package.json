@@ -9,6 +9,7 @@
     "start:prod": "next start -p 3000 -H 127.0.0.1",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test": "node --import tsx scripts/test-import-automation.ts",
     "assets:prepare": "python3 scripts/prepare-assets.py",
     "import:check": "node --import tsx scripts/check-import.ts",
     "categorization:check": "node --import tsx scripts/check-categorization.ts",

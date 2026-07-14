@@ -13,6 +13,7 @@ export type ImportValidationCode =
   | "technical_row"
   | "total_row"
   | "missing_code"
+  | "duplicate_code"
   | "missing_name"
   | "missing_price"
   | "invalid_price"
@@ -141,6 +142,37 @@ export interface AutoCategorizationPreviewReport {
   dangerousGroups: AutoCategorizationGroupPreview[];
 }
 
+export interface ImportPriceChangeReport {
+  existingWithPriceCount: number;
+  existingPriceUpdatedCount: number;
+  increasedCount: number;
+  decreasedCount: number;
+  unchangedCount: number;
+  maxIncreaseAmount: number;
+  maxIncreasePercent: number;
+  maxDecreaseAmount: number;
+  maxDecreasePercent: number;
+  averageChangeAmount: number;
+  averageChangePercent: number;
+}
+
+export type ImportSafetyCheckStatus = "passed" | "warning" | "blocked";
+
+export interface ImportSafetyCheckResult {
+  code: string;
+  status: ImportSafetyCheckStatus;
+  message: string;
+  currentValue: number | boolean;
+  threshold?: number;
+}
+
+export interface ImportSafetyReport {
+  canPublish: boolean;
+  blockingCount: number;
+  warningCount: number;
+  checks: ImportSafetyCheckResult[];
+}
+
 export interface ImportPreviewReport {
   fileName: string;
   selectedSheetName: string;
@@ -157,6 +189,8 @@ export interface ImportPreviewReport {
   archivedCount: number;
   unchangedCount: number;
   issueCounts: Record<string, number>;
+  priceChanges: ImportPriceChangeReport;
+  safety?: ImportSafetyReport;
   examples: {
     valid: AnalyzedImportRow[];
     needsReview: AnalyzedImportRow[];

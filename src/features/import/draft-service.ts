@@ -27,6 +27,8 @@ import { getSearchSynonyms } from "@/features/search/synonyms";
 import type { SearchSynonymRecord } from "@/features/search/types";
 import { slugify } from "@/lib/slug";
 import { analyzeImportFile } from "./analyze";
+import { needsProductReview, resolveImportProductName } from "./automation";
+import { evaluateImportSafety } from "./safety";
 import type {
   AnalyzedImportRow,
   AutoCategorizationDecisionPreview,
@@ -248,23 +250,29 @@ async function insertDraftProducts(
           const status = needsProductReview(row, categorization)
             ? ("needs_review" as const)
             : ("active" as const);
+          const productName = resolveImportProductName(
+            row,
+            existingByCode.get(row.shopCode!)
+          );
+          const reviewReason =
+            status === "needs_review" ? buildReviewReason(row, categorization) : null;
 
           return {
             catalogVersionId,
             shopCode: row.shopCode!,
             rawName: row.rawName,
-            name: row.name || row.shopCode!,
-            slug: slugify(`${row.shopCode}-${row.name || "bez-nazvaniya"}`),
+            name: productName,
+            slug: slugify(`${row.shopCode}-${productName}`),
             price: toNumericString(row.price)!,
             stockQuantity: toNumericString(row.stockQuantity),
             stockSum: toNumericString(row.stockSum),
             categoryId: categorization.target?.categoryId,
             subcategoryId: categorization.target?.subcategoryId,
             status,
-            reviewReason: buildReviewReason(row, categorization),
+            reviewReason,
             searchText: buildProductSearchText({
               shopCode: row.shopCode!,
-              name: row.name || row.shopCode!,
+              name: productName,
               rawName: row.rawName,
               categoryName: categorization.target?.categoryName,
               subcategoryName: categorization.target?.subcategoryName,
@@ -334,6 +342,25 @@ function withCategorizationReport(
     }
   }
 
+  const autoCategorizationPreview = buildAutoCategorizationPreview(
+    rows,
+    categorizationContext,
+    existingProducts
+  );
+  const activeProductCount = existingProducts.filter((product) => product.status === "active").length;
+  const safety = evaluateImportSafety({
+    report: {
+      ...report,
+      reviewRows: combinedReviewRows,
+      autoCategorizationPreview
+    },
+    activeProductCount,
+    draftActiveProductCount: autoCategorizationPreview.wouldAutoPublish,
+    invalidCategoryCount: 0,
+    hasActiveVersion: existingProducts.length > 0,
+    hasBlockingImport: false
+  });
+
   return {
     ...report,
     reviewRows: combinedReviewRows,
@@ -342,11 +369,8 @@ function withCategorizationReport(
       unmatchedRows,
       activeRules: categorizationContext.rules.length
     },
-    autoCategorizationPreview: buildAutoCategorizationPreview(
-      rows,
-      categorizationContext,
-      existingProducts
-    )
+    autoCategorizationPreview,
+    safety
   };
 }
 
@@ -610,28 +634,43 @@ function formatRowExample(row: AnalyzedImportRow) {
   return `${row.shopCode ?? "NO_CODE"} ${row.name || row.rawName}`.trim();
 }
 
-function needsProductReview(row: AnalyzedImportRow, categorization: CategorizationResult) {
-  return row.status === "needs_review" || categorization.needsReview;
-}
-
 function shouldAutoPublishInShadow(
   row: AnalyzedImportRow,
   categorization: CategorizationResult
 ) {
-  return Boolean(
-    row.status === "valid" &&
-      categorization.target &&
-      categorization.confidence >= AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD
-  );
+  return isImportProductCandidate(row) && !needsProductReview(row, categorization);
 }
 
 function buildReviewReason(row: AnalyzedImportRow, categorization: CategorizationResult) {
   return [
     ...row.issues.map((issue) => issue.message),
-    categorization.reviewReason
+    categorization.reviewReason,
+    buildCategorizationReviewReason(categorization)
   ]
     .filter(Boolean)
     .join("; ");
+}
+
+function buildCategorizationReviewReason(categorization: CategorizationResult) {
+  if (categorization.source === "existing_product_category") {
+    return null;
+  }
+
+  if (!categorization.target) {
+    return categorization.reviewReason ?? "Категория не определена.";
+  }
+
+  if (!categorization.target.categoryId || !categorization.target.subcategoryId) {
+    return "Категория или подкатегория не найдена в базе данных.";
+  }
+
+  if (categorization.confidence < AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD) {
+    return `Низкая уверенность автоматической категоризации: ${Math.round(
+      categorization.confidence * 100
+    )}%.`;
+  }
+
+  return null;
 }
 
 function toNumericString(value: number | null) {

@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { catalogTaxonomy, defaultCategorizationRules } from "../src/config/catalog-taxonomy";
+import { isPublicTaxonomyTarget } from "../src/config/public-taxonomy";
 import { buildDefaultCategorizationContext, categorizeProductName } from "../src/features/categorization/engine";
 import type { CategorizationResult } from "../src/features/categorization/types";
 import { createAdminRedirectUrlFromParts } from "../src/middleware";
-import { normalizeStoredImportReport } from "../src/features/admin/imports";
+import { canCancelImport, canPublishImport, normalizeStoredImportReport } from "../src/features/admin/imports";
+import { getStaticPublicCategories } from "../src/features/catalog/data";
 import { needsProductReview, resolveImportProductName } from "../src/features/import/automation";
 import { buildImportReport, buildPriceChangeReport } from "../src/features/import/report";
 import { evaluateImportSafety } from "../src/features/import/safety";
@@ -23,11 +26,11 @@ import type { SearchProductDocument } from "../src/features/search/types";
 
 const target = {
   categoryId: "cat-1",
-  categorySlug: "dvigatel",
-  categoryName: "Двигатель",
+  categorySlug: "filtry-i-masla",
+  categoryName: "Фильтры и масла",
   subcategoryId: "sub-1",
-  subcategorySlug: "filtry",
-  subcategoryName: "Фильтры"
+  subcategorySlug: "maslyanye-filtry",
+  subcategoryName: "Масляные фильтры"
 };
 
 run("existing product keeps category and skips review", () => {
@@ -114,6 +117,33 @@ run("stored import report preserves new price and automation summaries", () => {
   assert.equal(normalized.autoCategorizationPreview?.shadowHigh, 6);
   assert.equal(normalized.autoCategorizationPreview?.wouldRequireReview, 2);
   assert.equal(normalized.autoCategorizationPreview?.wouldAutoPublish, 9);
+});
+
+run("legacy import report cannot publish but can be cancelled", () => {
+  const normalized = normalizeStoredImportReport(legacyStoredReport());
+
+  assert.ok(normalized);
+  assert.equal(canPublishImport("analyzed", "draft", normalized), false);
+  assert.equal(canCancelImport("analyzed", "draft"), true);
+  assert.equal(canCancelImport("failed", "draft"), true);
+  assert.equal(canCancelImport("published", "active"), false);
+});
+
+run("public taxonomy excludes fasteners category and rules", () => {
+  assert.equal(getStaticPublicCategories().some((category) => category.slug === "krepezh"), false);
+  assert.equal(catalogTaxonomy.some((category) => String(category.slug) === "krepezh"), false);
+  assert.equal(
+    defaultCategorizationRules.some((rule) => rule.categorySlug === "krepezh"),
+    false
+  );
+  assert.equal(isPublicTaxonomyTarget("krepezh", "bolty"), false);
+});
+
+run("fastener-like single token is not auto-published as a new public category", () => {
+  const result = categorizeProductName("B-1 болт м8", buildDefaultCategorizationContext());
+
+  assert.notEqual(result.target?.categorySlug, "krepezh");
+  assert.equal(needsProductReview(row({ shopCode: "B-1", name: "болт м8" }), result), true);
 });
 
 run("new high-confidence product becomes active", () => {
@@ -222,10 +252,11 @@ run("admin redirect uses forwarded production origin", () => {
   assert.equal(url.toString().includes("localhost"), false);
 });
 
-run("search documents query filters active products", () => {
+run("search documents query filters active products and public taxonomy", () => {
   const source = readFileSync(new URL("../src/features/search/documents.ts", import.meta.url), "utf8");
 
   assert.match(source, /eq\(products\.status,\s*"active"\)/);
+  assert.match(source, /publicTaxonomyTargetCondition/);
 });
 
 run("publish prepares search index before active DB transaction", () => {

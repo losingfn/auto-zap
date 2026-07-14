@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import { CategoryGrid } from "@/components/catalog/category-grid";
 import { CatalogPageShell } from "@/components/catalog/page-shell";
 import { JsonLd } from "@/components/seo/json-ld";
-import { getStaticPublicCategories } from "@/features/catalog/data";
+import { getPublicCatalogCategories } from "@/features/catalog/data";
 import { buildBreadcrumbList, publicAbsoluteUrl } from "@/features/seo/structured-data";
 
 const catalogUrl = publicAbsoluteUrl("/catalog");
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Каталог автозапчастей",
@@ -19,8 +20,8 @@ export const metadata: Metadata = {
   }
 };
 
-export default function CatalogPage() {
-  const categories = getStaticPublicCategories();
+export default async function CatalogPage() {
+  const categories = await getPublicCatalogCategories();
 
   return (
     <CatalogPageShell

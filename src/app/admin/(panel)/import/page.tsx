@@ -135,7 +135,7 @@ export default async function AdminImportPage({ searchParams }: ImportPageProps)
           <h1 className="mt-2 text-3xl font-semibold">Загрузка каталога</h1>
           <p className="mt-3 max-w-2xl text-[#C8D1DF]">
             Загрузите .xls или .xlsx: система обновит цены, сохранит старые категории,
-            подготовит безопасный черновик и покажет, что можно публиковать.
+            проверит безопасность, опубликует каталог и пересоберёт поиск.
           </p>
         </div>
       </div>
@@ -144,9 +144,9 @@ export default async function AdminImportPage({ searchParams }: ImportPageProps)
         <Notice tone="danger">{errorMessages[params.error] ?? errorMessages.analysis_failed}</Notice>
       ) : null}
       {params.uploaded ? (
-        <Notice>Файл загружен, безопасный черновик и итоговый отчёт созданы.</Notice>
+        <Notice>Файл загружен, безопасный отчёт создан.</Notice>
       ) : null}
-      {params.published ? <Notice>Изменения опубликованы, поисковый индекс пересобран.</Notice> : null}
+      {params.published ? <Notice>Каталог успешно обновлён, поисковый индекс пересобран.</Notice> : null}
       {params.cancelled ? <Notice>Импорт отменён, draft-версия снята с публикации.</Notice> : null}
 
       <ImportUploadForm
@@ -1050,6 +1050,8 @@ function sourceLabel(source: string) {
     ambiguous_token: "Неоднозначный токен",
     empty_name: "Пустое название",
     invalid_name: "Некорректное название",
+    invalid_taxonomy_target: "Недоступная категория",
+    similarity: "Похожие товары",
     no_match: "Нет правила"
   };
 

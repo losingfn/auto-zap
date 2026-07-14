@@ -1,4 +1,9 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import {
+  getPublicCategorySlugs,
+  getPublicTaxonomyTargets,
+  isPublicCategorySlug
+} from "@/config/public-taxonomy";
 import { db } from "@/db/client";
 import { catalogVersions, categories, products, subcategories } from "@/db/schema";
 import { compactShopCode, normalizeSearchText } from "./normalization";
@@ -61,11 +66,24 @@ export async function searchProductsWithPostgres({
   }
 
   if (categorySlug) {
+    if (!admin && !isPublicCategorySlug(categorySlug)) {
+      return { total: 0, hits: [] };
+    }
+
     whereConditions.push(eq(categories.slug, categorySlug));
   }
 
   if (subcategorySlug) {
     whereConditions.push(eq(subcategories.slug, subcategorySlug));
+  }
+
+  if (!admin) {
+    whereConditions.push(
+      eq(categories.isActive, true),
+      eq(subcategories.isActive, true),
+      inArray(categories.slug, getPublicCategorySlugs()),
+      publicTaxonomyTargetCondition()
+    );
   }
 
   const [totalRow] = await db
@@ -127,4 +145,16 @@ export async function searchProductsWithPostgres({
     total: Number(totalRow?.count ?? 0),
     hits: rankSearchHits(documents, query, synonyms, sourceScores).slice(0, limit)
   };
+}
+
+function publicTaxonomyTargetCondition() {
+  const targets = getPublicTaxonomyTargets();
+
+  return sql<boolean>`(${sql.join(
+    targets.map(
+      (target) =>
+        sql`(${categories.slug} = ${target.categorySlug} AND ${subcategories.slug} = ${target.subcategorySlug})`
+    ),
+    sql` OR `
+  )})`;
 }

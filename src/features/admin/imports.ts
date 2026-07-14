@@ -199,13 +199,18 @@ export async function publishAdminImportBatch({
   importBatchId: string;
   adminUserId: string;
 }) {
-  const batch = await getActionableImportBatch(importBatchId);
+  const batch = await getImportBatchForAction(importBatchId);
 
   if (!batch.report) {
     throw new AdminImportError("not_ready", "Перед публикацией нужен предварительный отчёт.");
   }
 
-  if (batch.status !== "analyzed" || batch.versionStatus !== "draft") {
+  if (
+    !batch.catalogVersionId ||
+    batch.status !== "analyzed" ||
+    batch.versionStatus !== "draft" ||
+    batch.report.safety?.canPublish !== true
+  ) {
     throw new AdminImportError("already_finalized", "Этот импорт уже нельзя опубликовать.");
   }
 
@@ -267,9 +272,13 @@ export async function cancelAdminImportBatch({
   importBatchId: string;
   adminUserId: string;
 }) {
-  const batch = await getActionableImportBatch(importBatchId);
+  const batch = await getImportBatchForAction(importBatchId);
 
-  if (batch.status !== "analyzed" || batch.versionStatus !== "draft") {
+  if (batch.status === "cancelled") {
+    return;
+  }
+
+  if (!canCancelImport(batch.status, batch.versionStatus)) {
     throw new AdminImportError("already_finalized", "Этот импорт уже нельзя отменить.");
   }
 
@@ -280,10 +289,12 @@ export async function cancelAdminImportBatch({
         .set({ status: "cancelled" })
         .where(eq(importBatches.id, batch.id));
 
-      await tx
-        .update(catalogVersions)
-        .set({ status: "rolled_back" })
-        .where(eq(catalogVersions.id, batch.catalogVersionId));
+      if (batch.catalogVersionId && batch.versionStatus === "draft") {
+        await tx
+          .update(catalogVersions)
+          .set({ status: "rolled_back" })
+          .where(eq(catalogVersions.id, batch.catalogVersionId));
+      }
 
       await tx.insert(auditLogs).values({
         adminUserId,
@@ -359,7 +370,12 @@ async function assertImportCanStart(fileHash: string) {
     .select({ id: importBatches.id })
     .from(importBatches)
     .innerJoin(catalogVersions, eq(catalogVersions.id, importBatches.catalogVersionId))
-    .where(and(eq(importBatches.status, "analyzed"), eq(catalogVersions.status, "draft")))
+    .where(
+      and(
+        inArray(importBatches.status, ["uploaded", "analyzed", "failed"]),
+        eq(catalogVersions.status, "draft")
+      )
+    )
     .limit(1);
 
   if (openDraft) {
@@ -375,7 +391,7 @@ async function assertImportCanStart(fileHash: string) {
     .where(
       and(
         eq(importBatches.fileHash, fileHash),
-        inArray(importBatches.status, ["uploaded", "analyzed", "published"])
+        inArray(importBatches.status, ["uploaded", "analyzed"])
       )
     )
     .limit(1);
@@ -412,7 +428,7 @@ async function getImportBatchById(importBatchId: string) {
   return batch ?? null;
 }
 
-async function getActionableImportBatch(importBatchId: string) {
+async function getImportBatchForAction(importBatchId: string) {
   const [batch] = await db
     .select({
       id: importBatches.id,
@@ -423,17 +439,16 @@ async function getActionableImportBatch(importBatchId: string) {
       versionStatus: catalogVersions.status
     })
     .from(importBatches)
-    .innerJoin(catalogVersions, eq(catalogVersions.id, importBatches.catalogVersionId))
-    .where(and(eq(importBatches.id, importBatchId), eq(catalogVersions.status, "draft")))
+    .leftJoin(catalogVersions, eq(catalogVersions.id, importBatches.catalogVersionId))
+    .where(eq(importBatches.id, importBatchId))
     .limit(1);
 
-  if (!batch || !batch.catalogVersionId) {
-    throw new AdminImportError("not_found", "Черновик импорта не найден.");
+  if (!batch) {
+    throw new AdminImportError("not_found", "Импорт не найден.");
   }
 
   return {
     ...batch,
-    catalogVersionId: batch.catalogVersionId,
     report: toStoredReport(batch.report)
   };
 }
@@ -442,14 +457,33 @@ function toAdminImportBatchSummary(
   batch: Awaited<ReturnType<typeof getImportBatchById>> extends infer T ? NonNullable<T> : never
 ): AdminImportBatchSummary {
   const report = toStoredReport(batch.report);
-  const canChange = batch.status === "analyzed" && batch.versionStatus === "draft";
 
   return {
     ...batch,
     report,
-    canPublish: canChange && report !== null && report.safety?.canPublish !== false,
-    canCancel: canChange
+    canPublish: canPublishImport(batch.status, batch.versionStatus, report),
+    canCancel: canCancelImport(batch.status, batch.versionStatus)
   };
+}
+
+export function canPublishImport(
+  status: string,
+  versionStatus: string | null,
+  report: StoredImportReport | null
+) {
+  return status === "analyzed" && versionStatus === "draft" && report?.safety?.canPublish === true;
+}
+
+export function canCancelImport(status: string, versionStatus: string | null) {
+  if (status === "cancelled") {
+    return false;
+  }
+
+  if (status === "published" || versionStatus === "active" || versionStatus === "archived") {
+    return false;
+  }
+
+  return ["uploaded", "analyzed", "failed"].includes(status);
 }
 
 export function normalizeStoredImportReport(value: unknown): StoredImportReport | null {

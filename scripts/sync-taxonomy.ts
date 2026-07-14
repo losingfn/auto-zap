@@ -188,13 +188,6 @@ const categorySeo = new Map<string, Pick<CategorySeed, "seoTitle" | "seoDescript
     }
   ],
   [
-    "krepezh",
-    {
-      seoTitle: "Крепёж | Автозапчасти на Салтыкова-Щедрина",
-      seoDescription: "Болты, гайки, шайбы, хомуты, штуцеры и другой крепёж в каталоге магазина."
-    }
-  ],
-  [
     "aksessuary",
     {
       seoTitle: "Аксессуары | Автозапчасти на Салтыкова-Щедрина",

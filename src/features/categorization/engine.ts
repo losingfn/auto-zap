@@ -1,4 +1,5 @@
 import { defaultCategorizationRules } from "@/config/catalog-taxonomy";
+import { isPublicTaxonomyTarget } from "@/config/public-taxonomy";
 import { normalizeText } from "@/features/import/normalize";
 import {
   AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD,
@@ -120,26 +121,6 @@ const strongSingleTokens = new Set([
 ]);
 
 const safeHighConfidenceSingleRules = new Set([
-  "krepezh/bolty:болт",
-  "krepezh/bolty:din912",
-  "krepezh/bolty:din",
-  "krepezh/gayki:гайка",
-  "krepezh/gayki:гайк",
-  "krepezh/shayby:шайба",
-  "krepezh/shayby:шайб",
-  "krepezh/shayby:гровер",
-  "krepezh/shpilki:шпилька",
-  "krepezh/shpilki:шпильк",
-  "krepezh/vinty:винт",
-  "krepezh/vinty:саморез",
-  "krepezh/homuty:хомут",
-  "krepezh/homuty:norma",
-  "krepezh/shtucery-i-fitingi:штуцер",
-  "krepezh/shtucery-i-fitingi:фитинг",
-  "krepezh/soediniteli:соединитель",
-  "krepezh/soediniteli:соединител",
-  "krepezh/soediniteli:быстросъем",
-  "krepezh/soediniteli:быстросъём",
   "kuzov-i-optika/emblemy:эмблема",
   "kuzov-i-optika/emblemy:шильдик",
   "kuzov-i-optika/povtoriteli:повторитель",
@@ -209,9 +190,17 @@ export function categorizeProductName(
   }
 
   const score = scoreMatchedRule(matchedRule, text);
+  const target = targetFromRule(matchedRule);
+  if (!isPublicTaxonomyTarget(target.categorySlug, target.subcategorySlug)) {
+    return buildUnresolvedResult({
+      source: "invalid_taxonomy_target",
+      reason: "Правило указывает на категорию, которой нет в согласованной публичной таксономии.",
+      signal: `${target.categorySlug}/${target.subcategorySlug}`
+    });
+  }
 
   return {
-    target: targetFromRule(matchedRule),
+    target,
     matchedRule,
     confidence: score.confidence,
     source: score.source,
@@ -246,7 +235,9 @@ export function buildDefaultCategorizationContext(): CategorizationContext {
   }));
 
   return {
-    rules,
+    rules: rules.filter((rule) =>
+      isPublicTaxonomyTarget(rule.categorySlug, rule.subcategorySlug)
+    ),
     fallbackByCategorySlug: new Map<string, CategorizationTarget>()
   };
 }
@@ -366,7 +357,8 @@ function toExistingProductTarget(
     !existingProduct?.categoryId ||
     !existingProduct.subcategoryId ||
     !existingProduct.categorySlug ||
-    !existingProduct.subcategorySlug
+    !existingProduct.subcategorySlug ||
+    !isPublicTaxonomyTarget(existingProduct.categorySlug, existingProduct.subcategorySlug)
   ) {
     return null;
   }

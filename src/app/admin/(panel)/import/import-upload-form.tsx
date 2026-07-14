@@ -10,7 +10,7 @@ const waitingStages = [
   "Проверяем структуру Excel",
   "Сопоставляем товары",
   "Проверяем safety",
-  "Готовим безопасный черновик"
+  "Обновляем каталог и поиск"
 ];
 
 type ImportUploadFormProps = {
@@ -249,7 +249,7 @@ function WaitingStages({ activeStage }: { activeStage: number }) {
         ))}
       </ol>
       <p className="mt-3 text-xs leading-5 text-[#8FA1B8]">
-        Это индикатор ожидания: сервер сообщит итог после завершения анализа.
+        Это индикатор ожидания: сервер сообщит итог после завершения обновления.
       </p>
     </div>
   );

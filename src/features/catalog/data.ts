@@ -1,6 +1,12 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { catalogCategories } from "@/config/categories";
+import {
+  getPublicCategorySlugs,
+  getPublicTaxonomyTargets,
+  isPublicCategorySlug,
+  isPublicTaxonomyTarget
+} from "@/config/public-taxonomy";
 import { categories, catalogVersions, products, subcategories } from "@/db/schema";
 import type {
   PublicCategory,
@@ -17,13 +23,23 @@ const DEFAULT_PRODUCTS_PAGE_SIZE = 50;
 const PUBLIC_CATALOG_TIMEOUT_MS = 3500;
 
 export function getStaticPublicCategories(): PublicCategory[] {
-  return catalogCategories.map((category) => ({
-    slug: category.slug,
-    name: category.name,
-    icon: category.icon,
-    sortOrder: category.sortOrder,
-    isAllAssortment: "isAllAssortment" in category ? category.isAllAssortment : false
-  }));
+  return catalogCategories
+    .filter((category) => isPublicCategorySlug(category.slug))
+    .map((category) => ({
+      slug: category.slug,
+      name: category.name,
+      icon: category.icon,
+      sortOrder: category.sortOrder,
+      isAllAssortment: "isAllAssortment" in category ? category.isAllAssortment : false
+    }));
+}
+
+export async function getPublicCatalogCategories(): Promise<PublicCategory[]> {
+  return withCatalogTimeout(
+    loadPublicCatalogCategories(),
+    getStaticPublicCategories(),
+    "catalog categories"
+  );
 }
 
 function categoryIconBySlug(slug: string) {
@@ -34,6 +50,10 @@ function categoryIconBySlug(slug: string) {
 }
 
 function staticCategoryBySlug(slug: string) {
+  if (!isPublicCategorySlug(slug)) {
+    return undefined;
+  }
+
   return catalogCategories.find((item) => item.slug === slug);
 }
 
@@ -74,6 +94,10 @@ function withCatalogTimeout<T>(promise: Promise<T>, fallback: T, label: string):
 }
 
 export async function getCategoryBySlug(categorySlug: string) {
+  if (!isPublicCategorySlug(categorySlug)) {
+    return null;
+  }
+
   const [category] = await db
     .select({
       id: categories.id,
@@ -81,7 +105,7 @@ export async function getCategoryBySlug(categorySlug: string) {
       name: categories.name
     })
     .from(categories)
-    .where(eq(categories.slug, categorySlug))
+    .where(and(eq(categories.slug, categorySlug), eq(categories.isActive, true)))
     .limit(1);
 
   return category ?? null;
@@ -140,18 +164,22 @@ async function loadSubcategoriesForCategory(categorySlug: string): Promise<{
         name: subcategories.name
       })
       .from(subcategories)
-      .where(eq(subcategories.categoryId, category.id))
+      .where(and(eq(subcategories.categoryId, category.id), eq(subcategories.isActive, true)))
       .orderBy(asc(subcategories.name));
 
-    const items = await Promise.all(
-      rows.map(async (row) => ({
-        id: row.id,
-        slug: row.slug,
-        name: row.name,
-        description: null,
-        productCount: activeVersionId ? await countProducts(activeVersionId, row.id) : 0
-      }))
-    );
+    const items = (
+      await Promise.all(
+        rows
+          .filter((row) => isPublicTaxonomyTarget(category.slug, row.slug))
+          .map(async (row) => ({
+            id: row.id,
+            slug: row.slug,
+            name: row.name,
+            description: null,
+            productCount: activeVersionId ? await countProducts(activeVersionId, row.id) : 0
+          }))
+      )
+    ).filter((item) => item.productCount > 0);
 
     return {
       category: publicCategory,
@@ -161,6 +189,61 @@ async function loadSubcategoriesForCategory(categorySlug: string): Promise<{
     console.error("[catalog] failed to load category", { categorySlug, error });
     return { category: publicCategoryFromStatic(categorySlug), subcategories: [] };
   }
+}
+
+async function loadPublicCatalogCategories(): Promise<PublicCategory[]> {
+  const activeVersionId = await getActiveCatalogVersionId();
+  if (!activeVersionId) {
+    return [];
+  }
+
+  const rows = await db
+    .select({
+      id: categories.id,
+      slug: categories.slug,
+      name: categories.name,
+      sortOrder: categories.sortOrder,
+      productCount: sql<number>`count(${products.id})::int`
+    })
+    .from(products)
+    .innerJoin(categories, eq(categories.id, products.categoryId))
+    .innerJoin(subcategories, eq(subcategories.id, products.subcategoryId))
+    .where(
+      and(
+        eq(products.catalogVersionId, activeVersionId),
+        eq(products.status, "active"),
+        eq(categories.isActive, true),
+        eq(subcategories.isActive, true),
+        inArray(categories.slug, getPublicCategorySlugs()),
+        publicTaxonomyTargetCondition()
+      )
+    )
+    .groupBy(categories.id, categories.slug, categories.name, categories.sortOrder)
+    .orderBy(asc(categories.sortOrder), asc(categories.name));
+
+  const items: PublicCategory[] = rows
+    .filter((row) => row.productCount > 0 && row.slug !== ALL_ASSORTMENT_SLUG)
+    .map((row) => {
+      const staticCategory = staticCategoryBySlug(row.slug);
+
+      return {
+        id: row.id,
+        slug: row.slug,
+        name: staticCategory?.name ?? row.name,
+        icon: categoryIconBySlug(row.slug),
+        description: null,
+        sortOrder: staticCategory?.sortOrder ?? row.sortOrder,
+        isAllAssortment: false
+      };
+    });
+
+  const totalProducts = await countProducts(activeVersionId);
+  const allAssortment = publicCategoryFromStatic(ALL_ASSORTMENT_SLUG);
+  if (totalProducts > 0 && allAssortment) {
+    items.push(allAssortment);
+  }
+
+  return items.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "ru"));
 }
 
 export async function getProductsForSubcategory(
@@ -281,12 +364,13 @@ async function loadProductsForSubcategory({
       .where(
         and(
           eq(subcategories.categoryId, category.id),
-          eq(subcategories.slug, subcategorySlug)
+          eq(subcategories.slug, subcategorySlug),
+          eq(subcategories.isActive, true)
         )
       )
       .limit(1);
 
-    if (!subcategory) {
+    if (!subcategory || !isPublicTaxonomyTarget(category.slug, subcategory.slug)) {
       return { category: publicCategory, subcategory: null, products: [], pagination: emptyPagination };
     }
 
@@ -371,12 +455,19 @@ export async function getProductDetails(
       and(
         eq(products.catalogVersionId, activeVersionId),
         eq(products.status, "active"),
-        eq(products.slug, productSlug)
+        eq(products.slug, productSlug),
+        eq(categories.isActive, true),
+        eq(subcategories.isActive, true),
+        publicTaxonomyTargetCondition()
       )
     )
     .limit(1);
 
   if (!row) {
+    return null;
+  }
+
+  if (!isPublicTaxonomyTarget(row.categorySlug, row.subcategorySlug)) {
     return null;
   }
 
@@ -412,7 +503,11 @@ async function getActiveCatalogVersionId() {
 async function countProducts(activeVersionId: string, subcategoryId?: string) {
   const where = [
     eq(products.catalogVersionId, activeVersionId),
-    eq(products.status, "active")
+    eq(products.status, "active"),
+    eq(categories.isActive, true),
+    eq(subcategories.isActive, true),
+    inArray(categories.slug, getPublicCategorySlugs()),
+    publicTaxonomyTargetCondition()
   ];
 
   if (subcategoryId) {
@@ -422,6 +517,8 @@ async function countProducts(activeVersionId: string, subcategoryId?: string) {
   const [result] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(products)
+    .innerJoin(categories, eq(categories.id, products.categoryId))
+    .innerJoin(subcategories, eq(subcategories.id, products.subcategoryId))
     .where(and(...where));
 
   return Number(result?.count ?? 0);
@@ -434,7 +531,11 @@ async function getProductRows(
 ) {
   const where = [
     eq(products.catalogVersionId, activeVersionId),
-    eq(products.status, "active")
+    eq(products.status, "active"),
+    eq(categories.isActive, true),
+    eq(subcategories.isActive, true),
+    inArray(categories.slug, getPublicCategorySlugs()),
+    publicTaxonomyTargetCondition()
   ];
 
   if (subcategoryId) {
@@ -519,4 +620,16 @@ function buildPagination({
     totalItems,
     totalPages
   };
+}
+
+function publicTaxonomyTargetCondition() {
+  const targets = getPublicTaxonomyTargets();
+
+  return sql<boolean>`(${sql.join(
+    targets.map(
+      (target) =>
+        sql`(${categories.slug} = ${target.categorySlug} AND ${subcategories.slug} = ${target.subcategorySlug})`
+    ),
+    sql` OR `
+  )})`;
 }

@@ -1,5 +1,6 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { catalogTaxonomy } from "@/config/catalog-taxonomy";
+import { getPublicCategorySlugs, getPublicTaxonomyTargets } from "@/config/public-taxonomy";
 import { db } from "@/db/client";
 import { catalogVersions, categories, products, subcategories } from "@/db/schema";
 import {
@@ -53,7 +54,16 @@ export async function getSearchDocumentsForCatalogVersion(
     .from(products)
     .innerJoin(categories, eq(categories.id, products.categoryId))
     .innerJoin(subcategories, eq(subcategories.id, products.subcategoryId))
-    .where(and(eq(products.catalogVersionId, catalogVersionId), eq(products.status, "active")))
+    .where(
+      and(
+        eq(products.catalogVersionId, catalogVersionId),
+        eq(products.status, "active"),
+        eq(categories.isActive, true),
+        eq(subcategories.isActive, true),
+        inArray(categories.slug, getPublicCategorySlugs()),
+        publicTaxonomyTargetCondition()
+      )
+    )
     .orderBy(asc(products.name));
 
   return rows.map((row) =>
@@ -65,6 +75,18 @@ export async function getSearchDocumentsForCatalogVersion(
       synonyms
     )
   );
+}
+
+function publicTaxonomyTargetCondition() {
+  const targets = getPublicTaxonomyTargets();
+
+  return sql<boolean>`(${sql.join(
+    targets.map(
+      (target) =>
+        sql`(${categories.slug} = ${target.categorySlug} AND ${subcategories.slug} = ${target.subcategorySlug})`
+    ),
+    sql` OR `
+  )})`;
 }
 
 export function buildSearchDocument(

@@ -14,17 +14,26 @@ export async function uploadImportAction(formData: FormData) {
   const session = await requireAdminSession();
   const file = formData.get("file");
   let target = "/admin/import";
+  let importBatchId: string | null = null;
 
   try {
     const result = await createAdminDraftImportFromUpload({
       file: file instanceof File ? file : null,
       adminUserId: session.user.id
     });
+    importBatchId = result.importBatchId;
 
+    await publishAdminImportBatch({
+      importBatchId: result.importBatchId,
+      adminUserId: session.user.id
+    });
+
+    revalidatePath("/admin");
     revalidatePath("/admin/import");
-    target = `/admin/import?batch=${result.importBatchId}&uploaded=1`;
+    target = `/admin/import?batch=${encodeURIComponent(result.importBatchId)}&published=1`;
   } catch (error) {
-    target = `/admin/import?error=${getErrorCode(error, "analysis_failed")}`;
+    const batchParam = importBatchId ? `batch=${encodeURIComponent(importBatchId)}&` : "";
+    target = `/admin/import?${batchParam}error=${getErrorCode(error, importBatchId ? "publish_failed" : "analysis_failed")}`;
   }
 
   redirect(target);

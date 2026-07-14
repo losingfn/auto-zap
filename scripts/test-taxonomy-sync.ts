@@ -158,8 +158,8 @@ async function insertLearningRule() {
     FROM categories
     INNER JOIN subcategories
       ON subcategories.category_id = categories.id
-     AND subcategories.slug = 'bolty'
-    WHERE categories.slug = 'krepezh'
+     AND subcategories.slug = 'amortizatory'
+    WHERE categories.slug = 'podveska'
   `;
 }
 

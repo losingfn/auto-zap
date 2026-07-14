@@ -1,3 +1,4 @@
+import { getPublicCategorySlugs, isPublicCategorySlug } from "@/config/public-taxonomy";
 import { getSearchIndex } from "./meilisearch";
 import { buildExpandedQuery, normalizeSearchText } from "./normalization";
 import { searchProductsWithPostgres } from "./postgres";
@@ -25,6 +26,18 @@ export async function searchProducts(input: SearchProductsInput): Promise<Search
   const synonyms = await getSearchSynonyms();
   const normalizedQuery = normalizeSearchText(query);
   const expandedQuery = buildExpandedQuery(query, synonyms);
+
+  if (!input.admin && filters.categorySlug && !isPublicCategorySlug(filters.categorySlug)) {
+    return {
+      query,
+      normalizedQuery,
+      expandedQuery,
+      source: "meilisearch",
+      total: 0,
+      processingTimeMs: Date.now() - startedAt,
+      hits: []
+    };
+  }
 
   if (!normalizedQuery) {
     return {
@@ -133,7 +146,10 @@ async function searchProductsWithMeili(
 }
 
 function buildMeiliFilter(filters: { categorySlug?: string; subcategorySlug?: string }) {
-  const conditions = ['status = "active"'];
+  const publicCategories = getPublicCategorySlugs()
+    .map((slug) => `"${escapeMeiliFilterValue(slug)}"`)
+    .join(", ");
+  const conditions = ['status = "active"', `categorySlug IN [${publicCategories}]`];
 
   if (filters.categorySlug) {
     conditions.push(`categorySlug = "${escapeMeiliFilterValue(filters.categorySlug)}"`);

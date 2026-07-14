@@ -1,4 +1,5 @@
 import { and, desc, eq, ne, sql } from "drizzle-orm";
+import { getPublicTaxonomyTargets } from "@/config/public-taxonomy";
 import { db } from "@/db/client";
 import { catalogVersions, categories, importBatches, products, subcategories } from "@/db/schema";
 import { assertImportSafety, evaluateImportSafety } from "@/features/import/safety";
@@ -161,9 +162,27 @@ async function countInvalidActiveCategories(catalogVersionId: string) {
       and(
         eq(products.catalogVersionId, catalogVersionId),
         eq(products.status, "active"),
-        sql`(${categories.id} is null or ${subcategories.id} is null)`
+        sql`(
+          ${categories.id} is null
+          or ${subcategories.id} is null
+          or ${categories.isActive} is distinct from true
+          or ${subcategories.isActive} is distinct from true
+          or not ${publicTaxonomyTargetCondition()}
+        )`
       )
     );
 
   return Number(row?.count ?? 0);
+}
+
+function publicTaxonomyTargetCondition() {
+  const targets = getPublicTaxonomyTargets();
+
+  return sql<boolean>`(${sql.join(
+    targets.map(
+      (target) =>
+        sql`(${categories.slug} = ${target.categorySlug} AND ${subcategories.slug} = ${target.subcategorySlug})`
+    ),
+    sql` OR `
+  )})`;
 }

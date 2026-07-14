@@ -13,6 +13,8 @@ export type CategorizationSource =
   | "ambiguous_token"
   | "empty_name"
   | "invalid_name"
+  | "invalid_taxonomy_target"
+  | "similarity"
   | "no_match";
 
 export interface CategorizationSignal {

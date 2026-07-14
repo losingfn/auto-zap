@@ -1,4 +1,5 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
+import { isPublicCategorySlug, isPublicTaxonomyTarget } from "@/config/public-taxonomy";
 import { db } from "@/db/client";
 import { categories, categorizationRules, subcategories } from "@/db/schema";
 import type {
@@ -25,22 +26,30 @@ export async function getCategorizationContext(): Promise<CategorizationContext>
     .from(categorizationRules)
     .innerJoin(categories, eq(categories.id, categorizationRules.categoryId))
     .innerJoin(subcategories, eq(subcategories.id, categorizationRules.subcategoryId))
-    .where(eq(categorizationRules.isActive, true))
+    .where(
+      and(
+        eq(categorizationRules.isActive, true),
+        eq(categories.isActive, true),
+        eq(subcategories.isActive, true)
+      )
+    )
     .orderBy(asc(categorizationRules.priority));
 
-  const rules: CategorizationRuleRecord[] = rows.map((row) => ({
-    id: row.id,
-    pattern: row.pattern,
-    matchType: row.matchType,
-    priority: row.priority,
-    categoryId: row.categoryId,
-    categorySlug: row.categorySlug,
-    categoryName: row.categoryName,
-    subcategoryId: row.subcategoryId,
-    subcategorySlug: row.subcategorySlug,
-    subcategoryName: row.subcategoryName,
-    createdBy: row.createdBy
-  }));
+  const rules: CategorizationRuleRecord[] = rows
+    .filter((row) => isPublicTaxonomyTarget(row.categorySlug, row.subcategorySlug))
+    .map((row) => ({
+      id: row.id,
+      pattern: row.pattern,
+      matchType: row.matchType,
+      priority: row.priority,
+      categoryId: row.categoryId,
+      categorySlug: row.categorySlug,
+      categoryName: row.categoryName,
+      subcategoryId: row.subcategoryId,
+      subcategorySlug: row.subcategorySlug,
+      subcategoryName: row.subcategoryName,
+      createdBy: row.createdBy
+    }));
 
   const fallbackRows = await db
     .select({
@@ -53,11 +62,18 @@ export async function getCategorizationContext(): Promise<CategorizationContext>
     })
     .from(subcategories)
     .innerJoin(categories, eq(categories.id, subcategories.categoryId))
-    .where(eq(subcategories.isActive, true))
+    .where(and(eq(subcategories.isActive, true), eq(categories.isActive, true)))
     .orderBy(asc(categories.sortOrder), asc(subcategories.sortOrder));
 
   const fallbackByCategorySlug = new Map<string, CategorizationTarget>();
   for (const row of fallbackRows) {
+    if (
+      !isPublicCategorySlug(row.categorySlug) ||
+      !isPublicTaxonomyTarget(row.categorySlug, row.subcategorySlug)
+    ) {
+      continue;
+    }
+
     if (!fallbackByCategorySlug.has(row.categorySlug)) {
       fallbackByCategorySlug.set(row.categorySlug, {
         categoryId: row.categoryId,

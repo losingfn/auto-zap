@@ -41,12 +41,6 @@ export const catalogCategories = [
     sortOrder: 60
   },
   {
-    slug: "krepezh",
-    name: "Крепёж",
-    icon: categoryIcon("aksessuary"),
-    sortOrder: 70
-  },
-  {
     slug: "aksessuary",
     name: "Аксессуары",
     icon: categoryIcon("aksessuary"),

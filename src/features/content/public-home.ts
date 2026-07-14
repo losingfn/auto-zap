@@ -1,5 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { catalogCategories } from "@/config/categories";
+import { isPublicCategorySlug } from "@/config/public-taxonomy";
 import { siteConfig } from "@/config/site";
 import { db } from "@/db/client";
 import {
@@ -416,13 +417,15 @@ function getFallbackHomeContent(): PublicHomeContent {
     storePhotos: DEFAULT_STORE_PHOTOS,
     home: DEFAULT_HOME_CONTENT,
     vacancies: [...DEFAULT_VACANCIES],
-    categories: catalogCategories.map((category) => ({
-      slug: category.slug,
-      name: category.name,
-      icon: category.icon,
-      sortOrder: category.sortOrder,
-      isAllAssortment: "isAllAssortment" in category ? category.isAllAssortment : false
-    }))
+    categories: catalogCategories
+      .filter((category) => isPublicCategorySlug(category.slug))
+      .map((category) => ({
+        slug: category.slug,
+        name: category.name,
+        icon: category.icon,
+        sortOrder: category.sortOrder,
+        isAllAssortment: "isAllAssortment" in category ? category.isAllAssortment : false
+      }))
   };
 }
 
@@ -590,19 +593,21 @@ function buildPublicCategories(
     return getFallbackHomeContent().categories;
   }
 
-  return rows.map((row) => {
-    const staticCategory = catalogCategories.find((category) => category.slug === row.slug);
+  return rows
+    .filter((row) => isPublicCategorySlug(row.slug))
+    .map((row) => {
+      const staticCategory = catalogCategories.find((category) => category.slug === row.slug);
 
-    return {
-      id: row.id,
-      slug: row.slug,
-      name: row.name,
-      description: row.description,
-      icon: staticCategory?.icon ?? row.iconPath ?? "/assets/categories/ves-assortiment.png",
-      sortOrder: row.sortOrder,
-      isAllAssortment: row.slug === "ves-assortiment"
-    };
-  });
+      return {
+        id: row.id,
+        slug: row.slug,
+        name: row.name,
+        description: row.description,
+        icon: staticCategory?.icon ?? row.iconPath ?? "/assets/categories/ves-assortiment.png",
+        sortOrder: row.sortOrder,
+        isAllAssortment: row.slug === "ves-assortiment"
+      };
+    });
 }
 
 function defaultHours(): PublicBusinessHour[] {

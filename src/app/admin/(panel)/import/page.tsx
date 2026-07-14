@@ -19,6 +19,10 @@ type ImportPageProps = {
 };
 
 const numberFormatter = new Intl.NumberFormat("ru-RU");
+const percentFormatter = new Intl.NumberFormat("ru-RU", {
+  style: "percent",
+  maximumFractionDigits: 1
+});
 const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
   dateStyle: "medium",
   timeStyle: "short",
@@ -271,6 +275,8 @@ function ImportResultSummary({
           />
         </div>
 
+        {report.autoCategorizationPreview ? <AutoCategorizationSummary report={report} /> : null}
+
         {report.reviewRows > 0 ? <ReviewWarning count={report.reviewRows} /> : null}
         {missingNameCount > 0 ? <MissingNameNotice count={missingNameCount} /> : null}
         {report.errorRows > 0 ? <ErrorSummary count={report.errorRows} /> : null}
@@ -278,6 +284,204 @@ function ImportResultSummary({
         <ResultActions />
       </div>
     </section>
+  );
+}
+
+function AutoCategorizationSummary({ report }: { report: StoredImportReport }) {
+  const preview = report.autoCategorizationPreview;
+  if (!preview) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-card border border-[#243249] bg-[#0B1220] p-4 sm:p-5">
+      <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
+        <div>
+          <h3 className="text-lg font-semibold">Автоматическая категоризация</h3>
+          <p className="mt-2 text-sm leading-6 text-[#8FA1B8]">
+            Это предварительный расчёт. В этом этапе система показывает, что может распределить
+            автоматически, но логика публикации ещё не изменена.
+          </p>
+        </div>
+        <Badge>Порог {formatPercent(preview.threshold)}</Badge>
+      </div>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          description="Текущее поведение: товар получил категорию по прежним правилам."
+          label="Legacy matched"
+          value={preview.legacyMatched}
+        />
+        <StatCard
+          description="Текущее поведение: правило не нашлось, товар уйдёт в проверку."
+          label="Legacy needs review"
+          tone={preview.legacyNeedsReview > 0 ? "warning" : "default"}
+          value={preview.legacyNeedsReview}
+        />
+        <StatCard
+          description="Shadow preview: confidence выше или равен порогу."
+          label="Shadow high"
+          value={preview.shadowHigh}
+        />
+        <StatCard
+          description="Shadow preview: средний confidence."
+          label="Shadow medium"
+          value={preview.shadowMedium}
+        />
+        <StatCard
+          description="Shadow preview: низкий confidence или нет правила."
+          label="Shadow low"
+          tone={preview.shadowLow > 0 ? "warning" : "default"}
+          value={preview.shadowLow}
+        />
+        <StatCard
+          description="Shadow preview: будущая автопубликация при текущем пороге."
+          label="Would auto-publish"
+          value={preview.wouldAutoPublish}
+        />
+        <StatCard
+          description="Shadow preview: будущая ручная проверка при текущем пороге."
+          label="Would require review"
+          tone={preview.wouldRequireReview > 0 ? "warning" : "default"}
+          value={preview.wouldRequireReview}
+        />
+        <StatCard
+          description="Среднее значение confidence по кандидатам."
+          label="Средняя уверенность"
+          value={formatPercent(preview.averageConfidence)}
+        />
+      </div>
+
+      <details className="mt-4 rounded-card border border-[#243249] bg-[#101827]">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold transition hover:text-[#9DBDFB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#93C5FD]">
+          Показать технические примеры
+        </summary>
+        <div className="space-y-5 border-t border-[#243249] p-4">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <PreviewMetricList
+              title="Уровни уверенности"
+              items={[
+                ["Высокая", preview.highConfidence],
+                ["Средняя", preview.mediumConfidence],
+                ["Низкая", preview.lowConfidence],
+                ["Старая категория", preview.existingCategoryPreserved],
+                ["Would auto-publish", preview.wouldAutoPublish],
+                ["Would require review", preview.wouldRequireReview],
+                ["Пустое название", preview.emptyName]
+              ]}
+            />
+            <PreviewMetricList
+              title="Источники"
+              items={preview.sources.map((source) => [
+                sourceLabel(source.source),
+                source.count
+              ])}
+            />
+            <PreviewGroupList title="Группы внимания" groups={preview.topUnresolvedGroups} />
+          </div>
+
+          {preview.dangerousGroups.length > 0 ? (
+            <PreviewGroupList title="Опасные сигналы" groups={preview.dangerousGroups} />
+          ) : null}
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <PreviewExamples title="Высокая уверенность" examples={preview.highConfidenceExamples} />
+            <PreviewExamples title="Низкая уверенность" examples={preview.lowConfidenceExamples} />
+          </div>
+        </div>
+      </details>
+    </section>
+  );
+}
+
+function PreviewMetricList({
+  items,
+  title
+}: {
+  items: Array<[string, number]>;
+  title: string;
+}) {
+  return (
+    <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4">
+      <h4 className="text-sm font-semibold">{title}</h4>
+      {items.length > 0 ? (
+        <dl className="mt-3 space-y-2 text-sm">
+          {items.map(([label, value]) => (
+            <div key={label} className="flex items-center justify-between gap-3">
+              <dt className="text-[#8FA1B8]">{label}</dt>
+              <dd className="font-semibold">{numberFormatter.format(value)}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className="mt-3 text-sm text-[#8FA1B8]">Нет данных.</p>
+      )}
+    </div>
+  );
+}
+
+function PreviewGroupList({
+  groups,
+  title
+}: {
+  groups: NonNullable<
+    StoredImportReport["autoCategorizationPreview"]
+  >["topUnresolvedGroups"];
+  title: string;
+}) {
+  return (
+    <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4">
+      <h4 className="text-sm font-semibold">{title}</h4>
+      {groups.length > 0 ? (
+        <div className="mt-3 space-y-3">
+          {groups.slice(0, 6).map((group) => (
+            <div key={group.key}>
+              <p className="text-sm font-semibold">
+                {group.label}: {numberFormatter.format(group.count)}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-[#8FA1B8]">
+                {group.examples.slice(0, 2).join("; ")}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-[#8FA1B8]">Нет данных.</p>
+      )}
+    </div>
+  );
+}
+
+function PreviewExamples({
+  examples,
+  title
+}: {
+  examples: NonNullable<
+    StoredImportReport["autoCategorizationPreview"]
+  >["highConfidenceExamples"];
+  title: string;
+}) {
+  return (
+    <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4">
+      <h4 className="text-sm font-semibold">{title}</h4>
+      {examples.length > 0 ? (
+        <div className="mt-3 space-y-3">
+          {examples.slice(0, 5).map((example) => (
+            <div key={`${example.rowNumber}-${example.shopCode}`}>
+              <p className="text-sm font-semibold">
+                Строка {example.rowNumber}: {example.shopCode} {example.name || example.rawName}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-[#8FA1B8]">
+                {formatPercent(example.confidence)} · {sourceLabel(example.source)} ·{" "}
+                {example.reason}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-[#8FA1B8]">Нет примеров.</p>
+      )}
+    </div>
   );
 }
 
@@ -562,7 +766,7 @@ function StatCard({
   description: string;
   label: string;
   tone?: "default" | "warning" | "danger";
-  value: number;
+  value: number | string;
 }) {
   const toneClass =
     tone === "danger"
@@ -574,7 +778,9 @@ function StatCard({
   return (
     <article className={`rounded-card border p-5 ${toneClass}`}>
       <p className="text-sm text-[#8FA1B8]">{label}</p>
-      <p className="mt-3 text-3xl font-semibold">{numberFormatter.format(value)}</p>
+      <p className="mt-3 text-3xl font-semibold">
+        {typeof value === "number" ? numberFormatter.format(value) : value}
+      </p>
       <p className="mt-3 text-sm leading-6 text-[#8FA1B8]">{description}</p>
     </article>
   );
@@ -629,4 +835,25 @@ function formatColumn(index: number | null) {
 
 function formatDate(date: Date | null) {
   return date ? dateFormatter.format(date) : "—";
+}
+
+function formatPercent(value: number) {
+  return percentFormatter.format(value);
+}
+
+function sourceLabel(source: string) {
+  const labels: Record<string, string> = {
+    existing_product_category: "Старая категория",
+    exact_article_rule: "Точное правило",
+    exact_prefix_rule: "Префикс артикула",
+    verified_learning_rule: "Проверенное правило",
+    strong_multi_token: "Многословное правило",
+    single_strong_token: "Один сильный токен",
+    ambiguous_token: "Неоднозначный токен",
+    empty_name: "Пустое название",
+    invalid_name: "Некорректное название",
+    no_match: "Нет правила"
+  };
+
+  return labels[source] ?? source;
 }

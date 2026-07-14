@@ -41,16 +41,22 @@ export const catalogCategories = [
     sortOrder: 60
   },
   {
+    slug: "krepezh",
+    name: "Крепёж",
+    icon: categoryIcon("aksessuary"),
+    sortOrder: 70
+  },
+  {
     slug: "aksessuary",
     name: "Аксессуары",
     icon: categoryIcon("aksessuary"),
-    sortOrder: 70
+    sortOrder: 80
   },
   {
     slug: "ves-assortiment",
     name: "Весь ассортимент",
     icon: categoryIcon("ves-assortiment"),
-    sortOrder: 80,
+    sortOrder: 90,
     isAllAssortment: true
   }
 ] as const;

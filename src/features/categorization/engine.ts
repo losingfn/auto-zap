@@ -33,6 +33,7 @@ const PREFIX_RULE_CONFIDENCE = 0.98;
 const VERIFIED_LEARNING_RULE_CONFIDENCE = 0.95;
 const SINGLE_STRONG_TOKEN_CONFIDENCE = 0.88;
 const AMBIGUOUS_TOKEN_CONFIDENCE = 0.82;
+const SAFE_SINGLE_RULE_CONFIDENCE = AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD;
 
 const stopSignalTokens = new Set([
   "a",
@@ -116,6 +117,33 @@ const strongSingleTokens = new Set([
   "цапф",
   "чехол",
   "шаров"
+]);
+
+const safeHighConfidenceSingleRules = new Set([
+  "krepezh/bolty:болт",
+  "krepezh/bolty:din912",
+  "krepezh/bolty:din",
+  "krepezh/gayki:гайка",
+  "krepezh/gayki:гайк",
+  "krepezh/shayby:шайба",
+  "krepezh/shayby:шайб",
+  "krepezh/shayby:гровер",
+  "krepezh/shpilki:шпилька",
+  "krepezh/shpilki:шпильк",
+  "krepezh/vinty:винт",
+  "krepezh/vinty:саморез",
+  "krepezh/homuty:хомут",
+  "krepezh/homuty:norma",
+  "krepezh/shtucery-i-fitingi:штуцер",
+  "krepezh/shtucery-i-fitingi:фитинг",
+  "krepezh/soediniteli:соединитель",
+  "krepezh/soediniteli:соединител",
+  "krepezh/soediniteli:быстросъем",
+  "krepezh/soediniteli:быстросъём",
+  "kuzov-i-optika/emblemy:эмблема",
+  "kuzov-i-optika/emblemy:шильдик",
+  "kuzov-i-optika/povtoriteli:повторитель",
+  "kuzov-i-optika/povtoriteli:поворотник"
 ]);
 
 export function normalizeForCategorization(value: string) {
@@ -277,6 +305,15 @@ function scoreMatchedRule(
   }
 
   const [token] = tokens;
+  if (token && isSafeHighConfidenceSingleRule(rule, token)) {
+    return {
+      confidence: SAFE_SINGLE_RULE_CONFIDENCE,
+      source: "single_strong_token",
+      reason: `Сработало безопасное точное правило: "${rule.pattern}".`,
+      matchedSignals
+    };
+  }
+
   if (token && strongSingleTokens.has(token) && !dangerousSingleTokens.has(token)) {
     return {
       confidence: SINGLE_STRONG_TOKEN_CONFIDENCE,
@@ -292,6 +329,12 @@ function scoreMatchedRule(
     reason: `Сработал неоднозначный или опасный токен, нужна ручная проверка: "${rule.pattern}".`,
     matchedSignals
   };
+}
+
+function isSafeHighConfidenceSingleRule(rule: CategorizationRuleRecord, token: string) {
+  return safeHighConfidenceSingleRules.has(
+    `${rule.categorySlug}/${rule.subcategorySlug}:${token}`
+  );
 }
 
 function buildUnresolvedResult({

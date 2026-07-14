@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { buildDefaultCategorizationContext, categorizeProductName } from "../src/features/categorization/engine";
 import type { CategorizationResult } from "../src/features/categorization/types";
 import { createAdminRedirectUrlFromParts } from "../src/middleware";
+import { normalizeStoredImportReport } from "../src/features/admin/imports";
 import { needsProductReview, resolveImportProductName } from "../src/features/import/automation";
 import { buildImportReport, buildPriceChangeReport } from "../src/features/import/report";
 import { evaluateImportSafety } from "../src/features/import/safety";
@@ -67,6 +68,52 @@ run("existing product updates price and preserves name fallback", () => {
   assert.equal(priceChanges.increasedCount, 1);
   assert.equal(priceChanges.maxIncreaseAmount, 25);
   assert.equal(resolveImportProductName(row({ name: null }), existing.get("A-1")), "Старое название");
+});
+
+run("legacy stored import report gets safe PR10 defaults", () => {
+  const normalized = normalizeStoredImportReport(legacyStoredReport());
+
+  assert.ok(normalized);
+  assert.equal(normalized.priceChanges.existingWithPriceCount, 0);
+  assert.equal(normalized.priceChanges.existingPriceUpdatedCount, 0);
+  assert.equal(normalized.priceChanges.increasedCount, 0);
+  assert.equal(normalized.priceChanges.decreasedCount, 0);
+  assert.equal(normalized.priceChanges.unchangedCount, 0);
+  assert.deepEqual(normalized.examples.needsReview, []);
+  assert.equal(normalized.autoCategorizationPreview?.existingCategoryPreserved, 0);
+  assert.equal(normalized.autoCategorizationPreview?.wouldAutoPublish, 0);
+});
+
+run("stored import report preserves new price and automation summaries", () => {
+  const normalized = normalizeStoredImportReport({
+    ...legacyStoredReport(),
+    existingWithPriceCount: 7,
+    pricesChanged: 4,
+    pricesIncreased: 3,
+    pricesDecreased: 1,
+    pricesUnchanged: 2,
+    maxIncrease: 150,
+    maxDecrease: -40,
+    averagePercentChange: 0.12,
+    existingInherited: 5,
+    newHighConfidence: 6,
+    newNeedsReview: 2,
+    expectedPublicCount: 9
+  });
+
+  assert.ok(normalized);
+  assert.equal(normalized.priceChanges.existingWithPriceCount, 7);
+  assert.equal(normalized.priceChanges.existingPriceUpdatedCount, 4);
+  assert.equal(normalized.priceChanges.increasedCount, 3);
+  assert.equal(normalized.priceChanges.decreasedCount, 1);
+  assert.equal(normalized.priceChanges.unchangedCount, 2);
+  assert.equal(normalized.priceChanges.maxIncreaseAmount, 150);
+  assert.equal(normalized.priceChanges.maxDecreaseAmount, -40);
+  assert.equal(normalized.priceChanges.averageChangePercent, 0.12);
+  assert.equal(normalized.autoCategorizationPreview?.existingCategoryPreserved, 5);
+  assert.equal(normalized.autoCategorizationPreview?.shadowHigh, 6);
+  assert.equal(normalized.autoCategorizationPreview?.wouldRequireReview, 2);
+  assert.equal(normalized.autoCategorizationPreview?.wouldAutoPublish, 9);
 });
 
 run("new high-confidence product becomes active", () => {
@@ -385,6 +432,26 @@ function report(overrides: Partial<ImportPreviewReport> = {}): ImportPreviewRepo
       dangerousGroups: []
     },
     ...overrides
+  };
+}
+
+function legacyStoredReport() {
+  return {
+    fileName: "old-catalog.xls",
+    selectedSheetName: "Sheet1",
+    sheets: [],
+    totalRows: 10,
+    productCandidateRows: 10,
+    parsedRows: 10,
+    validRows: 9,
+    reviewRows: 1,
+    errorRows: 0,
+    skippedRows: 0,
+    addedCount: 2,
+    updatedCount: 3,
+    archivedCount: 0,
+    unchangedCount: 4,
+    issueCounts: {}
   };
 }
 

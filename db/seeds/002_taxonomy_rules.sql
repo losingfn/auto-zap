@@ -372,8 +372,6 @@ WITH rule_seed(pattern, category_slug, subcategory_slug, priority) AS (
     ('фара', 'kuzov-i-optika', 'fary', 10),
     ('подфарник', 'kuzov-i-optika', 'fary', 11),
     ('очки фар', 'kuzov-i-optika', 'fary', 12),
-    ('стекло фары', 'kuzov-i-optika', 'fary', 13),
-    ('стекло фар', 'kuzov-i-optika', 'fary', 13),
     ('противотуманки', 'kuzov-i-optika', 'fary', 14),
     ('противотуманные фары', 'kuzov-i-optika', 'fary', 15),
     ('фароискатель', 'kuzov-i-optika', 'fary', 16),
@@ -462,8 +460,6 @@ WITH rule_seed(pattern, category_slug, subcategory_slug, priority) AS (
     ('кард.вала', 'dvigatel-i-transmissiya', 'detali-transmissii', 79),
     ('радиатор', 'dvigatel-i-transmissiya', 'ohlazhdenie', 80),
     ('термостат', 'dvigatel-i-transmissiya', 'ohlazhdenie', 81),
-    ('патрубок радиатор', 'dvigatel-i-transmissiya', 'ohlazhdenie', 82),
-    ('патрубки печки', 'dvigatel-i-transmissiya', 'ohlazhdenie', 83),
     ('расширительного бачка', 'dvigatel-i-transmissiya', 'ohlazhdenie', 84),
     ('бачок расширительный', 'dvigatel-i-transmissiya', 'ohlazhdenie', 84),
     ('вентилятор радиатора', 'dvigatel-i-transmissiya', 'ohlazhdenie', 85),
@@ -598,10 +594,35 @@ SET
   is_active = true,
   updated_at = now();
 
+WITH deprecated_rule_seed(pattern, match_type, category_slug, subcategory_slug) AS (
+  VALUES
+    ('воздушн', 'contains', NULL, NULL),
+    ('топлив', 'contains', NULL, NULL),
+    ('салон', 'contains', NULL, NULL),
+    ('шланг', 'contains', NULL, NULL),
+    ('патрубок радиатор', 'contains', 'dvigatel-i-transmissiya', 'ohlazhdenie'),
+    ('патрубки печки', 'contains', 'dvigatel-i-transmissiya', 'ohlazhdenie'),
+    ('стекло фары', 'contains', 'kuzov-i-optika', 'fary'),
+    ('стекло фар', 'contains', 'kuzov-i-optika', 'fary')
+)
 UPDATE categorization_rules
 SET
   is_active = false,
   updated_at = now()
+FROM deprecated_rule_seed
+LEFT JOIN categories
+  ON categories.slug = deprecated_rule_seed.category_slug
+LEFT JOIN subcategories
+  ON subcategories.category_id = categories.id
+ AND subcategories.slug = deprecated_rule_seed.subcategory_slug
 WHERE
-  match_type = 'contains'
-  AND pattern IN ('воздушн', 'топлив', 'салон', 'шланг');
+  categorization_rules.created_by IS NULL
+  AND categorization_rules.pattern = deprecated_rule_seed.pattern
+  AND categorization_rules.match_type = deprecated_rule_seed.match_type::rule_match_type
+  AND (
+    deprecated_rule_seed.category_slug IS NULL
+    OR (
+      categorization_rules.category_id = categories.id
+      AND categorization_rules.subcategory_id = subcategories.id
+    )
+  );

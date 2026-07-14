@@ -427,8 +427,6 @@ export const defaultCategorizationRules = [
   rule("фара", "kuzov-i-optika", "fary", 10),
   rule("подфарник", "kuzov-i-optika", "fary", 11),
   rule("очки фар", "kuzov-i-optika", "fary", 12),
-  rule("стекло фары", "kuzov-i-optika", "fary", 13),
-  rule("стекло фар", "kuzov-i-optika", "fary", 13),
   rule("противотуманки", "kuzov-i-optika", "fary", 14),
   rule("противотуманные фары", "kuzov-i-optika", "fary", 15),
   rule("фароискатель", "kuzov-i-optika", "fary", 16),
@@ -518,8 +516,6 @@ export const defaultCategorizationRules = [
   rule("кард.вала", "dvigatel-i-transmissiya", "detali-transmissii", 79),
   rule("радиатор", "dvigatel-i-transmissiya", "ohlazhdenie", 80),
   rule("термостат", "dvigatel-i-transmissiya", "ohlazhdenie", 81),
-  rule("патрубок радиатор", "dvigatel-i-transmissiya", "ohlazhdenie", 82),
-  rule("патрубки печки", "dvigatel-i-transmissiya", "ohlazhdenie", 83),
   rule("расширительного бачка", "dvigatel-i-transmissiya", "ohlazhdenie", 84),
   rule("бачок расширительный", "dvigatel-i-transmissiya", "ohlazhdenie", 84),
   rule("вентилятор радиатора", "dvigatel-i-transmissiya", "ohlazhdenie", 85),
@@ -640,6 +636,17 @@ export const defaultCategorizationRules = [
   rule("кз-", "kuzov-i-optika", "kuzovnye-detali", 252)
 ] as const;
 
+export const deprecatedCategorizationRules = [
+  deprecatedRule("воздушн"),
+  deprecatedRule("топлив"),
+  deprecatedRule("салон"),
+  deprecatedRule("шланг"),
+  deprecatedRule("патрубок радиатор", "dvigatel-i-transmissiya", "ohlazhdenie"),
+  deprecatedRule("патрубки печки", "dvigatel-i-transmissiya", "ohlazhdenie"),
+  deprecatedRule("стекло фары", "kuzov-i-optika", "fary"),
+  deprecatedRule("стекло фар", "kuzov-i-optika", "fary")
+] as const;
+
 function rule(pattern: string, categorySlug: string, subcategorySlug: string, priority: number) {
   return {
     pattern,
@@ -647,5 +654,14 @@ function rule(pattern: string, categorySlug: string, subcategorySlug: string, pr
     categorySlug,
     subcategorySlug,
     priority
+  } as const;
+}
+
+function deprecatedRule(pattern: string, categorySlug?: string, subcategorySlug?: string) {
+  return {
+    pattern,
+    matchType: "contains",
+    categorySlug,
+    subcategorySlug
   } as const;
 }

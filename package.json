@@ -13,6 +13,8 @@
     "import:check": "node --import tsx scripts/check-import.ts",
     "categorization:check": "node --import tsx scripts/check-categorization.ts",
     "categorization:gaps": "node --import tsx scripts/analyze-categorization-gaps.ts",
+    "taxonomy:sync": "scripts/with-env.sh node --import tsx scripts/sync-taxonomy.ts",
+    "taxonomy:sync:test": "scripts/with-env.sh node --import tsx scripts/test-taxonomy-sync.ts",
     "taxonomy:sync-seed": "node --import tsx scripts/sync-taxonomy-seed.ts",
     "search:sync": "scripts/with-env.sh node --import tsx scripts/sync-search-index.ts",
     "search:check": "scripts/with-env.sh node --import tsx scripts/check-search.ts",

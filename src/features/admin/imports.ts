@@ -13,7 +13,7 @@ import {
 import { createDraftImport } from "@/features/import/draft-service";
 import { publishCatalogVersion } from "@/features/import/publish-service";
 import { ImportSafetyError } from "@/features/import/safety";
-import type { ImportPreviewReport } from "@/features/import/types";
+import type { ImportPreviewReport, ImportSafetyCheckStatus } from "@/features/import/types";
 
 const MAX_IMPORT_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 const IMPORT_UPLOAD_DIR = path.join(process.cwd(), "data", "imports", "uploads");
@@ -452,12 +452,12 @@ function toAdminImportBatchSummary(
   };
 }
 
-function toStoredReport(value: unknown): StoredImportReport | null {
+export function normalizeStoredImportReport(value: unknown): StoredImportReport | null {
   if (!value || typeof value !== "object") {
     return null;
   }
 
-  const maybeReport = value as Partial<StoredImportReport>;
+  const maybeReport = value as Partial<StoredImportReport> & Record<string, unknown>;
   if (
     typeof maybeReport.addedCount !== "number" ||
     typeof maybeReport.updatedCount !== "number" ||
@@ -468,7 +468,212 @@ function toStoredReport(value: unknown): StoredImportReport | null {
     return null;
   }
 
-  return maybeReport as StoredImportReport;
+  return {
+    ...(maybeReport as StoredImportReport),
+    fileName: stringValue(maybeReport.fileName, ""),
+    selectedSheetName: stringValue(maybeReport.selectedSheetName, ""),
+    sheets: arrayValue(maybeReport.sheets),
+    totalRows: numberValue(maybeReport.totalRows),
+    productCandidateRows: numberValue(maybeReport.productCandidateRows),
+    parsedRows: numberValue(maybeReport.parsedRows),
+    validRows: numberValue(maybeReport.validRows),
+    reviewRows: numberValue(maybeReport.reviewRows),
+    errorRows: numberValue(maybeReport.errorRows),
+    skippedRows: numberValue(maybeReport.skippedRows),
+    addedCount: numberValue(maybeReport.addedCount),
+    updatedCount: numberValue(maybeReport.updatedCount),
+    archivedCount: numberValue(maybeReport.archivedCount),
+    unchangedCount: numberValue(maybeReport.unchangedCount),
+    issueCounts: normalizeIssueCounts(maybeReport.issueCounts),
+    priceChanges: normalizePriceChanges(maybeReport),
+    safety: normalizeSafetyReport(maybeReport.safety),
+    examples: normalizeExamples(maybeReport.examples),
+    autoCategorizationPreview: normalizeAutoCategorizationPreview(maybeReport),
+    categorization: normalizeCategorizationSummary(maybeReport.categorization)
+  };
+}
+
+function toStoredReport(value: unknown): StoredImportReport | null {
+  return normalizeStoredImportReport(value);
+}
+
+function normalizePriceChanges(report: Record<string, unknown>) {
+  const priceChanges = recordValue(report.priceChanges);
+
+  return {
+    existingWithPriceCount: numberValue(
+      priceChanges?.existingWithPriceCount,
+      report.existingWithPriceCount
+    ),
+    existingPriceUpdatedCount: numberValue(
+      priceChanges?.existingPriceUpdatedCount,
+      report.pricesChanged
+    ),
+    increasedCount: numberValue(priceChanges?.increasedCount, report.pricesIncreased),
+    decreasedCount: numberValue(priceChanges?.decreasedCount, report.pricesDecreased),
+    unchangedCount: numberValue(priceChanges?.unchangedCount, report.pricesUnchanged),
+    maxIncreaseAmount: numberValue(priceChanges?.maxIncreaseAmount, report.maxIncrease),
+    maxIncreasePercent: numberValue(priceChanges?.maxIncreasePercent),
+    maxDecreaseAmount: numberValue(priceChanges?.maxDecreaseAmount, report.maxDecrease),
+    maxDecreasePercent: numberValue(priceChanges?.maxDecreasePercent),
+    averageChangeAmount: numberValue(priceChanges?.averageChangeAmount),
+    averageChangePercent: numberValue(
+      priceChanges?.averageChangePercent,
+      report.averagePercentChange
+    )
+  };
+}
+
+function normalizeAutoCategorizationPreview(report: Record<string, unknown>) {
+  const preview = recordValue(report.autoCategorizationPreview);
+  const shadowHigh = numberValue(
+    preview?.shadowHigh,
+    preview?.highConfidence,
+    report.newHighConfidence
+  );
+  const shadowMedium = numberValue(preview?.shadowMedium, preview?.mediumConfidence);
+  const shadowLow = numberValue(preview?.shadowLow, preview?.lowConfidence);
+  const wouldAutoPublish = numberValue(preview?.wouldAutoPublish, report.expectedPublicCount);
+  const wouldRequireReview = numberValue(preview?.wouldRequireReview, report.newNeedsReview);
+
+  return {
+    totalProducts: numberValue(preview?.totalProducts, report.productCandidateRows),
+    legacyMatched: numberValue(preview?.legacyMatched),
+    legacyNeedsReview: numberValue(preview?.legacyNeedsReview),
+    existingCategoryPreserved: numberValue(
+      preview?.existingCategoryPreserved,
+      report.existingInherited
+    ),
+    shadowHigh,
+    shadowMedium,
+    shadowLow,
+    wouldAutoPublish,
+    wouldRequireReview,
+    highConfidence: numberValue(preview?.highConfidence, shadowHigh),
+    mediumConfidence: numberValue(preview?.mediumConfidence, shadowMedium),
+    lowConfidence: numberValue(preview?.lowConfidence, shadowLow),
+    needsReview: numberValue(preview?.needsReview, wouldRequireReview),
+    emptyName: numberValue(preview?.emptyName),
+    averageConfidence: numberValue(preview?.averageConfidence),
+    automationPotential: numberValue(preview?.automationPotential),
+    threshold: numberValue(preview?.threshold, 0.92),
+    sources: arrayValue(preview?.sources),
+    topUnresolvedGroups: arrayValue(preview?.topUnresolvedGroups),
+    highConfidenceExamples: arrayValue(preview?.highConfidenceExamples),
+    lowConfidenceExamples: arrayValue(preview?.lowConfidenceExamples),
+    dangerousGroups: arrayValue(preview?.dangerousGroups)
+  };
+}
+
+function normalizeSafetyReport(value: unknown): StoredImportReport["safety"] {
+  const safety = recordValue(value);
+  if (!safety) {
+    return undefined;
+  }
+
+  const checks = arrayValue(safety.checks)
+    .map((check) => normalizeSafetyCheck(check))
+    .filter((check) => check !== null);
+  const blockingCount = numberValue(
+    safety.blockingCount,
+    checks.filter((check) => check.status === "blocked").length
+  );
+  const warningCount = numberValue(
+    safety.warningCount,
+    checks.filter((check) => check.status === "warning").length
+  );
+
+  return {
+    canPublish:
+      typeof safety.canPublish === "boolean"
+        ? safety.canPublish
+        : checks.length > 0 && blockingCount === 0,
+    blockingCount,
+    warningCount,
+    checks
+  };
+}
+
+function normalizeSafetyCheck(value: unknown) {
+  const check = recordValue(value);
+  if (!check) {
+    return null;
+  }
+
+  return {
+    code: stringValue(check.code, "unknown"),
+    status: safetyStatusValue(check.status),
+    message: stringValue(check.message, "Нет данных."),
+    currentValue:
+      typeof check.currentValue === "boolean"
+        ? check.currentValue
+        : numberValue(check.currentValue),
+    threshold: typeof check.threshold === "number" ? check.threshold : undefined
+  };
+}
+
+function normalizeExamples(value: unknown): StoredImportReport["examples"] {
+  const examples = recordValue(value);
+
+  return {
+    valid: arrayValue(examples?.valid),
+    needsReview: arrayValue(examples?.needsReview),
+    errors: arrayValue(examples?.errors)
+  };
+}
+
+function normalizeIssueCounts(value: unknown) {
+  const counts = recordValue(value);
+  if (!counts) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(counts).map(([key, count]) => [key, numberValue(count)])
+  );
+}
+
+function normalizeCategorizationSummary(value: unknown): StoredImportReport["categorization"] {
+  const categorization = recordValue(value);
+  if (!categorization) {
+    return undefined;
+  }
+
+  return {
+    matchedRows: numberValue(categorization.matchedRows),
+    unmatchedRows: numberValue(categorization.unmatchedRows),
+    activeRules: numberValue(categorization.activeRules)
+  };
+}
+
+function recordValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function arrayValue<T = never>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function numberValue(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+  }
+
+  return 0;
+}
+
+function stringValue(value: unknown, fallback: string) {
+  return typeof value === "string" ? value : fallback;
+}
+
+function safetyStatusValue(value: unknown): ImportSafetyCheckStatus {
+  return value === "passed" || value === "warning" || value === "blocked"
+    ? value
+    : "warning";
 }
 
 function toAuditReportSummary(report: StoredImportReport | ImportPreviewReport) {

@@ -44,6 +44,19 @@ run("existing product keeps category and skips review", () => {
   assert.equal(needsProductReview(row(), result), false);
 });
 
+run("previous needs_review product does not become trusted existing category", () => {
+  const context = buildDefaultCategorizationContext();
+  const result = categorizeProductName("A-1 неизвестный товар", context, {
+    existingProduct: {
+      ...target,
+      status: "needs_review"
+    }
+  });
+
+  assert.notEqual(result.source, "existing_product_category");
+  assert.equal(needsProductReview(row(), result), true);
+});
+
 run("existing product updates price and preserves name fallback", () => {
   const existing = new Map<string, ExistingProductSnapshot>([
     ["A-1", { shopCode: "A-1", name: "Старое название", price: 100 }]

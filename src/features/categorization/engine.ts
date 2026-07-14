@@ -362,6 +362,7 @@ function toExistingProductTarget(
   existingProduct: ExistingProductCategorizationSnapshot | null | undefined
 ): CategorizationTarget | null {
   if (
+    (existingProduct?.status && existingProduct.status !== "active") ||
     !existingProduct?.categoryId ||
     !existingProduct.subcategoryId ||
     !existingProduct.categorySlug ||

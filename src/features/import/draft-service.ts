@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   categories,
@@ -150,7 +150,7 @@ async function getActiveProducts(): Promise<ExistingProductSnapshot[]> {
     .from(products)
     .leftJoin(categories, eq(categories.id, products.categoryId))
     .leftJoin(subcategories, eq(subcategories.id, products.subcategoryId))
-    .where(eq(products.catalogVersionId, activeVersion.id));
+    .where(and(eq(products.catalogVersionId, activeVersion.id), eq(products.status, "active")));
 
   return rows.map((row) => ({
     shopCode: row.shopCode,

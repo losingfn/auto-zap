@@ -22,86 +22,201 @@ export function getSearchIndex() {
   return getMeiliClient().index<SearchProductDocument>(SEARCH_INDEX_UID);
 }
 
-export async function ensureSearchIndex(synonyms: SearchSynonymRecord[]) {
-  const client = getMeiliClient();
+type SearchIndexTask = unknown;
 
-  try {
-    await client.getRawIndex(SEARCH_INDEX_UID);
-  } catch {
-    await client.tasks.waitForTask(await client.createIndex(SEARCH_INDEX_UID, { primaryKey: "id" }));
-  }
+export interface SearchIndexClient {
+  tasks: {
+    waitForTask(task: SearchIndexTask): Promise<unknown>;
+  };
+  getRawIndex(uid: string): Promise<unknown>;
+  createIndex(uid: string, options: { primaryKey: string }): Promise<SearchIndexTask>;
+  deleteIndex(uid: string): Promise<SearchIndexTask>;
+  index<T>(uid: string): SearchIndex<T>;
+  swapIndexes(params: Array<{ indexes: [string, string] }>): Promise<SearchIndexTask>;
+}
 
-  const index = getSearchIndex();
-  await index.tasks.waitForTask(
-    await index.updateSettings({
-      searchableAttributes: [
-        "shopCode",
-        "shopCodeCompact",
-        "name",
-        "categoryName",
-        "subcategoryName",
-        "synonymText",
-        "brandText",
-        "translitText",
-        "searchText"
-      ],
-      displayedAttributes: [
-        "id",
-        "catalogVersionId",
-        "shopCode",
-        "shopCodeNormalized",
-        "shopCodeCompact",
-        "name",
-        "rawName",
-        "slug",
-        "price",
-        "categorySlug",
-        "categoryName",
-        "subcategorySlug",
-        "subcategoryName",
-        "url",
-        "searchText",
-        "normalizedText",
-        "synonymText",
-        "translitText",
-        "brandText"
-      ],
-      filterableAttributes: ["catalogVersionId", "categorySlug", "subcategorySlug", "status"],
-      sortableAttributes: ["price"],
-      rankingRules: ["words", "typo", "proximity", "attribute", "sort", "exactness"],
-      typoTolerance: {
-        enabled: true,
-        minWordSizeForTypos: {
-          oneTypo: 4,
-          twoTypos: 8
-        },
-        disableOnWords: ["акб", "кпп", "грм", "гур"]
-      },
-      synonyms: buildMeiliSynonyms(synonyms),
-      pagination: {
-        maxTotalHits: 1000
-      }
-    })
+export interface SearchIndex<T> {
+  updateSettings(settings: ReturnType<typeof buildSearchIndexSettings>): Promise<SearchIndexTask>;
+  deleteAllDocuments(): Promise<SearchIndexTask>;
+  addDocuments(documents: T[], options: { primaryKey: string }): Promise<SearchIndexTask>;
+  getStats(): Promise<{ numberOfDocuments: number }>;
+}
+
+export interface ReplaceSearchIndexOptions {
+  expectedDocumentCount?: number;
+  stagingIndexUid?: string;
+  targetIndexUid?: string;
+}
+
+export async function ensureSearchIndex(
+  synonyms: SearchSynonymRecord[],
+  indexUid = SEARCH_INDEX_UID,
+  client: SearchIndexClient = getMeiliClient() as SearchIndexClient
+) {
+  await ensureSearchIndexExists(client, indexUid);
+
+  const index = client.index<SearchProductDocument>(indexUid);
+  await client.tasks.waitForTask(
+    await index.updateSettings(buildSearchIndexSettings(synonyms))
   );
 
   return index;
 }
 
+export function buildStagingSearchIndexUid(catalogVersionId: string) {
+  const suffix = catalogVersionId
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80);
+
+  return `${SEARCH_INDEX_UID}__staging__${suffix || "catalog"}`;
+}
+
 export async function replaceSearchIndexDocuments(
   documents: SearchProductDocument[],
-  synonyms: SearchSynonymRecord[]
+  synonyms: SearchSynonymRecord[],
+  options: ReplaceSearchIndexOptions = {}
 ) {
-  const index = await ensureSearchIndex(synonyms);
+  return replaceSearchIndexDocumentsWithClient(
+    getMeiliClient() as SearchIndexClient,
+    documents,
+    synonyms,
+    options
+  );
+}
 
-  await index.tasks.waitForTask(await index.deleteAllDocuments());
+export async function replaceSearchIndexDocumentsWithClient(
+  client: SearchIndexClient,
+  documents: SearchProductDocument[],
+  synonyms: SearchSynonymRecord[],
+  options: ReplaceSearchIndexOptions = {}
+) {
+  const targetIndexUid = options.targetIndexUid ?? SEARCH_INDEX_UID;
+  const stagingIndexUid =
+    options.stagingIndexUid ?? `${targetIndexUid}__staging__manual`;
+  const expectedDocumentCount = options.expectedDocumentCount ?? documents.length;
+
+  await ensureSearchIndexExists(client, targetIndexUid);
+  const stagingIndex = await prepareFreshSearchIndex(client, stagingIndexUid, synonyms);
+
+  await stagingIndex.deleteAllDocuments().then((task) => client.tasks.waitForTask(task));
 
   for (let indexStart = 0; indexStart < documents.length; indexStart += 1000) {
     const chunk = documents.slice(indexStart, indexStart + 1000);
-    await index.tasks.waitForTask(await index.addDocuments(chunk, { primaryKey: "id" }));
+    await stagingIndex.addDocuments(chunk, { primaryKey: "id" }).then((task) =>
+      client.tasks.waitForTask(task)
+    );
   }
 
+  const stats = await stagingIndex.getStats();
+  if (stats.numberOfDocuments !== expectedDocumentCount) {
+    throw new Error(
+      `Поисковый индекс подготовлен не полностью: ожидалось ${expectedDocumentCount}, получено ${stats.numberOfDocuments}.`
+    );
+  }
+
+  await client.swapIndexes([{ indexes: [targetIndexUid, stagingIndexUid] }]).then((task) =>
+    client.tasks.waitForTask(task)
+  );
+
   return {
-    indexUid: SEARCH_INDEX_UID,
+    indexUid: targetIndexUid,
+    stagingIndexUid,
     indexedCount: documents.length
   };
+}
+
+async function ensureSearchIndexExists(client: SearchIndexClient, indexUid: string) {
+  try {
+    await client.getRawIndex(indexUid);
+  } catch {
+    await client.tasks.waitForTask(await client.createIndex(indexUid, { primaryKey: "id" }));
+  }
+}
+
+async function prepareFreshSearchIndex(
+  client: SearchIndexClient,
+  indexUid: string,
+  synonyms: SearchSynonymRecord[]
+) {
+  await deleteIndexIfExists(client, indexUid);
+  await client.tasks.waitForTask(await client.createIndex(indexUid, { primaryKey: "id" }));
+
+  const index = client.index<SearchProductDocument>(indexUid);
+  await client.tasks.waitForTask(await index.updateSettings(buildSearchIndexSettings(synonyms)));
+
+  return index;
+}
+
+async function deleteIndexIfExists(client: SearchIndexClient, indexUid: string) {
+  try {
+    await client.tasks.waitForTask(await client.deleteIndex(indexUid));
+  } catch (error) {
+    if (!isIndexNotFoundError(error)) {
+      throw error;
+    }
+  }
+}
+
+function buildSearchIndexSettings(synonyms: SearchSynonymRecord[]) {
+  return {
+    searchableAttributes: [
+      "shopCode",
+      "shopCodeCompact",
+      "name",
+      "categoryName",
+      "subcategoryName",
+      "synonymText",
+      "brandText",
+      "translitText",
+      "searchText"
+    ],
+    displayedAttributes: [
+      "id",
+      "catalogVersionId",
+      "shopCode",
+      "shopCodeNormalized",
+      "shopCodeCompact",
+      "name",
+      "rawName",
+      "slug",
+      "price",
+      "categorySlug",
+      "categoryName",
+      "subcategorySlug",
+      "subcategoryName",
+      "url",
+      "searchText",
+      "normalizedText",
+      "synonymText",
+      "translitText",
+      "brandText"
+    ],
+    filterableAttributes: ["catalogVersionId", "categorySlug", "subcategorySlug", "status"],
+    sortableAttributes: ["price"],
+    rankingRules: ["words", "typo", "proximity", "attribute", "sort", "exactness"],
+    typoTolerance: {
+      enabled: true,
+      minWordSizeForTypos: {
+        oneTypo: 4,
+        twoTypos: 8
+      },
+      disableOnWords: ["акб", "кпп", "грм", "гур"]
+    },
+    synonyms: buildMeiliSynonyms(synonyms),
+    pagination: {
+      maxTotalHits: 1000
+    }
+  };
+}
+
+function isIndexNotFoundError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "cause" in error &&
+    typeof (error as { cause?: { code?: unknown } }).cause === "object" &&
+    (error as { cause?: { code?: unknown } }).cause?.code === "index_not_found"
+  );
 }

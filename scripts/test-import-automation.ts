@@ -1,15 +1,24 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { buildDefaultCategorizationContext, categorizeProductName } from "../src/features/categorization/engine";
 import type { CategorizationResult } from "../src/features/categorization/types";
 import { createAdminRedirectUrlFromParts } from "../src/middleware";
 import { needsProductReview, resolveImportProductName } from "../src/features/import/automation";
 import { buildImportReport, buildPriceChangeReport } from "../src/features/import/report";
 import { evaluateImportSafety } from "../src/features/import/safety";
+import { SEARCH_INDEX_PREPARE_FAILED_MESSAGE } from "../src/features/search/indexing";
+import {
+  replaceSearchIndexDocumentsWithClient,
+  SEARCH_INDEX_UID,
+  type SearchIndex,
+  type SearchIndexClient
+} from "../src/features/search/meilisearch";
 import type {
   AnalyzedImportRow,
   ExistingProductSnapshot,
   ImportPreviewReport
 } from "../src/features/import/types";
+import type { SearchProductDocument } from "../src/features/search/types";
 
 const target = {
   categoryId: "cat-1",
@@ -153,7 +162,28 @@ run("admin redirect uses forwarded production origin", () => {
   assert.equal(url.toString().includes("localhost"), false);
 });
 
-console.log("import automation checks passed");
+run("search documents query filters active products", () => {
+  const source = readFileSync(new URL("../src/features/search/documents.ts", import.meta.url), "utf8");
+
+  assert.match(source, /eq\(products\.status,\s*"active"\)/);
+});
+
+run("publish prepares search index before active DB transaction", () => {
+  const source = readFileSync(
+    new URL("../src/features/import/publish-service.ts", import.meta.url),
+    "utf8"
+  );
+  const searchSyncIndex = source.indexOf("syncSearchIndexForCatalogVersion(catalogVersionId)");
+  const transactionIndex = source.indexOf("db.transaction");
+
+  assert.ok(searchSyncIndex > -1);
+  assert.ok(transactionIndex > -1);
+  assert.ok(searchSyncIndex < transactionIndex);
+});
+
+run("search indexing failure message keeps old search explicit", () => {
+  assert.match(SEARCH_INDEX_PREPARE_FAILED_MESSAGE, /Старый поиск сохранён/);
+});
 
 function run(name: string, test: () => void) {
   try {
@@ -163,6 +193,92 @@ function run(name: string, test: () => void) {
     console.error(`not ok - ${name}`);
     throw error;
   }
+}
+
+async function runAsync(name: string, test: () => Promise<void>) {
+  try {
+    await test();
+    console.log(`ok - ${name}`);
+  } catch (error) {
+    console.error(`not ok - ${name}`);
+    throw error;
+  }
+}
+
+async function runSearchIndexChecks() {
+  await runAsync("failed staging add keeps active search index intact", async () => {
+    const oldDocument = searchDocument({ id: "old-product", name: "Old product" });
+    const newDocument = searchDocument({ id: "new-product", name: "New product" });
+    const stagingIndexUid = `${SEARCH_INDEX_UID}__staging__failed-add`;
+    const client = new FakeSearchIndexClient([oldDocument]);
+    client.failAddForUid.add(stagingIndexUid);
+
+    await assert.rejects(
+      () =>
+        replaceSearchIndexDocumentsWithClient(client, [newDocument], [], {
+          expectedDocumentCount: 1,
+          stagingIndexUid
+        }),
+      /add failed/
+    );
+
+    assert.deepEqual(getFakeIndex(client, SEARCH_INDEX_UID).documents.map((document) => document.id), [
+      "old-product"
+    ]);
+    assert.equal(getFakeIndex(client, SEARCH_INDEX_UID).deleteAllDocumentsCount, 0);
+    assert.equal(client.swaps.length, 0);
+  });
+
+  await runAsync("successful staging index swaps active search index", async () => {
+    const oldDocument = searchDocument({ id: "old-product", name: "Old product" });
+    const newDocuments = [
+      searchDocument({ id: "new-product-1", name: "New product 1" }),
+      searchDocument({ id: "new-product-2", name: "New product 2" })
+    ];
+    const stagingIndexUid = `${SEARCH_INDEX_UID}__staging__success`;
+    const client = new FakeSearchIndexClient([oldDocument]);
+
+    const result = await replaceSearchIndexDocumentsWithClient(client, newDocuments, [], {
+      expectedDocumentCount: newDocuments.length,
+      stagingIndexUid
+    });
+
+    assert.equal(result.indexUid, SEARCH_INDEX_UID);
+    assert.equal(result.stagingIndexUid, stagingIndexUid);
+    assert.equal(result.indexedCount, 2);
+    assert.deepEqual(getFakeIndex(client, SEARCH_INDEX_UID).documents.map((document) => document.id), [
+      "new-product-1",
+      "new-product-2"
+    ]);
+    assert.deepEqual(getFakeIndex(client, stagingIndexUid).documents.map((document) => document.id), [
+      "old-product"
+    ]);
+    assert.deepEqual(client.swaps, [[SEARCH_INDEX_UID, stagingIndexUid]]);
+  });
+
+  await runAsync("staging count mismatch blocks swap and keeps active search index", async () => {
+    const oldDocument = searchDocument({ id: "old-product", name: "Old product" });
+    const newDocument = searchDocument({ id: "new-product", name: "New product" });
+    const stagingIndexUid = `${SEARCH_INDEX_UID}__staging__count-mismatch`;
+    const client = new FakeSearchIndexClient([oldDocument]);
+    client.statsOverrideByUid.set(stagingIndexUid, 0);
+
+    await assert.rejects(
+      () =>
+        replaceSearchIndexDocumentsWithClient(client, [newDocument], [], {
+          expectedDocumentCount: 1,
+          stagingIndexUid
+        }),
+      /ожидалось 1, получено 0/
+    );
+
+    assert.deepEqual(getFakeIndex(client, SEARCH_INDEX_UID).documents.map((document) => document.id), [
+      "old-product"
+    ]);
+    assert.equal(client.swaps.length, 0);
+  });
+
+  console.log("import automation checks passed");
 }
 
 function row(overrides: Partial<AnalyzedImportRow> = {}): AnalyzedImportRow {
@@ -258,3 +374,144 @@ function report(overrides: Partial<ImportPreviewReport> = {}): ImportPreviewRepo
     ...overrides
   };
 }
+
+function searchDocument(overrides: Partial<SearchProductDocument> = {}): SearchProductDocument {
+  return {
+    id: "product",
+    catalogVersionId: "catalog-version",
+    status: "active",
+    shopCode: "A-1",
+    shopCodeNormalized: "a-1",
+    shopCodeCompact: "a1",
+    name: "Product",
+    rawName: "Product",
+    slug: "product",
+    price: 100,
+    categorySlug: "dvigatel",
+    categoryName: "Двигатель",
+    subcategorySlug: "filtry",
+    subcategoryName: "Фильтры",
+    url: "/catalog/dvigatel/filtry/product",
+    searchText: "Product",
+    normalizedText: "product",
+    synonymText: "",
+    translitText: "product",
+    brandText: "",
+    ...overrides
+  };
+}
+
+function getFakeIndex(client: FakeSearchIndexClient, indexUid: string) {
+  const index = client.indexes.get(indexUid);
+  assert.ok(index, `Expected fake index ${indexUid} to exist`);
+  return index;
+}
+
+class FakeSearchIndexClient implements SearchIndexClient {
+  readonly indexes = new Map<string, FakeSearchIndex<SearchProductDocument>>();
+  readonly failAddForUid = new Set<string>();
+  readonly statsOverrideByUid = new Map<string, number>();
+  readonly swaps: Array<[string, string]> = [];
+  readonly tasks = {
+    waitForTask: async (task: unknown) => task
+  };
+
+  constructor(activeDocuments: SearchProductDocument[]) {
+    this.indexes.set(SEARCH_INDEX_UID, new FakeSearchIndex(SEARCH_INDEX_UID, activeDocuments));
+  }
+
+  async getRawIndex(uid: string) {
+    const index = this.indexes.get(uid);
+    if (!index) {
+      throw { cause: { code: "index_not_found" } };
+    }
+
+    return index;
+  }
+
+  async createIndex(uid: string) {
+    const index = new FakeSearchIndex<SearchProductDocument>(uid);
+    index.failOnAddMessage = this.failAddForUid.has(uid) ? "add failed" : null;
+    index.statsOverride = this.statsOverrideByUid.get(uid) ?? null;
+    this.indexes.set(uid, index);
+
+    return { taskUid: `create:${uid}` };
+  }
+
+  async deleteIndex(uid: string) {
+    if (!this.indexes.has(uid)) {
+      throw { cause: { code: "index_not_found" } };
+    }
+
+    this.indexes.delete(uid);
+    return { taskUid: `delete:${uid}` };
+  }
+
+  index<T>(uid: string): SearchIndex<T> {
+    let index = this.indexes.get(uid);
+    if (!index) {
+      index = new FakeSearchIndex<SearchProductDocument>(uid);
+      this.indexes.set(uid, index);
+    }
+
+    return index as unknown as SearchIndex<T>;
+  }
+
+  async swapIndexes(params: Array<{ indexes: [string, string] }>) {
+    for (const { indexes } of params) {
+      const [firstUid, secondUid] = indexes;
+      const firstIndex = getFakeIndex(this, firstUid);
+      const secondIndex = getFakeIndex(this, secondUid);
+      const firstDocuments = firstIndex.documents;
+
+      firstIndex.documents = secondIndex.documents;
+      secondIndex.documents = firstDocuments;
+      this.swaps.push([firstUid, secondUid]);
+    }
+
+    return { taskUid: "swap" };
+  }
+}
+
+class FakeSearchIndex<T extends { id: string }> implements SearchIndex<T> {
+  documents: T[];
+  deleteAllDocumentsCount = 0;
+  updateSettingsCount = 0;
+  failOnAddMessage: string | null = null;
+  statsOverride: number | null = null;
+
+  constructor(readonly uid: string, documents: T[] = []) {
+    this.documents = [...documents];
+  }
+
+  async updateSettings() {
+    this.updateSettingsCount += 1;
+    return { taskUid: `settings:${this.uid}` };
+  }
+
+  async deleteAllDocuments() {
+    this.deleteAllDocumentsCount += 1;
+    this.documents = [];
+    return { taskUid: `delete-documents:${this.uid}` };
+  }
+
+  async addDocuments(documents: T[]) {
+    if (this.failOnAddMessage) {
+      throw new Error(this.failOnAddMessage);
+    }
+
+    this.documents.push(...documents);
+    return { taskUid: `add-documents:${this.uid}` };
+  }
+
+  async getStats() {
+    return {
+      numberOfDocuments: this.statsOverride ?? this.documents.length
+    };
+  }
+}
+
+void runSearchIndexChecks().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

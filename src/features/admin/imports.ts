@@ -428,8 +428,15 @@ function toAuditReportSummary(report: StoredImportReport | ImportPreviewReport) 
     autoCategorizationPreview: report.autoCategorizationPreview
       ? {
           totalProducts: report.autoCategorizationPreview.totalProducts,
+          legacyMatched: report.autoCategorizationPreview.legacyMatched,
+          legacyNeedsReview: report.autoCategorizationPreview.legacyNeedsReview,
           existingCategoryPreserved:
             report.autoCategorizationPreview.existingCategoryPreserved,
+          shadowHigh: report.autoCategorizationPreview.shadowHigh,
+          shadowMedium: report.autoCategorizationPreview.shadowMedium,
+          shadowLow: report.autoCategorizationPreview.shadowLow,
+          wouldAutoPublish: report.autoCategorizationPreview.wouldAutoPublish,
+          wouldRequireReview: report.autoCategorizationPreview.wouldRequireReview,
           highConfidence: report.autoCategorizationPreview.highConfidence,
           mediumConfidence: report.autoCategorizationPreview.mediumConfidence,
           lowConfidence: report.autoCategorizationPreview.lowConfidence,

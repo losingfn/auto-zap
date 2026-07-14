@@ -36,33 +36,35 @@ const confidenceBuckets = {
   low: 0
 };
 
-let matched = 0;
-let needsReview = 0;
+let legacyMatched = 0;
+let legacyNeedsReview = 0;
+let wouldAutoPublish = 0;
+let wouldRequireReview = 0;
 
 for (const row of analysis.rows) {
   if (!row.shopCode || row.price === null || row.status === "error" || row.status === "skipped") {
     continue;
   }
 
-  const result = categorizeProductName(buildTitle(row), context, {
-    emptyName: !row.name || row.issues.some((issue) => issue.code === "missing_name")
-  });
+  const result = categorizeProductName(buildTitle(row), context);
   const bucket = getCategorizationConfidenceBucket(result);
   confidenceBuckets[bucket] += 1;
   sources.set(result.source, (sources.get(result.source) ?? 0) + 1);
   pushExample(examples[bucket], toExample(row, result), 8);
 
-  if (result.needsReview) {
-    needsReview += 1;
-    pushUnresolvedGroup(unresolvedGroups, row, result);
+  if (shouldAutoPublishInShadow(row, result)) {
+    wouldAutoPublish += 1;
   } else {
-    matched += 1;
+    wouldRequireReview += 1;
   }
 
   if (!result.target) {
+    legacyNeedsReview += 1;
+    pushUnresolvedGroup(unresolvedGroups, row, result);
     continue;
   }
 
+  legacyMatched += 1;
   const key = `${result.target.categorySlug}/${result.target.subcategorySlug}`;
   const current = summary.get(key) ?? {
     categorySlug: result.target.categorySlug,
@@ -80,8 +82,15 @@ console.log(
       selectedSheetName: analysis.report.selectedSheetName,
       rules: context.rules.length,
       threshold: AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD,
-      matched,
-      needsReview,
+      matched: legacyMatched,
+      needsReview: legacyNeedsReview,
+      legacyMatched,
+      legacyNeedsReview,
+      shadowHigh: confidenceBuckets.high,
+      shadowMedium: confidenceBuckets.medium,
+      shadowLow: confidenceBuckets.low,
+      wouldAutoPublish,
+      wouldRequireReview,
       confidenceBuckets,
       existingProductCategory: sources.get("existing_product_category") ?? 0,
       sources: [...sources.entries()]
@@ -157,4 +166,12 @@ function topEntries(bucket: Map<string, { count: number; examples: string[] }>, 
     .map(([key, value]) => ({ key, ...value }))
     .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key, "ru"))
     .slice(0, limit);
+}
+
+function shouldAutoPublishInShadow(row: AnalyzedImportRow, result: CategorizationResult) {
+  return Boolean(
+    row.status === "valid" &&
+      result.target &&
+      result.confidence >= AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD
+  );
 }

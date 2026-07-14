@@ -181,7 +181,6 @@ export function categorizeProductName(
   }
 
   const score = scoreMatchedRule(matchedRule, text);
-  const needsReview = score.confidence < AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD;
 
   return {
     target: targetFromRule(matchedRule),
@@ -190,8 +189,8 @@ export function categorizeProductName(
     source: score.source,
     reason: score.reason,
     matchedSignals: score.matchedSignals,
-    needsReview,
-    reviewReason: needsReview ? score.reason : null
+    needsReview: false,
+    reviewReason: null
   };
 }
 

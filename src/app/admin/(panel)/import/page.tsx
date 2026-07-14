@@ -306,32 +306,49 @@ function AutoCategorizationSummary({ report }: { report: StoredImportReport }) {
         <Badge>Порог {formatPercent(preview.threshold)}</Badge>
       </div>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          description="Товары с прежней категорией из активного каталога."
-          label="Сохранена прежняя категория"
-          value={preview.existingCategoryPreserved}
+          description="Текущее поведение: товар получил категорию по прежним правилам."
+          label="Legacy matched"
+          value={preview.legacyMatched}
         />
         <StatCard
-          description="Новые товары выше порога уверенности."
-          label="Уверенно распределено автоматически"
-          value={preview.highConfidence}
+          description="Текущее поведение: правило не нашлось, товар уйдёт в проверку."
+          label="Legacy needs review"
+          tone={preview.legacyNeedsReview > 0 ? "warning" : "default"}
+          value={preview.legacyNeedsReview}
+        />
+        <StatCard
+          description="Shadow preview: confidence выше или равен порогу."
+          label="Shadow high"
+          value={preview.shadowHigh}
+        />
+        <StatCard
+          description="Shadow preview: средний confidence."
+          label="Shadow medium"
+          value={preview.shadowMedium}
+        />
+        <StatCard
+          description="Shadow preview: низкий confidence или нет правила."
+          label="Shadow low"
+          tone={preview.shadowLow > 0 ? "warning" : "default"}
+          value={preview.shadowLow}
+        />
+        <StatCard
+          description="Shadow preview: будущая автопубликация при текущем пороге."
+          label="Would auto-publish"
+          value={preview.wouldAutoPublish}
+        />
+        <StatCard
+          description="Shadow preview: будущая ручная проверка при текущем пороге."
+          label="Would require review"
+          tone={preview.wouldRequireReview > 0 ? "warning" : "default"}
+          value={preview.wouldRequireReview}
         />
         <StatCard
           description="Среднее значение confidence по кандидатам."
           label="Средняя уверенность"
           value={formatPercent(preview.averageConfidence)}
-        />
-        <StatCard
-          description="Строки с ошибками данных или низкой уверенностью."
-          label="Требуют внимания"
-          tone={preview.needsReview > 0 ? "warning" : "default"}
-          value={preview.needsReview}
-        />
-        <StatCard
-          description="Доля товаров, которые можно сохранить или распределить автоматически."
-          label="Потенциальная автоматизация"
-          value={formatPercent(preview.automationPotential)}
         />
       </div>
 
@@ -347,6 +364,9 @@ function AutoCategorizationSummary({ report }: { report: StoredImportReport }) {
                 ["Высокая", preview.highConfidence],
                 ["Средняя", preview.mediumConfidence],
                 ["Низкая", preview.lowConfidence],
+                ["Старая категория", preview.existingCategoryPreserved],
+                ["Would auto-publish", preview.wouldAutoPublish],
+                ["Would require review", preview.wouldRequireReview],
                 ["Пустое название", preview.emptyName]
               ]}
             />

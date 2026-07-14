@@ -94,6 +94,8 @@ export interface AutoCategorizationDecisionPreview {
   source: CategorizationSource;
   reason: string;
   needsReview: boolean;
+  wouldAutoPublish: boolean;
+  wouldRequireReview: boolean;
   categorySlug?: string;
   categoryName?: string;
   subcategorySlug?: string;
@@ -116,7 +118,14 @@ export interface AutoCategorizationSourceSummary {
 
 export interface AutoCategorizationPreviewReport {
   totalProducts: number;
+  legacyMatched: number;
+  legacyNeedsReview: number;
   existingCategoryPreserved: number;
+  shadowHigh: number;
+  shadowMedium: number;
+  shadowLow: number;
+  wouldAutoPublish: number;
+  wouldRequireReview: number;
   highConfidence: number;
   mediumConfidence: number;
   lowConfidence: number;

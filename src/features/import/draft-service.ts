@@ -323,10 +323,10 @@ function withCategorizationReport(
     }
 
     const categorization = categorizeImportRow(row, categorizationContext, existingByCode);
-    if (categorization.needsReview) {
-      unmatchedRows += 1;
-    } else {
+    if (categorization.target) {
       matchedRows += 1;
+    } else {
+      unmatchedRows += 1;
     }
 
     if (needsProductReview(row, categorization)) {
@@ -363,11 +363,14 @@ function buildAutoCategorizationPreview(
   const lowConfidenceExamples: AutoCategorizationDecisionPreview[] = [];
 
   let totalProducts = 0;
+  let legacyMatched = 0;
+  let legacyNeedsReview = 0;
   let existingCategoryPreserved = 0;
-  let highConfidence = 0;
-  let mediumConfidence = 0;
-  let lowConfidence = 0;
-  let needsReview = 0;
+  let shadowHigh = 0;
+  let shadowMedium = 0;
+  let shadowLow = 0;
+  let wouldAutoPublish = 0;
+  let wouldRequireReview = 0;
   let emptyName = 0;
   let confidenceSum = 0;
 
@@ -382,27 +385,35 @@ function buildAutoCategorizationPreview(
     confidenceSum += categorization.confidence;
     sourceCounts.set(categorization.source, (sourceCounts.get(categorization.source) ?? 0) + 1);
 
+    if (categorization.target) {
+      legacyMatched += 1;
+    } else {
+      legacyNeedsReview += 1;
+    }
+
     if (row.issues.some((issue) => issue.code === "missing_name")) {
       emptyName += 1;
     }
 
-    if (categorization.source === "existing_product_category") {
-      existingCategoryPreserved += 1;
+    const bucket = getCategorizationConfidenceBucket(categorization);
+    if (bucket === "high") {
+      shadowHigh += 1;
+      pushPreviewExample(highConfidenceExamples, decision, 8);
+    } else if (bucket === "medium") {
+      shadowMedium += 1;
     } else {
-      const bucket = getCategorizationConfidenceBucket(categorization);
-      if (bucket === "high") {
-        highConfidence += 1;
-        pushPreviewExample(highConfidenceExamples, decision, 8);
-      } else if (bucket === "medium") {
-        mediumConfidence += 1;
-      } else {
-        lowConfidence += 1;
-        pushPreviewExample(lowConfidenceExamples, decision, 8);
-      }
+      shadowLow += 1;
+      pushPreviewExample(lowConfidenceExamples, decision, 8);
     }
 
-    if (needsProductReview(row, categorization)) {
-      needsReview += 1;
+    if (categorization.source === "existing_product_category") {
+      existingCategoryPreserved += 1;
+    }
+
+    if (shouldAutoPublishInShadow(row, categorization)) {
+      wouldAutoPublish += 1;
+    } else {
+      wouldRequireReview += 1;
       pushGroup(unresolvedGroups, buildUnresolvedGroup(row, categorization));
       pushPreviewExample(lowConfidenceExamples, decision, 8);
     }
@@ -414,15 +425,21 @@ function buildAutoCategorizationPreview(
 
   return {
     totalProducts,
+    legacyMatched,
+    legacyNeedsReview,
     existingCategoryPreserved,
-    highConfidence,
-    mediumConfidence,
-    lowConfidence,
-    needsReview,
+    shadowHigh,
+    shadowMedium,
+    shadowLow,
+    wouldAutoPublish,
+    wouldRequireReview,
+    highConfidence: shadowHigh,
+    mediumConfidence: shadowMedium,
+    lowConfidence: shadowLow,
+    needsReview: wouldRequireReview,
     emptyName,
     averageConfidence: totalProducts > 0 ? confidenceSum / totalProducts : 0,
-    automationPotential:
-      totalProducts > 0 ? (existingCategoryPreserved + highConfidence) / totalProducts : 0,
+    automationPotential: totalProducts > 0 ? wouldAutoPublish / totalProducts : 0,
     threshold: AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD,
     sources: [...sourceCounts.entries()]
       .map(([source, count]) => ({ source, count }))
@@ -441,8 +458,7 @@ function categorizeImportRow(
 ) {
   const existingProduct = row.shopCode ? existingByCode.get(row.shopCode) : null;
   return categorizeProductName(buildCategorizationTitle(row), categorizationContext, {
-    existingProduct,
-    emptyName: !row.name || row.issues.some((issue) => issue.code === "missing_name")
+    existingProduct
   });
 }
 
@@ -476,6 +492,8 @@ function toDecisionPreview(
     source: categorization.source,
     reason: categorization.reason,
     needsReview: needsProductReview(row, categorization),
+    wouldAutoPublish: shouldAutoPublishInShadow(row, categorization),
+    wouldRequireReview: !shouldAutoPublishInShadow(row, categorization),
     categorySlug: categorization.target?.categorySlug,
     categoryName: categorization.target?.categoryName,
     subcategorySlug: categorization.target?.subcategorySlug,
@@ -594,6 +612,17 @@ function formatRowExample(row: AnalyzedImportRow) {
 
 function needsProductReview(row: AnalyzedImportRow, categorization: CategorizationResult) {
   return row.status === "needs_review" || categorization.needsReview;
+}
+
+function shouldAutoPublishInShadow(
+  row: AnalyzedImportRow,
+  categorization: CategorizationResult
+) {
+  return Boolean(
+    row.status === "valid" &&
+      categorization.target &&
+      categorization.confidence >= AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD
+  );
 }
 
 function buildReviewReason(row: AnalyzedImportRow, categorization: CategorizationResult) {

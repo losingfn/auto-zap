@@ -5,7 +5,10 @@ import {
   getCategorizationConfidenceBucket,
   normalizeForCategorization
 } from "../src/features/categorization/engine";
-import type { CategorizationSource } from "../src/features/categorization/types";
+import {
+  AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD,
+  type CategorizationSource
+} from "../src/features/categorization/types";
 import { analyzeImportFile } from "../src/features/import/analyze";
 
 const [, , inputPath] = process.argv;
@@ -74,9 +77,13 @@ const sources = new Map<CategorizationSource, number>();
 const totalCandidates = {
   matched: 0,
   needsReview: 0,
-  highConfidence: 0,
-  mediumConfidence: 0,
-  lowConfidence: 0,
+  legacyMatched: 0,
+  legacyNeedsReview: 0,
+  shadowHigh: 0,
+  shadowMedium: 0,
+  shadowLow: 0,
+  wouldAutoPublish: 0,
+  wouldRequireReview: 0,
   existingProductCategory: 0
 };
 
@@ -86,30 +93,36 @@ for (const row of analysis.rows) {
   }
 
   const rawTitle = `${row.shopCode} ${row.name || row.rawName}`;
-  const result = categorizeProductName(rawTitle, context, {
-    emptyName: !row.name || row.issues.some((issue) => issue.code === "missing_name")
-  });
+  const result = categorizeProductName(rawTitle, context);
   const bucket = getCategorizationConfidenceBucket(result);
   sources.set(result.source, (sources.get(result.source) ?? 0) + 1);
 
   if (bucket === "high") {
-    totalCandidates.highConfidence += 1;
+    totalCandidates.shadowHigh += 1;
   } else if (bucket === "medium") {
-    totalCandidates.mediumConfidence += 1;
+    totalCandidates.shadowMedium += 1;
   } else {
-    totalCandidates.lowConfidence += 1;
+    totalCandidates.shadowLow += 1;
+  }
+
+  if (shouldAutoPublishInShadow(row, result)) {
+    totalCandidates.wouldAutoPublish += 1;
+  } else {
+    totalCandidates.wouldRequireReview += 1;
   }
 
   if (result.source === "existing_product_category") {
     totalCandidates.existingProductCategory += 1;
   }
 
-  if (!result.needsReview) {
+  if (result.target) {
     totalCandidates.matched += 1;
+    totalCandidates.legacyMatched += 1;
     continue;
   }
 
   totalCandidates.needsReview += 1;
+  totalCandidates.legacyNeedsReview += 1;
   const example = `${row.shopCode} ${row.name || row.rawName}`.trim();
   const prefix = row.shopCode.split("-")[0]?.trim().toUpperCase() || "NO_PREFIX";
   pushCount(prefixes, prefix, example);
@@ -157,4 +170,15 @@ function topEntries(bucket: Map<string, { count: number; examples: string[] }>, 
     .map(([key, value]) => ({ key, ...value }))
     .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key, "ru"))
     .slice(0, limit);
+}
+
+function shouldAutoPublishInShadow(
+  row: { status: string },
+  result: { target: unknown; confidence: number }
+) {
+  return Boolean(
+    row.status === "valid" &&
+      result.target &&
+      result.confidence >= AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD
+  );
 }

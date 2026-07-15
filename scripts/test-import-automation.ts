@@ -8,6 +8,7 @@ import { createAdminRedirectUrlFromParts } from "../src/middleware";
 import {
   canCancelImport,
   canPublishImport,
+  isBlockingDuplicateFileImport,
   isBlockingImportDraft,
   normalizeStoredImportReport
 } from "../src/features/admin/imports";
@@ -145,6 +146,7 @@ run("legacy unfinished import statuses can be cancelled", () => {
   assert.equal(canCancelImport("failed", "draft"), true);
   assert.equal(canCancelImport("safety_blocked", "draft"), true);
   assert.equal(canCancelImport("processing", "draft"), true);
+  assert.equal(canCancelImport("legacy_review_blocked", "draft"), true);
   assert.equal(canCancelImport("published", "active"), false);
   assert.equal(canCancelImport("analyzed", "active"), false);
   assert.equal(canCancelImport("analyzed", "archived"), false);
@@ -155,6 +157,24 @@ run("cancelled imports do not block the next import", () => {
   assert.equal(isBlockingImportDraft("failed", "draft"), true);
   assert.equal(isBlockingImportDraft("cancelled", "draft"), false);
   assert.equal(isBlockingImportDraft("cancelled", "rolled_back"), false);
+});
+
+run("same file hash from cancelled import does not block new upload", () => {
+  assert.equal(isBlockingDuplicateFileImport("cancelled", "rolled_back"), false);
+  assert.equal(isBlockingDuplicateFileImport("cancelled", "draft"), false);
+});
+
+run("same file hash from published import does not block new upload", () => {
+  assert.equal(isBlockingDuplicateFileImport("published", "active"), false);
+  assert.equal(isBlockingDuplicateFileImport("published", "archived"), false);
+});
+
+run("same file hash from active unfinished draft still blocks duplicate upload", () => {
+  assert.equal(isBlockingDuplicateFileImport("uploaded", "draft"), true);
+  assert.equal(isBlockingDuplicateFileImport("analyzed", "draft"), true);
+  assert.equal(isBlockingDuplicateFileImport("uploaded", "rolled_back"), false);
+  assert.equal(isBlockingDuplicateFileImport("analyzed", "active"), false);
+  assert.equal(isBlockingDuplicateFileImport("failed", "draft"), false);
 });
 
 run("public taxonomy excludes fasteners category and rules", () => {

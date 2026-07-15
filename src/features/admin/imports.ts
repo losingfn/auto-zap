@@ -24,6 +24,8 @@ const ALLOWED_MIME_TYPES = new Set([
 ]);
 const GENERIC_MIME_TYPES = new Set(["", "application/octet-stream"]);
 const BLOCKING_IMPORT_STATUSES = ["uploaded", "analyzed", "failed"] as const;
+const BLOCKING_DUPLICATE_FILE_STATUSES = ["uploaded", "analyzed"] as const;
+const BLOCKING_DUPLICATE_FILE_STATUS_SET = new Set<string>(BLOCKING_DUPLICATE_FILE_STATUSES);
 const CANCELABLE_IMPORT_STATUSES = new Set([
   "uploaded",
   "analyzed",
@@ -31,6 +33,7 @@ const CANCELABLE_IMPORT_STATUSES = new Set([
   "safety_blocked",
   "processing"
 ]);
+const FINAL_IMPORT_STATUSES = new Set(["cancelled", "published"]);
 
 export type AdminImportErrorCode =
   | "missing_file"
@@ -396,10 +399,12 @@ async function assertImportCanStart(fileHash: string) {
   const [sameFile] = await db
     .select({ id: importBatches.id })
     .from(importBatches)
+    .innerJoin(catalogVersions, eq(catalogVersions.id, importBatches.catalogVersionId))
     .where(
       and(
         eq(importBatches.fileHash, fileHash),
-        inArray(importBatches.status, ["uploaded", "analyzed"])
+        inArray(importBatches.status, BLOCKING_DUPLICATE_FILE_STATUSES),
+        eq(catalogVersions.status, "draft")
       )
     )
     .limit(1);
@@ -483,7 +488,7 @@ export function canPublishImport(
 }
 
 export function canCancelImport(status: string, versionStatus: string | null) {
-  if (status === "cancelled") {
+  if (FINAL_IMPORT_STATUSES.has(status)) {
     return false;
   }
 
@@ -491,11 +496,19 @@ export function canCancelImport(status: string, versionStatus: string | null) {
     return false;
   }
 
+  if (versionStatus === "draft") {
+    return true;
+  }
+
   return CANCELABLE_IMPORT_STATUSES.has(status);
 }
 
 export function isBlockingImportDraft(status: string, versionStatus: string | null) {
   return versionStatus === "draft" && canCancelImport(status, versionStatus);
+}
+
+export function isBlockingDuplicateFileImport(status: string, versionStatus: string | null) {
+  return versionStatus === "draft" && BLOCKING_DUPLICATE_FILE_STATUS_SET.has(status);
 }
 
 export function normalizeStoredImportReport(value: unknown): StoredImportReport | null {

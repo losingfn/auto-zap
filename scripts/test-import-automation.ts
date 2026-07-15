@@ -6,10 +6,14 @@ import { buildDefaultCategorizationContext, categorizeProductName } from "../src
 import type { CategorizationResult } from "../src/features/categorization/types";
 import { createAdminRedirectUrlFromParts } from "../src/middleware";
 import {
+  AdminImportError,
   canCancelImport,
+  canCancelImportForUi,
+  canCancelImportStrict,
   canPublishImport,
   isBlockingDuplicateFileImport,
   isBlockingImportDraft,
+  isFinalizedImport,
   normalizeStoredImportReport
 } from "../src/features/admin/imports";
 import {
@@ -18,6 +22,11 @@ import {
   isSameOriginAdminMutation
 } from "../src/features/admin/import-cancel-endpoint";
 import { getStaticPublicCategories } from "../src/features/catalog/data";
+import { diagnoseImportDeadlock } from "../src/features/import/import-diagnostics";
+import {
+  selectImportBatchForAdminPage,
+  type ImportStateBatch
+} from "../src/features/import/import-state";
 import { needsProductReview, resolveImportProductName } from "../src/features/import/automation";
 import { buildImportReport, buildPriceChangeReport } from "../src/features/import/report";
 import { evaluateImportSafety } from "../src/features/import/safety";
@@ -135,46 +144,200 @@ run("legacy import report cannot publish but can be cancelled", () => {
 
   assert.ok(normalized);
   assert.equal(canPublishImport("analyzed", "draft", normalized), false);
-  assert.equal(canCancelImport("analyzed", "draft"), true);
-  assert.equal(canCancelImport("failed", "draft"), true);
-  assert.equal(canCancelImport("published", "active"), false);
+  assert.equal(canCancelImportForUi(importState({ status: "analyzed" })), true);
+  assert.equal(canCancelImportForUi(importState({ status: "failed" })), true);
+  assert.equal(canCancelImportForUi(importState({ status: "published", versionStatus: "active" })), false);
 });
 
 run("legacy unfinished import statuses can be cancelled", () => {
-  assert.equal(canCancelImport("analyzed", "draft"), true);
-  assert.equal(canCancelImport("uploaded", "draft"), true);
-  assert.equal(canCancelImport("failed", "draft"), true);
-  assert.equal(canCancelImport("safety_blocked", "draft"), true);
-  assert.equal(canCancelImport("processing", "draft"), true);
-  assert.equal(canCancelImport("legacy_review_blocked", "draft"), true);
+  assert.equal(canCancelImportForUi(importState({ status: "analyzed" })), true);
+  assert.equal(canCancelImportForUi(importState({ status: "uploaded" })), true);
+  assert.equal(canCancelImportForUi(importState({ status: "failed" })), true);
+  assert.equal(canCancelImportForUi(importState({ status: "safety_blocked" })), true);
+  assert.equal(canCancelImportForUi(importState({ status: "processing" })), true);
+  assert.equal(canCancelImportForUi(importState({ status: "legacy_review_blocked" })), true);
   assert.equal(canCancelImport("published", "active"), false);
-  assert.equal(canCancelImport("analyzed", "active"), false);
-  assert.equal(canCancelImport("analyzed", "archived"), false);
+  assert.equal(canCancelImportForUi(importState({ status: "analyzed", versionStatus: "active" })), false);
+  assert.equal(canCancelImportForUi(importState({ status: "analyzed", versionStatus: "archived" })), false);
 });
 
 run("cancelled imports do not block the next import", () => {
-  assert.equal(isBlockingImportDraft("analyzed", "draft"), true);
-  assert.equal(isBlockingImportDraft("failed", "draft"), true);
-  assert.equal(isBlockingImportDraft("cancelled", "draft"), false);
-  assert.equal(isBlockingImportDraft("cancelled", "rolled_back"), false);
+  assert.equal(isBlockingImportDraft(importState({ status: "analyzed" })), true);
+  assert.equal(isBlockingImportDraft(importState({ status: "failed" })), true);
+  assert.equal(isBlockingImportDraft(importState({ status: "cancelled" })), false);
+  assert.equal(isBlockingImportDraft(importState({ status: "cancelled", versionStatus: "rolled_back" })), false);
 });
 
 run("same file hash from cancelled import does not block new upload", () => {
-  assert.equal(isBlockingDuplicateFileImport("cancelled", "rolled_back"), false);
-  assert.equal(isBlockingDuplicateFileImport("cancelled", "draft"), false);
+  assert.equal(
+    isBlockingDuplicateFileImport(importState({ status: "cancelled", versionStatus: "rolled_back" })),
+    false
+  );
+  assert.equal(isBlockingDuplicateFileImport(importState({ status: "cancelled" })), false);
 });
 
 run("same file hash from published import does not block new upload", () => {
-  assert.equal(isBlockingDuplicateFileImport("published", "active"), false);
-  assert.equal(isBlockingDuplicateFileImport("published", "archived"), false);
+  assert.equal(
+    isBlockingDuplicateFileImport(importState({ status: "published", versionStatus: "active" })),
+    false
+  );
+  assert.equal(
+    isBlockingDuplicateFileImport(importState({ status: "published", versionStatus: "archived" })),
+    false
+  );
 });
 
 run("same file hash from active unfinished draft still blocks duplicate upload", () => {
-  assert.equal(isBlockingDuplicateFileImport("uploaded", "draft"), true);
-  assert.equal(isBlockingDuplicateFileImport("analyzed", "draft"), true);
-  assert.equal(isBlockingDuplicateFileImport("uploaded", "rolled_back"), false);
-  assert.equal(isBlockingDuplicateFileImport("analyzed", "active"), false);
-  assert.equal(isBlockingDuplicateFileImport("failed", "draft"), false);
+  assert.equal(isBlockingDuplicateFileImport(importState({ status: "uploaded" })), true);
+  assert.equal(isBlockingDuplicateFileImport(importState({ status: "analyzed" })), true);
+  assert.equal(
+    isBlockingDuplicateFileImport(importState({ status: "uploaded", versionStatus: "rolled_back" })),
+    false
+  );
+  assert.equal(
+    isBlockingDuplicateFileImport(importState({ status: "analyzed", versionStatus: "active" })),
+    false
+  );
+  assert.equal(isBlockingDuplicateFileImport(importState({ status: "failed" })), false);
+});
+
+run("cancelled and rolled back draft state is no longer blocking", () => {
+  const before = importState({ status: "analyzed", versionStatus: "draft" });
+  const after = importState({ status: "cancelled", versionStatus: "rolled_back" });
+
+  assert.equal(isBlockingImportDraft(before), true);
+  assert.equal(canCancelImportStrict(before), true);
+  assert.equal(isBlockingImportDraft(after), false);
+  assert.equal(canCancelImportForUi(after), false);
+});
+
+run("active published and archived imports cannot be cancelled", () => {
+  assert.equal(
+    canCancelImportStrict(importState({ status: "published", versionStatus: "active" })),
+    false
+  );
+  assert.equal(
+    canCancelImportStrict(importState({ status: "analyzed", versionStatus: "archived" })),
+    false
+  );
+  assert.equal(
+    canCancelImportStrict(importState({ status: "archived", versionStatus: "draft" })),
+    false
+  );
+});
+
+run("admin import selection prefers hidden blocking draft over newer finalized import", () => {
+  const blocking = importState({ id: "old-blocking", status: "legacy_unknown" });
+  const finalized = importState({
+    id: "new-finalized",
+    status: "published",
+    versionStatus: "active"
+  });
+
+  assert.equal(
+    selectImportBatchForAdminPage({
+      blockingDraft: blocking,
+      recentBatches: [finalized, blocking]
+    })?.id,
+    "old-blocking"
+  );
+  assert.equal(isFinalizedImport(finalized), true);
+});
+
+run("requested import stays selected but hidden blocking draft is diagnosable", () => {
+  const blocking = importState({ id: "old-blocking", status: "analyzed" });
+  const finalized = importState({
+    id: "new-finalized",
+    status: "published",
+    versionStatus: "active"
+  });
+
+  assert.equal(
+    selectImportBatchForAdminPage({
+      blockingDraft: blocking,
+      recentBatches: [finalized, blocking],
+      requestedBatch: finalized
+    })?.id,
+    "new-finalized"
+  );
+  assert.equal(
+    diagnoseImportDeadlock({
+      rows: [
+        diagnosticRow(blocking, { isBlockingDraft: true, canCancelForUi: true, canCancelStrict: true }),
+        diagnosticRow(finalized)
+      ],
+      selectedBatchId: "new-finalized"
+    }),
+    "hidden_blocking_draft"
+  );
+});
+
+run("upload import_in_progress redirect carries blocking batch id", () => {
+  const actionSource = readFileSync(
+    new URL("../src/app/admin/(panel)/import/actions.ts", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(actionSource, /getErrorBatchId\(error\)/);
+  assert.match(actionSource, /details\.blockingBatchId/);
+  assert.match(actionSource, /batch=\$\{encodeURIComponent\(batchId\)\}&/);
+});
+
+run("blocking draft cancel availability ignores publish and legacy report state", () => {
+  const legacyReport = normalizeStoredImportReport(legacyStoredReport());
+  const legacyDraft = importState({ status: "legacy_unknown", report: legacyReport });
+
+  assert.equal(canPublishImport(legacyDraft.status, legacyDraft.versionStatus, legacyReport), false);
+  assert.equal(canCancelImportStrict(legacyDraft), true);
+  assert.equal(canCancelImportForUi(legacyDraft), true);
+});
+
+run("diagnostic classifier identifies cancel-disabled and duplicate-only states", () => {
+  assert.equal(
+    diagnoseImportDeadlock({
+      rows: [
+        {
+          id: "blocking",
+          status: "legacy_unknown",
+          isBlockingDraft: true,
+          isDuplicateHashBlocker: false,
+          canCancelForUi: false,
+          canCancelStrict: true
+        }
+      ],
+      selectedBatchId: "blocking"
+    }),
+    "cancel_disabled_for_blocking_draft"
+  );
+  assert.equal(
+    diagnoseImportDeadlock({
+      rows: [
+        {
+          id: "same-file",
+          status: "uploaded",
+          isBlockingDraft: false,
+          isDuplicateHashBlocker: true,
+          canCancelForUi: false,
+          canCancelStrict: false
+        }
+      ],
+      selectedBatchId: null
+    }),
+    "duplicate_hash_only"
+  );
+});
+
+run("diagnostic blocker script is read-only and reports selected/blocking ids", () => {
+  const source = readFileSync(
+    new URL("../scripts/diagnose-import-blockers.ts", import.meta.url),
+    "utf8"
+  );
+
+  assert.doesNotMatch(source, /\.insert\(|\.update\(|\.delete\(/);
+  assert.match(source, /blockingDraftCount/);
+  assert.match(source, /selectedBatchId/);
+  assert.match(source, /blockingBatchId/);
+  assert.match(source, /recommendedSafeAction/);
 });
 
 run("public taxonomy excludes fasteners category and rules", () => {
@@ -532,6 +695,26 @@ async function runImportCancelEndpointChecks() {
     assert.equal(payload.error.message, "database unavailable");
   });
 
+  await runAsync("cancel endpoint returns clear error for finalized import", async () => {
+    const response = await handleCancelImportRequest(
+      cancelRequest(),
+      { batchId: "active-batch" },
+      {
+        getSession: async () => testSession(),
+        cancelImportBatch: async () => {
+          throw new AdminImportError("already_finalized", "Этот импорт уже нельзя отменить.");
+        },
+        logger: { error: () => undefined }
+      }
+    );
+    const payload = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(payload.ok, false);
+    assert.equal(payload.error.code, "already_finalized");
+    assert.equal(payload.error.message, "Этот импорт уже нельзя отменить.");
+  });
+
   await runAsync("same-origin cancel request allows forwarded production origin", async () => {
     const request = new Request("http://127.0.0.1:3000/api/admin/imports/batch-1/cancel", {
       method: "POST",
@@ -707,6 +890,38 @@ function testSession() {
       fullName: "Admin",
       role: "owner" as const
     }
+  };
+}
+
+function importState(overrides: Partial<ImportStateBatch> = {}): ImportStateBatch {
+  return {
+    id: "batch-1",
+    catalogVersionId: "version-1",
+    status: "analyzed",
+    versionStatus: "draft",
+    fileHash: "hash-1",
+    report: null,
+    ...overrides
+  };
+}
+
+function diagnosticRow(
+  state: ImportStateBatch,
+  overrides: Partial<{
+    isBlockingDraft: boolean;
+    isDuplicateHashBlocker: boolean;
+    canCancelForUi: boolean;
+    canCancelStrict: boolean;
+  }> = {}
+) {
+  return {
+    id: state.id ?? "batch-1",
+    status: state.status,
+    isBlockingDraft: isBlockingImportDraft(state),
+    isDuplicateHashBlocker: isBlockingDuplicateFileImport(state),
+    canCancelForUi: canCancelImportForUi(state),
+    canCancelStrict: canCancelImportStrict(state),
+    ...overrides
   };
 }
 

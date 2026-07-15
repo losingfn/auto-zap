@@ -158,6 +158,13 @@ export default async function AdminImportPage({ searchParams }: ImportPageProps)
         initialErrorMessage={uploadErrorMessage}
       />
 
+      {data.blockingDraft ? (
+        <BlockingDraftNotice
+          batch={data.blockingDraft}
+          isSelected={data.selected?.id === data.blockingDraft.id}
+        />
+      ) : null}
+
       <div className="mt-8 grid gap-6 xl:grid-cols-[1fr_320px]">
         <section className="space-y-6">
           {data.selected ? (
@@ -247,6 +254,36 @@ function ImportHeader({ batch }: { batch: SelectedImportBatch }) {
             <Badge>{statusLabels[batch.versionStatus] ?? batch.versionStatus}</Badge>
           ) : null}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function BlockingDraftNotice({
+  batch,
+  isSelected
+}: {
+  batch: SelectedImportBatch;
+  isSelected: boolean;
+}) {
+  return (
+    <section className="mt-6 rounded-card border border-[#854D0E] bg-[#2A2113] p-5 text-[#FDE68A]">
+      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div>
+          <h2 className="text-base font-semibold">
+            Найден незавершённый черновик, который блокирует загрузку нового Excel
+          </h2>
+          <p className="mt-2 text-sm leading-6">
+            Его можно безопасно отменить. Активный каталог и поиск не изменятся.
+          </p>
+          <p className="mt-2 text-xs leading-5 text-[#FDE68A]">
+            {batch.sourceFileName} · {statusLabels[batch.status] ?? batch.status}
+          </p>
+        </div>
+
+        {isSelected ? null : (
+          <ImportCancelButton batchId={batch.id} disabled={!batch.canCancelForUi} />
+        )}
       </div>
     </section>
   );
@@ -820,7 +857,7 @@ function ImportActions({
 }
 
 function isLegacyDraft(batch: SelectedImportBatch, report: StoredImportReport | null) {
-  return batch.status === "analyzed" && batch.versionStatus === "draft" && !report?.safety;
+  return batch.isBlockingDraft && !report?.safety;
 }
 
 function SheetSummary({ report }: { report: StoredImportReport }) {

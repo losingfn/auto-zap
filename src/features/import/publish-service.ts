@@ -2,6 +2,7 @@ import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { getPublicTaxonomyTargets } from "@/config/public-taxonomy";
 import { db } from "@/db/client";
 import { catalogVersions, categories, importBatches, products, subcategories } from "@/db/schema";
+import { isBlockingImportDraft } from "@/features/import/import-state";
 import { assertImportSafety, evaluateImportSafety } from "@/features/import/safety";
 import type { ImportPreviewReport, ImportSafetyReport } from "@/features/import/types";
 import { syncSearchIndexForCatalogVersion } from "@/features/search/indexing";
@@ -115,20 +116,24 @@ async function getActiveCatalogVersionId(exceptCatalogVersionId?: string) {
 }
 
 async function hasOtherBlockingImport(catalogVersionId: string) {
-  const [row] = await db
-    .select({ id: importBatches.id })
+  const rows = await db
+    .select({
+      id: importBatches.id,
+      catalogVersionId: importBatches.catalogVersionId,
+      status: importBatches.status,
+      versionStatus: catalogVersions.status
+    })
     .from(importBatches)
     .innerJoin(catalogVersions, eq(catalogVersions.id, importBatches.catalogVersionId))
     .where(
       and(
-        eq(importBatches.status, "analyzed"),
         eq(catalogVersions.status, "draft"),
         ne(catalogVersions.id, catalogVersionId)
       )
     )
-    .limit(1);
+    .limit(100);
 
-  return Boolean(row);
+  return rows.some((row) => isBlockingImportDraft(row));
 }
 
 async function countActiveProductsInCurrentCatalog(exceptCatalogVersionId: string) {

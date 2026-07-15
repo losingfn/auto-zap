@@ -38,7 +38,7 @@ export function ImportCancelButton({
     setSuccessMessage(null);
 
     const confirmed = window.confirm(
-      "Отменить этот черновик? Активный каталог и поиск не изменятся"
+      "Отменить этот черновик? Активный каталог и поиск не изменятся."
     );
     if (!confirmed) {
       return;

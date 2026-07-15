@@ -32,8 +32,10 @@ export async function uploadImportAction(formData: FormData) {
     revalidatePath("/admin/import");
     target = `/admin/import?batch=${encodeURIComponent(result.importBatchId)}&published=1`;
   } catch (error) {
-    const batchParam = importBatchId ? `batch=${encodeURIComponent(importBatchId)}&` : "";
-    target = `/admin/import?${batchParam}error=${getErrorCode(error, importBatchId ? "publish_failed" : "analysis_failed")}`;
+    const errorCode = getErrorCode(error, importBatchId ? "publish_failed" : "analysis_failed");
+    const batchId = importBatchId ?? getErrorBatchId(error);
+    const batchParam = batchId ? `batch=${encodeURIComponent(batchId)}&` : "";
+    target = `/admin/import?${batchParam}error=${errorCode}`;
   }
 
   redirect(target);
@@ -87,4 +89,12 @@ function getErrorCode(error: unknown, fallback: string) {
   }
 
   return fallback;
+}
+
+function getErrorBatchId(error: unknown) {
+  if (!(error instanceof AdminImportError)) {
+    return null;
+  }
+
+  return error.details.blockingBatchId ?? error.details.duplicateBatchId ?? null;
 }

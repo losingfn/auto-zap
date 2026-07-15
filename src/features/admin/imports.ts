@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   adminUsers,
@@ -11,9 +11,33 @@ import {
   importErrors
 } from "@/db/schema";
 import { createDraftImport } from "@/features/import/draft-service";
+import {
+  canCancelImportForUi,
+  canCancelImportStrict,
+  canPublishImport,
+  isBlockingDuplicateFileImport,
+  isBlockingImportDraft,
+  isDuplicateFileBlockerForHash,
+  isFinalImportStatus,
+  isFinalizedImport,
+  selectImportBatchForAdminPage,
+  type ImportStartBlocker,
+  type ImportStateBatch
+} from "@/features/import/import-state";
 import { publishCatalogVersion } from "@/features/import/publish-service";
 import { ImportSafetyError } from "@/features/import/safety";
 import type { ImportPreviewReport, ImportSafetyCheckStatus } from "@/features/import/types";
+
+export {
+  canCancelImportForUi,
+  canCancelImportStrict,
+  canPublishImport,
+  isBlockingDuplicateFileImport,
+  isBlockingImportDraft,
+  isDuplicateFileBlockerForHash,
+  isFinalImportStatus,
+  isFinalizedImport
+};
 
 const MAX_IMPORT_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 const IMPORT_UPLOAD_DIR = path.join(process.cwd(), "data", "imports", "uploads");
@@ -23,17 +47,6 @@ const ALLOWED_MIME_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 ]);
 const GENERIC_MIME_TYPES = new Set(["", "application/octet-stream"]);
-const BLOCKING_IMPORT_STATUSES = ["uploaded", "analyzed", "failed"] as const;
-const BLOCKING_DUPLICATE_FILE_STATUSES = ["uploaded", "analyzed"] as const;
-const BLOCKING_DUPLICATE_FILE_STATUS_SET = new Set<string>(BLOCKING_DUPLICATE_FILE_STATUSES);
-const CANCELABLE_IMPORT_STATUSES = new Set([
-  "uploaded",
-  "analyzed",
-  "failed",
-  "safety_blocked",
-  "processing"
-]);
-const FINAL_IMPORT_STATUSES = new Set(["cancelled", "published"]);
 
 export type AdminImportErrorCode =
   | "missing_file"
@@ -54,12 +67,18 @@ export type AdminImportErrorCode =
 export class AdminImportError extends Error {
   constructor(
     public readonly code: AdminImportErrorCode,
-    message: string
+    message: string,
+    public readonly details: AdminImportErrorDetails = {}
   ) {
     super(message);
     this.name = "AdminImportError";
   }
 }
+
+export type AdminImportErrorDetails = {
+  blockingBatchId?: string;
+  duplicateBatchId?: string;
+};
 
 export type StoredImportReport = ImportPreviewReport & {
   categorization?: {
@@ -83,6 +102,11 @@ export type AdminImportBatchSummary = {
   report: StoredImportReport | null;
   canPublish: boolean;
   canCancel: boolean;
+  canCancelStrict: boolean;
+  canCancelForUi: boolean;
+  isBlockingDraft: boolean;
+  isFinalized: boolean;
+  fileHash: string | null;
 };
 
 export type AdminImportRowError = {
@@ -91,6 +115,21 @@ export type AdminImportRowError = {
   fieldName: string | null;
   code: string;
   message: string;
+};
+
+type ImportBatchRecord = {
+  id: string;
+  catalogVersionId: string | null;
+  sourceFileName: string;
+  status: string;
+  createdAt: Date;
+  analyzedAt: Date | null;
+  publishedAt: Date | null;
+  report: unknown;
+  versionStatus: string | null;
+  fileHash: string | null;
+  uploadedByName: string | null;
+  uploadedByEmail: string | null;
 };
 
 export async function createAdminDraftImportFromUpload({
@@ -165,6 +204,7 @@ export async function getAdminImportPageData(selectedBatchId?: string) {
       publishedAt: importBatches.publishedAt,
       report: importBatches.report,
       versionStatus: catalogVersions.status,
+      fileHash: importBatches.fileHash,
       uploadedByName: adminUsers.fullName,
       uploadedByEmail: adminUsers.email
     })
@@ -174,13 +214,21 @@ export async function getAdminImportPageData(selectedBatchId?: string) {
     .orderBy(desc(importBatches.createdAt))
     .limit(10);
 
-  const selectedRaw =
+  const blockingDraft = await getBlockingImportDraft();
+  const requestedBatch =
     (selectedBatchId ? batches.find((batch) => batch.id === selectedBatchId) : null) ??
-    (selectedBatchId ? await getImportBatchById(selectedBatchId) : null) ??
-    batches[0] ??
-    null;
+    (selectedBatchId ? await getImportBatchById(selectedBatchId) : null);
+  const selectedRaw = selectImportBatchForAdminPage({
+    blockingDraft,
+    recentBatches: batches,
+    requestedBatch
+  });
 
   const selected = selectedRaw ? toAdminImportBatchSummary(selectedRaw) : null;
+  const blockingDraftSummary = blockingDraft ? toAdminImportBatchSummary(blockingDraft) : null;
+  const recentSummaries = mergeImportBatchSummaries(
+    blockingDraftSummary ? [blockingDraftSummary, ...batches.map(toAdminImportBatchSummary)] : batches.map(toAdminImportBatchSummary)
+  );
   const errors = selected
     ? await db
         .select({
@@ -197,8 +245,12 @@ export async function getAdminImportPageData(selectedBatchId?: string) {
     : [];
 
   return {
-    batches: batches.map(toAdminImportBatchSummary),
+    batches: recentSummaries,
     selected,
+    blockingDraft: blockingDraftSummary,
+    hiddenBlockingDraft: Boolean(
+      blockingDraftSummary && (!selected || selected.id !== blockingDraftSummary.id)
+    ),
     errors
   };
 }
@@ -289,7 +341,7 @@ export async function cancelAdminImportBatch({
     return;
   }
 
-  if (!canCancelImport(batch.status, batch.versionStatus)) {
+  if (!canCancelImportStrict(batch)) {
     throw new AdminImportError("already_finalized", "Этот импорт уже нельзя отменить.");
   }
 
@@ -377,44 +429,100 @@ async function saveUploadedImportFile(file: File | null) {
 }
 
 async function assertImportCanStart(fileHash: string) {
-  const [openDraft] = await db
-    .select({ id: importBatches.id })
-    .from(importBatches)
-    .innerJoin(catalogVersions, eq(catalogVersions.id, importBatches.catalogVersionId))
-    .where(
-      and(
-        inArray(importBatches.status, BLOCKING_IMPORT_STATUSES),
-        eq(catalogVersions.status, "draft")
-      )
-    )
-    .limit(1);
+  const blocker = await getImportStartBlocker(fileHash);
 
-  if (openDraft) {
+  if (blocker?.type === "blocking_draft") {
     throw new AdminImportError(
       "import_in_progress",
-      "Уже есть подготовленный черновик импорта. Опубликуйте или отмените его перед новой загрузкой."
+      "Уже есть подготовленный черновик импорта. Опубликуйте или отмените его перед новой загрузкой.",
+      { blockingBatchId: blocker.batch.id }
     );
   }
 
-  const [sameFile] = await db
-    .select({ id: importBatches.id })
-    .from(importBatches)
-    .innerJoin(catalogVersions, eq(catalogVersions.id, importBatches.catalogVersionId))
-    .where(
-      and(
-        eq(importBatches.fileHash, fileHash),
-        inArray(importBatches.status, BLOCKING_DUPLICATE_FILE_STATUSES),
-        eq(catalogVersions.status, "draft")
-      )
-    )
-    .limit(1);
-
-  if (sameFile) {
+  if (blocker?.type === "duplicate_file") {
     throw new AdminImportError(
       "duplicate_file",
-      "Файл с таким содержимым уже загружался. Повторная загрузка заблокирована."
+      "Файл с таким содержимым уже загружался. Повторная загрузка заблокирована.",
+      { duplicateBatchId: blocker.batch.id }
     );
   }
+}
+
+export async function getImportStartBlocker(fileHash: string): Promise<ImportStartBlocker | null> {
+  const blockingDraft = await getBlockingImportDraft();
+  if (blockingDraft) {
+    return {
+      type: "blocking_draft",
+      batch: blockingDraft
+    };
+  }
+
+  const duplicateFile = await getDuplicateFileBlocker(fileHash);
+  if (duplicateFile) {
+    return {
+      type: "duplicate_file",
+      batch: duplicateFile
+    };
+  }
+
+  return null;
+}
+
+export async function getBlockingImportDraft(exceptCatalogVersionId?: string) {
+  const draftRows = await db
+    .select({
+      id: importBatches.id,
+      catalogVersionId: importBatches.catalogVersionId,
+      sourceFileName: importBatches.sourceFileName,
+      status: importBatches.status,
+      createdAt: importBatches.createdAt,
+      analyzedAt: importBatches.analyzedAt,
+      publishedAt: importBatches.publishedAt,
+      report: importBatches.report,
+      versionStatus: catalogVersions.status,
+      fileHash: importBatches.fileHash,
+      uploadedByName: adminUsers.fullName,
+      uploadedByEmail: adminUsers.email
+    })
+    .from(importBatches)
+    .innerJoin(catalogVersions, eq(catalogVersions.id, importBatches.catalogVersionId))
+    .leftJoin(adminUsers, eq(adminUsers.id, importBatches.uploadedBy))
+    .where(eq(catalogVersions.status, "draft"))
+    .orderBy(desc(importBatches.createdAt))
+    .limit(100);
+
+  return (
+    draftRows.find(
+      (batch) =>
+        batch.catalogVersionId !== exceptCatalogVersionId && isBlockingImportDraft(batch)
+    ) ?? null
+  );
+}
+
+export async function getDuplicateFileBlocker(fileHash: string) {
+  const sameFileRows = await db
+    .select({
+      id: importBatches.id,
+      catalogVersionId: importBatches.catalogVersionId,
+      sourceFileName: importBatches.sourceFileName,
+      status: importBatches.status,
+      createdAt: importBatches.createdAt,
+      analyzedAt: importBatches.analyzedAt,
+      publishedAt: importBatches.publishedAt,
+      report: importBatches.report,
+      versionStatus: catalogVersions.status,
+      fileHash: importBatches.fileHash,
+      uploadedByName: adminUsers.fullName,
+      uploadedByEmail: adminUsers.email
+    })
+    .from(importBatches)
+    .leftJoin(catalogVersions, eq(catalogVersions.id, importBatches.catalogVersionId))
+    .leftJoin(adminUsers, eq(adminUsers.id, importBatches.uploadedBy))
+    .where(eq(importBatches.fileHash, fileHash))
+    .orderBy(desc(importBatches.createdAt))
+    .limit(50);
+
+  return sameFileRows.find((batch) => isDuplicateFileBlockerForHash(batch, fileHash)) ?? null;
 }
 
 async function getImportBatchById(importBatchId: string) {
@@ -429,6 +537,7 @@ async function getImportBatchById(importBatchId: string) {
       publishedAt: importBatches.publishedAt,
       report: importBatches.report,
       versionStatus: catalogVersions.status,
+      fileHash: importBatches.fileHash,
       uploadedByName: adminUsers.fullName,
       uploadedByEmail: adminUsers.email
     })
@@ -449,7 +558,8 @@ async function getImportBatchForAction(importBatchId: string) {
       sourceFileName: importBatches.sourceFileName,
       status: importBatches.status,
       report: importBatches.report,
-      versionStatus: catalogVersions.status
+      versionStatus: catalogVersions.status,
+      fileHash: importBatches.fileHash
     })
     .from(importBatches)
     .leftJoin(catalogVersions, eq(catalogVersions.id, importBatches.catalogVersionId))
@@ -467,48 +577,59 @@ async function getImportBatchForAction(importBatchId: string) {
 }
 
 function toAdminImportBatchSummary(
-  batch: Awaited<ReturnType<typeof getImportBatchById>> extends infer T ? NonNullable<T> : never
+  batch: ImportBatchRecord
 ): AdminImportBatchSummary {
   const report = toStoredReport(batch.report);
+  const state = toImportStateBatch(batch, report);
 
   return {
     ...batch,
     report,
     canPublish: canPublishImport(batch.status, batch.versionStatus, report),
-    canCancel: canCancelImport(batch.status, batch.versionStatus)
+    canCancel: canCancelImportForUi(state),
+    canCancelStrict: canCancelImportStrict(state),
+    canCancelForUi: canCancelImportForUi(state),
+    isBlockingDraft: isBlockingImportDraft(state),
+    isFinalized: isFinalizedImport(state)
   };
 }
 
-export function canPublishImport(
-  status: string,
-  versionStatus: string | null,
-  report: StoredImportReport | null
-) {
-  return status === "analyzed" && versionStatus === "draft" && report?.safety?.canPublish === true;
-}
-
 export function canCancelImport(status: string, versionStatus: string | null) {
-  if (FINAL_IMPORT_STATUSES.has(status)) {
-    return false;
-  }
-
-  if (status === "published" || versionStatus === "active" || versionStatus === "archived") {
-    return false;
-  }
-
-  if (versionStatus === "draft") {
-    return true;
-  }
-
-  return CANCELABLE_IMPORT_STATUSES.has(status);
+  return canCancelImportForUi({
+    catalogVersionId: versionStatus === "draft" ? "__legacy_unknown_version__" : null,
+    status,
+    versionStatus
+  });
 }
 
-export function isBlockingImportDraft(status: string, versionStatus: string | null) {
-  return versionStatus === "draft" && canCancelImport(status, versionStatus);
+function toImportStateBatch(
+  batch: Pick<ImportBatchRecord, "id" | "catalogVersionId" | "status" | "versionStatus" | "fileHash">,
+  report?: StoredImportReport | null
+): ImportStateBatch {
+  return {
+    id: batch.id,
+    catalogVersionId: batch.catalogVersionId,
+    status: batch.status,
+    versionStatus: batch.versionStatus,
+    fileHash: batch.fileHash,
+    report
+  };
 }
 
-export function isBlockingDuplicateFileImport(status: string, versionStatus: string | null) {
-  return versionStatus === "draft" && BLOCKING_DUPLICATE_FILE_STATUS_SET.has(status);
+function mergeImportBatchSummaries(batches: AdminImportBatchSummary[]) {
+  const seen = new Set<string>();
+  const merged: AdminImportBatchSummary[] = [];
+
+  for (const batch of batches) {
+    if (seen.has(batch.id)) {
+      continue;
+    }
+
+    seen.add(batch.id);
+    merged.push(batch);
+  }
+
+  return merged;
 }
 
 export function normalizeStoredImportReport(value: unknown): StoredImportReport | null {

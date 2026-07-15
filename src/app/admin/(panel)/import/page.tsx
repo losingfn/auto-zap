@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getAdminImportPageData, type StoredImportReport } from "@/features/admin/imports";
-import { cancelImportAction, publishImportAction, uploadImportAction } from "./actions";
+import { publishImportAction, uploadImportAction } from "./actions";
+import { ImportCancelButton } from "./import-cancel-button";
 import { ImportUploadForm } from "./import-upload-form";
 
 export const metadata: Metadata = {
@@ -147,7 +148,9 @@ export default async function AdminImportPage({ searchParams }: ImportPageProps)
         <Notice>Файл загружен, безопасный отчёт создан.</Notice>
       ) : null}
       {params.published ? <Notice>Каталог успешно обновлён, поисковый индекс пересобран.</Notice> : null}
-      {params.cancelled ? <Notice>Импорт отменён, draft-версия снята с публикации.</Notice> : null}
+      {params.cancelled ? (
+        <Notice>Черновик отменён. Теперь можно загрузить новый Excel.</Notice>
+      ) : null}
 
       <ImportUploadForm
         action={uploadImportAction}
@@ -168,13 +171,22 @@ export default async function AdminImportPage({ searchParams }: ImportPageProps)
                     batchId={data.selected.id}
                     canPublish={data.selected.canPublish}
                     canCancel={data.selected.canCancel}
+                    isLegacyDraft={isLegacyDraft(data.selected, report)}
                   />
                   <TechnicalDetails errors={data.errors} report={report} />
                 </>
               ) : (
-                <div className="rounded-card border border-[#243249] bg-[#101827] p-5 text-[#C8D1DF]">
-                  Предварительный отчёт ещё не создан. Публикация недоступна.
-                </div>
+                <>
+                  <div className="rounded-card border border-[#243249] bg-[#101827] p-5 text-[#C8D1DF]">
+                    Предварительный отчёт ещё не создан. Публикация недоступна.
+                  </div>
+                  <ImportActions
+                    batchId={data.selected.id}
+                    canPublish={false}
+                    canCancel={data.selected.canCancel}
+                    isLegacyDraft={isLegacyDraft(data.selected, report)}
+                  />
+                </>
               )}
             </>
           ) : (
@@ -768,14 +780,23 @@ function TechnicalEmptyState({ children }: { children: React.ReactNode }) {
 function ImportActions({
   batchId,
   canPublish,
-  canCancel
+  canCancel,
+  isLegacyDraft
 }: {
   batchId: string;
   canPublish: boolean;
   canCancel: boolean;
+  isLegacyDraft: boolean;
 }) {
   return (
     <section className="rounded-card border border-[#243249] bg-[#101827] p-5">
+      {isLegacyDraft ? (
+        <div className="mb-4 rounded-card border border-[#854D0E] bg-[#2A2113] px-4 py-3 text-sm leading-6 text-[#FDE68A]">
+          Этот черновик создан предыдущей версией импорта. Его нельзя публиковать. Отмените его и
+          загрузите Excel заново.
+        </div>
+      ) : null}
+
       <div className="grid gap-3 sm:grid-cols-[auto_auto_1fr] sm:items-center">
         <form action={publishImportAction}>
           <input type="hidden" name="batchId" value={batchId} />
@@ -788,16 +809,7 @@ function ImportActions({
           </button>
         </form>
 
-        <form action={cancelImportAction}>
-          <input type="hidden" name="batchId" value={batchId} />
-          <button
-            type="submit"
-            disabled={!canCancel}
-            className="inline-flex h-11 items-center justify-center rounded-card border border-[#4169A8] px-5 text-sm font-semibold text-white transition hover:border-[#73A0F5] hover:bg-[#1A2740] disabled:cursor-not-allowed disabled:border-[#334155] disabled:text-[#64748B]"
-          >
-            Отменить импорт
-          </button>
-        </form>
+        <ImportCancelButton batchId={batchId} disabled={!canCancel} />
 
         <p className="text-sm text-[#8FA1B8]">
           Публикация доступна только для draft-версии, которая прошла safety checks.
@@ -805,6 +817,10 @@ function ImportActions({
       </div>
     </section>
   );
+}
+
+function isLegacyDraft(batch: SelectedImportBatch, report: StoredImportReport | null) {
+  return batch.status === "analyzed" && batch.versionStatus === "draft" && !report?.safety;
 }
 
 function SheetSummary({ report }: { report: StoredImportReport }) {

@@ -23,6 +23,14 @@ const ALLOWED_MIME_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 ]);
 const GENERIC_MIME_TYPES = new Set(["", "application/octet-stream"]);
+const BLOCKING_IMPORT_STATUSES = ["uploaded", "analyzed", "failed"] as const;
+const CANCELABLE_IMPORT_STATUSES = new Set([
+  "uploaded",
+  "analyzed",
+  "failed",
+  "safety_blocked",
+  "processing"
+]);
 
 export type AdminImportErrorCode =
   | "missing_file"
@@ -372,7 +380,7 @@ async function assertImportCanStart(fileHash: string) {
     .innerJoin(catalogVersions, eq(catalogVersions.id, importBatches.catalogVersionId))
     .where(
       and(
-        inArray(importBatches.status, ["uploaded", "analyzed", "failed"]),
+        inArray(importBatches.status, BLOCKING_IMPORT_STATUSES),
         eq(catalogVersions.status, "draft")
       )
     )
@@ -483,7 +491,11 @@ export function canCancelImport(status: string, versionStatus: string | null) {
     return false;
   }
 
-  return ["uploaded", "analyzed", "failed"].includes(status);
+  return CANCELABLE_IMPORT_STATUSES.has(status);
+}
+
+export function isBlockingImportDraft(status: string, versionStatus: string | null) {
+  return versionStatus === "draft" && canCancelImport(status, versionStatus);
 }
 
 export function normalizeStoredImportReport(value: unknown): StoredImportReport | null {

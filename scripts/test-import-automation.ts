@@ -5,7 +5,17 @@ import { isPublicTaxonomyTarget } from "../src/config/public-taxonomy";
 import { buildDefaultCategorizationContext, categorizeProductName } from "../src/features/categorization/engine";
 import type { CategorizationResult } from "../src/features/categorization/types";
 import { createAdminRedirectUrlFromParts } from "../src/middleware";
-import { canCancelImport, canPublishImport, normalizeStoredImportReport } from "../src/features/admin/imports";
+import {
+  canCancelImport,
+  canPublishImport,
+  isBlockingImportDraft,
+  normalizeStoredImportReport
+} from "../src/features/admin/imports";
+import {
+  buildImportCancelledRedirect,
+  handleCancelImportRequest,
+  isSameOriginAdminMutation
+} from "../src/features/admin/import-cancel-endpoint";
 import { getStaticPublicCategories } from "../src/features/catalog/data";
 import { needsProductReview, resolveImportProductName } from "../src/features/import/automation";
 import { buildImportReport, buildPriceChangeReport } from "../src/features/import/report";
@@ -127,6 +137,24 @@ run("legacy import report cannot publish but can be cancelled", () => {
   assert.equal(canCancelImport("analyzed", "draft"), true);
   assert.equal(canCancelImport("failed", "draft"), true);
   assert.equal(canCancelImport("published", "active"), false);
+});
+
+run("legacy unfinished import statuses can be cancelled", () => {
+  assert.equal(canCancelImport("analyzed", "draft"), true);
+  assert.equal(canCancelImport("uploaded", "draft"), true);
+  assert.equal(canCancelImport("failed", "draft"), true);
+  assert.equal(canCancelImport("safety_blocked", "draft"), true);
+  assert.equal(canCancelImport("processing", "draft"), true);
+  assert.equal(canCancelImport("published", "active"), false);
+  assert.equal(canCancelImport("analyzed", "active"), false);
+  assert.equal(canCancelImport("analyzed", "archived"), false);
+});
+
+run("cancelled imports do not block the next import", () => {
+  assert.equal(isBlockingImportDraft("analyzed", "draft"), true);
+  assert.equal(isBlockingImportDraft("failed", "draft"), true);
+  assert.equal(isBlockingImportDraft("cancelled", "draft"), false);
+  assert.equal(isBlockingImportDraft("cancelled", "rolled_back"), false);
 });
 
 run("public taxonomy excludes fasteners category and rules", () => {
@@ -276,6 +304,34 @@ run("search indexing failure message keeps old search explicit", () => {
   assert.match(SEARCH_INDEX_PREPARE_FAILED_MESSAGE, /Старый поиск сохранён/);
 });
 
+run("cancel action uses stable API button instead of server action form", () => {
+  const pageSource = readFileSync(
+    new URL("../src/app/admin/(panel)/import/page.tsx", import.meta.url),
+    "utf8"
+  );
+  const buttonSource = readFileSync(
+    new URL("../src/app/admin/(panel)/import/import-cancel-button.tsx", import.meta.url),
+    "utf8"
+  );
+
+  assert.doesNotMatch(pageSource, /action=\{cancelImportAction\}/);
+  assert.match(pageSource, /ImportCancelButton/);
+  assert.match(buttonSource, /fetch\(\s*`\/api\/admin\/imports\/\$\{encodeURIComponent\(batchId\)\}\/cancel`/);
+  assert.match(buttonSource, /Отмена…/);
+  assert.match(buttonSource, /role="alert"/);
+  assert.match(buttonSource, /router\.replace/);
+});
+
+run("cancel business logic does not touch active catalog or Meilisearch", () => {
+  const source = readFileSync(new URL("../src/features/admin/imports.ts", import.meta.url), "utf8");
+  const cancelSource = extractFunctionSource(source, "cancelAdminImportBatch", "function validateImportFile");
+
+  assert.match(cancelSource, /set\(\{\s*status:\s*"cancelled"\s*\}\)/s);
+  assert.match(cancelSource, /status:\s*"rolled_back"/);
+  assert.doesNotMatch(cancelSource, /syncSearch|Meili|meili/i);
+  assert.doesNotMatch(cancelSource, /status:\s*"active"/);
+});
+
 function run(name: string, test: () => void) {
   try {
     test();
@@ -297,6 +353,8 @@ async function runAsync(name: string, test: () => Promise<void>) {
 }
 
 async function runSearchIndexChecks() {
+  await runImportCancelEndpointChecks();
+
   await runAsync("failed staging add keeps active search index intact", async () => {
     const oldDocument = searchDocument({ id: "old-product", name: "Old product" });
     const newDocument = searchDocument({ id: "new-product", name: "New product" });
@@ -370,6 +428,102 @@ async function runSearchIndexChecks() {
   });
 
   console.log("import automation checks passed");
+}
+
+async function runImportCancelEndpointChecks() {
+  await runAsync("cancel endpoint without admin session returns unauthorized", async () => {
+    let called = false;
+    const response = await handleCancelImportRequest(
+      cancelRequest(),
+      { batchId: "batch-1" },
+      {
+        getSession: async () => null,
+        cancelImportBatch: async () => {
+          called = true;
+        }
+      }
+    );
+    const payload = await response.json();
+
+    assert.equal(response.status, 401);
+    assert.equal(payload.ok, false);
+    assert.equal(payload.error.code, "unauthorized");
+    assert.equal(called, false);
+  });
+
+  await runAsync("cancel endpoint with valid session calls shared business function", async () => {
+    let calledWith: { importBatchId: string; adminUserId: string } | null = null;
+    const response = await handleCancelImportRequest(
+      cancelRequest(),
+      { batchId: "batch-1" },
+      {
+        getSession: async () => testSession(),
+        cancelImportBatch: async (input) => {
+          calledWith = input;
+        }
+      }
+    );
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(calledWith, { importBatchId: "batch-1", adminUserId: "admin-1" });
+    assert.deepEqual(payload, {
+      ok: true,
+      status: "cancelled",
+      redirectTo: buildImportCancelledRedirect("batch-1")
+    });
+  });
+
+  await runAsync("cancel endpoint rejects cross-origin mutation", async () => {
+    let called = false;
+    const response = await handleCancelImportRequest(
+      cancelRequest("https://evil.example"),
+      { batchId: "batch-1" },
+      {
+        getSession: async () => testSession(),
+        cancelImportBatch: async () => {
+          called = true;
+        }
+      }
+    );
+    const payload = await response.json();
+
+    assert.equal(response.status, 403);
+    assert.equal(payload.ok, false);
+    assert.equal(called, false);
+  });
+
+  await runAsync("cancel endpoint surfaces business errors as JSON", async () => {
+    const response = await handleCancelImportRequest(
+      cancelRequest(),
+      { batchId: "batch-1" },
+      {
+        getSession: async () => testSession(),
+        cancelImportBatch: async () => {
+          throw new Error("database unavailable");
+        },
+        logger: { error: () => undefined }
+      }
+    );
+    const payload = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(payload.ok, false);
+    assert.equal(payload.error.message, "database unavailable");
+  });
+
+  await runAsync("same-origin cancel request allows forwarded production origin", async () => {
+    const request = new Request("http://127.0.0.1:3000/api/admin/imports/batch-1/cancel", {
+      method: "POST",
+      headers: {
+        origin: "https://autozap.example",
+        "x-forwarded-host": "autozap.example",
+        "x-forwarded-proto": "https"
+      }
+    });
+
+    assert.equal(isSameOriginAdminMutation(request), true);
+  });
 }
 
 function row(overrides: Partial<AnalyzedImportRow> = {}): AnalyzedImportRow {
@@ -516,6 +670,33 @@ function getFakeIndex(client: FakeSearchIndexClient, indexUid: string) {
   const index = client.indexes.get(indexUid);
   assert.ok(index, `Expected fake index ${indexUid} to exist`);
   return index;
+}
+
+function cancelRequest(origin = "https://autozap.example") {
+  return new Request("https://autozap.example/api/admin/imports/batch-1/cancel", {
+    method: "POST",
+    headers: { origin }
+  });
+}
+
+function testSession() {
+  return {
+    user: {
+      id: "admin-1",
+      email: "admin@example.com",
+      fullName: "Admin",
+      role: "owner" as const
+    }
+  };
+}
+
+function extractFunctionSource(source: string, startPattern: string, endPattern: string) {
+  const start = source.indexOf(startPattern);
+  const end = source.indexOf(endPattern, start);
+  assert.ok(start >= 0, `Missing source start ${startPattern}`);
+  assert.ok(end > start, `Missing source end ${endPattern}`);
+
+  return source.slice(start, end);
 }
 
 class FakeSearchIndexClient implements SearchIndexClient {

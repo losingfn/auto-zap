@@ -9,6 +9,8 @@ import {
   importBatches,
   products,
   reviewQueue,
+  reviewWorkspaceItems,
+  reviewWorkspaces,
   subcategories
 } from "@/db/schema";
 
@@ -35,12 +37,24 @@ export async function getAdminDashboardStats() {
     ? and(eq(reviewQueue.catalogVersionId, activeVersion.id), eq(reviewQueue.status, "open"))
     : eq(reviewQueue.status, "open");
 
-  const [productCount, categoryCount, subcategoryCount, reviewCount, auditLogRows, importRows] =
+  const [productCount, categoryCount, subcategoryCount, reviewCount, preparedReviewCount, openWorkspaceRows, auditLogRows, importRows] =
     await Promise.all([
       countRows(products, productWhere),
       countRows(categories, eq(categories.isActive, true)),
       countRows(subcategories, eq(subcategories.isActive, true)),
       countRows(reviewQueue, reviewWhere),
+      countRows(reviewWorkspaceItems, eq(reviewWorkspaceItems.status, "pending")),
+      db
+        .select({
+          id: reviewWorkspaces.id,
+          status: reviewWorkspaces.status,
+          createdAt: reviewWorkspaces.createdAt,
+          updatedAt: reviewWorkspaces.updatedAt
+        })
+        .from(reviewWorkspaces)
+        .where(eq(reviewWorkspaces.status, "open"))
+        .orderBy(desc(reviewWorkspaces.updatedAt), desc(reviewWorkspaces.createdAt))
+        .limit(1),
       db
         .select({
           id: auditLogs.id,
@@ -77,6 +91,8 @@ export async function getAdminDashboardStats() {
     subcategoryCount,
     lastCatalogUpdate: activeVersion?.publishedAt ?? activeVersion?.updatedAt ?? null,
     reviewQueueCount: reviewCount,
+    reviewPreparedCount: preparedReviewCount,
+    reviewWorkspace: openWorkspaceRows[0] ?? null,
     auditLogs: auditLogRows,
     recentImports: importRows
   };

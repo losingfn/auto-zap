@@ -24,13 +24,27 @@ const secondaryButtonClassName =
 const smallSecondaryButtonClassName =
   "inline-flex h-10 items-center justify-center rounded-card border border-[#4169A8] px-4 text-sm font-semibold text-white transition hover:border-[#73A0F5] hover:bg-[#1A2740] disabled:cursor-not-allowed disabled:border-[#243249] disabled:bg-transparent disabled:text-[#536174]";
 const DRAFT_ONLY_MESSAGE =
-  "Массовые действия доступны только для черновика текущего импорта. Это защищает активный каталог от случайных изменений.";
+  "Массовые действия доступны только в рабочей сессии. Это защищает активный каталог от случайных изменений.";
 const NO_UNDO_MESSAGE =
-  "Автоматического отката нет. Ошибку можно исправить повторным действием или через backup.";
+  "Последнее неопубликованное действие можно отменить до финальной публикации.";
 const LARGE_ACTION_THRESHOLD = 100;
 const DANGEROUS_RULE_WORDS = new Set([
+  "болт",
+  "гайка",
+  "шайба",
+  "кольцо",
   "комплект",
+  "кронштейн",
+  "трубка",
+  "втулка",
+  "палец",
   "ремкомплект",
+  "корпус",
+  "крышка",
+  "датчик",
+  "клапан",
+  "подшипник",
+  "сальник",
   "передний",
   "задний",
   "левый",
@@ -49,14 +63,15 @@ export function ReviewGroupActionForm({
 }: ReviewControlsProps & {
   group: AdminReviewGroup;
 }) {
-  const bulkDisabled = filters.scope !== "draft";
-  const requiresTypedConfirmation = group.count > LARGE_ACTION_THRESHOLD;
+  const bulkDisabled = filters.scope !== "workspace";
+  const impactCount = group.impactedProductCount;
+  const requiresTypedConfirmation = impactCount > LARGE_ACTION_THRESHOLD;
   const [confirmationCount, setConfirmationCount] = useState("");
   const [categoryLabel, setCategoryLabel] = useState("");
   const [subcategoryLabel, setSubcategoryLabel] = useState("");
   const [rulePattern, setRulePattern] = useState(group.rulePattern ?? "");
-  const countConfirmed = !requiresTypedConfirmation || confirmationCount.trim() === String(group.count);
-  const actionDisabled = bulkDisabled || !countConfirmed;
+  const countConfirmed = !requiresTypedConfirmation || confirmationCount.trim() === String(impactCount);
+  const actionDisabled = bulkDisabled || !countConfirmed || impactCount === 0 || !group.suggestedCategoryId || !group.suggestedSubcategoryId;
 
   return (
     <form
@@ -77,7 +92,7 @@ export function ReviewGroupActionForm({
 
         if (requiresTypedConfirmation && !countConfirmed) {
           event.preventDefault();
-          window.alert(`Для подтверждения введите: ${group.count}`);
+          window.alert(`Для подтверждения введите: ${impactCount}`);
           return;
         }
 
@@ -95,15 +110,15 @@ export function ReviewGroupActionForm({
 
         const lines = [
           "Вы собираетесь назначить:",
-          "Scope: Черновик текущего импорта",
+          "Scope: Рабочая сессия проверки",
           `Категория: ${category}`,
           `Подкатегория: ${subcategory}`,
-          `Количество товаров: ${group.count}`,
+          `Количество товаров: ${impactCount}`,
           `Создаётся правило: ${learnRule ? "да" : "нет"}`,
           "",
           NO_UNDO_MESSAGE,
           "",
-          `Это действие применится к ${group.count} товарам из текущей очереди проверки.`
+          `Это действие применится к ${impactCount} безопасным товарам из preview.`
         ];
 
         if (learnRule) {
@@ -119,6 +134,8 @@ export function ReviewGroupActionForm({
       <HiddenReviewFilters filters={filters} />
       <input type="hidden" name="group" value={group.key} />
       <input type="hidden" name="confirmationCount" value={confirmationCount} />
+      <input type="hidden" name="expectedCount" value={impactCount} />
+      <input type="hidden" name="previewToken" value={group.previewToken} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <label>
@@ -126,6 +143,7 @@ export function ReviewGroupActionForm({
           <CategorySelect
             categories={categories}
             name="categoryId"
+            defaultValue={group.suggestedCategoryId ?? ""}
             disabled={bulkDisabled}
             onSelectionLabelChange={setCategoryLabel}
           />
@@ -135,6 +153,7 @@ export function ReviewGroupActionForm({
           <SubcategorySelect
             categories={categories}
             name="subcategoryId"
+            defaultValue={group.suggestedSubcategoryId ?? ""}
             disabled={bulkDisabled}
             onSelectionLabelChange={setSubcategoryLabel}
           />
@@ -156,8 +175,8 @@ export function ReviewGroupActionForm({
       <div className="mt-4 rounded-card border border-[#243249] bg-[#0B1220] p-4 text-sm text-[#C8D1DF]">
         <p className="font-semibold">Preview перед массовым действием</p>
         <dl className="mt-3 grid gap-2 text-sm">
-          <PreviewRow label="Scope" value="Черновик текущего импорта" />
-          <PreviewRow label="Количество товаров" value={String(group.count)} />
+          <PreviewRow label="Scope" value="Рабочая сессия проверки" />
+          <PreviewRow label="Количество товаров" value={String(impactCount)} />
           <PreviewRow label="Категория" value={categoryLabel || "Не выбрана"} />
           <PreviewRow label="Подкатегория" value={subcategoryLabel || "Не выбрана"} />
           <PreviewRow
@@ -176,7 +195,7 @@ export function ReviewGroupActionForm({
           </ul>
         </div>
         <p className="mt-2 text-[#8FA1B8]">
-          Правило будет применяться в будущих импортах. Каталог не публикуется автоматически.
+          Каталог не меняется до финальной публикации рабочей сессии.
         </p>
         <p className="mt-2 text-[#FDE68A]">{NO_UNDO_MESSAGE}</p>
         {bulkDisabled ? <p className="mt-2 text-[#FDE68A]">{DRAFT_ONLY_MESSAGE}</p> : null}
@@ -190,7 +209,7 @@ export function ReviewGroupActionForm({
 
       {requiresTypedConfirmation ? (
         <TypedCountConfirmation
-          count={group.count}
+          count={impactCount}
           value={confirmationCount}
           disabled={bulkDisabled}
           onChange={setConfirmationCount}
@@ -225,7 +244,7 @@ export function ReviewBulkSelectionForm({ categories, filters }: ReviewControlsP
   const [selectedCount, setSelectedCount] = useState(0);
   const [confirmationCount, setConfirmationCount] = useState("");
   const [rulePattern, setRulePattern] = useState("");
-  const bulkDisabled = filters.scope !== "draft";
+  const bulkDisabled = filters.scope !== "workspace";
   const requiresTypedConfirmation = selectedCount > LARGE_ACTION_THRESHOLD;
   const countConfirmed = !requiresTypedConfirmation || confirmationCount.trim() === String(selectedCount);
 
@@ -294,7 +313,7 @@ export function ReviewBulkSelectionForm({ categories, filters }: ReviewControlsP
 
         const lines = [
           "Вы собираетесь назначить:",
-          "Scope: Черновик текущего импорта",
+          "Scope: Рабочая сессия проверки",
           `Категория: ${category}`,
           `Подкатегория: ${subcategory}`,
           `Количество товаров: ${selectedCount}`,
@@ -312,6 +331,7 @@ export function ReviewBulkSelectionForm({ categories, filters }: ReviewControlsP
     >
       <HiddenReviewFilters filters={filters} />
       <input type="hidden" name="confirmationCount" value={confirmationCount} />
+      <input type="hidden" name="expectedCount" value={selectedCount} />
       {bulkDisabled ? <DisabledBulkNotice /> : null}
       <div className="flex flex-wrap items-center gap-3">
         <button
@@ -405,7 +425,7 @@ export function ReviewReapplyRulesForm({
   filters: AdminReviewActionFilters;
   count: number;
 }) {
-  const bulkDisabled = filters.scope !== "draft";
+  const bulkDisabled = filters.scope !== "workspace";
   const requiresTypedConfirmation = count > LARGE_ACTION_THRESHOLD;
   const [confirmationCount, setConfirmationCount] = useState("");
   const countConfirmed = !requiresTypedConfirmation || confirmationCount.trim() === String(count);

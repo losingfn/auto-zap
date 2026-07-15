@@ -9,7 +9,11 @@ import {
   type AdminReviewItem,
   type AdminReviewParams
 } from "@/features/admin/review";
-import { resolveReviewItemAction } from "./actions";
+import {
+  publishReviewWorkspaceAction,
+  resolveReviewItemAction,
+  undoLastReviewWorkspaceAction
+} from "./actions";
 import {
   ReviewBulkSelectionForm,
   ReviewGroupActionForm,
@@ -41,6 +45,18 @@ const versionStatusLabels: Record<string, string> = {
   active: "Активная версия"
 };
 
+const workspaceStatusLabels: Record<AdminReviewItem["workspaceStatus"], string> = {
+  open: "В очереди",
+  prepared: "Подготовлен",
+  excluded: "Исключён"
+};
+
+const suggestionLevelLabels: Record<AdminReviewItem["suggestionLevel"], string> = {
+  ready: "Готово",
+  quick: "Быстро проверить",
+  manual: "Вручную"
+};
+
 const ruleSkippedLabels: Record<string, string> = {
   empty: "Правило не создано: шаблон пустой.",
   no_safe_pattern: "Правило не создано: не удалось подобрать достаточно точный шаблон.",
@@ -52,11 +68,14 @@ const ruleSkippedLabels: Record<string, string> = {
 };
 
 const errorLabels: Record<string, string> = {
-  save_failed: "Не удалось сохранить исправление. Проверьте категорию и подкатегорию.",
+  save_failed: "Не удалось подготовить исправление. Проверьте категорию и подкатегорию.",
   bulk_failed: "Не удалось выполнить массовое действие. Проверьте выбранную группу и категорию.",
   rules_failed: "Не удалось повторно применить правила к очереди.",
-  bulk_scope_forbidden: "Массовые действия разрешены только для черновика текущего импорта.",
+  undo_failed: "Не удалось отменить последнее неопубликованное действие.",
+  publish_failed: "Не удалось опубликовать рабочую сессию. Активный каталог и поиск не изменены.",
+  bulk_scope_forbidden: "Массовые действия разрешены только в рабочей сессии.",
   bulk_confirmation_required: "Для массового действия больше 100 товаров нужно ввести точное количество.",
+  bulk_preview_stale: "Состав группы изменился. Обновите preview и повторите действие.",
   bulk_rule_blocked: "Правило не создано: шаблон слишком широкий или опасный. Массовое действие не выполнено."
 };
 
@@ -72,10 +91,10 @@ export default async function AdminReviewPage({ searchParams }: ReviewPageProps)
           <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#9DBDFB]">
             Проверка товаров
           </p>
-          <h1 className="mt-2 text-3xl font-semibold">Проверка товаров</h1>
+          <h1 className="mt-2 text-3xl font-semibold">Рабочая сессия проверки</h1>
           <p className="mt-3 max-w-3xl text-[#C8D1DF]">
-            Здесь находятся товары, для которых система не смогла уверенно определить категорию
-            или обнаружила проблему в данных.
+            Здесь можно распределять товары пачками без изменения публичного каталога. Изменения
+            попадут на сайт только после финальной публикации рабочей сессии.
           </p>
         </div>
         <ReviewReapplyRulesForm filters={filters} count={data.filteredCount} />
@@ -83,50 +102,18 @@ export default async function AdminReviewPage({ searchParams }: ReviewPageProps)
 
       <Notices params={params} />
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-        <SummaryCard label="Всего требуют проверки" value={data.summary.total} />
-        <SummaryCard label="Без категории" value={data.summary.missingCategory} />
-        <SummaryCard label="Без подкатегории" value={data.summary.missingSubcategory} />
-        <SummaryCard label="Без названия" value={data.summary.missingName} />
-        <SummaryCard label="Без уверенного предложения" value={data.summary.noSuggestion} />
-        <SummaryCard label="Решено сегодня" value={data.summary.resolvedToday} />
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard label="Осталось в очереди" value={data.summary.total} />
+        <SummaryCard label="Готовые группы" value={data.summary.readyGroups} />
+        <SummaryCard label="Готовые товары" value={data.summary.readyProducts} />
+        <SummaryCard label="Быстрая проверка" value={data.summary.quickProducts} />
+        <SummaryCard label="Только вручную" value={data.summary.manualProducts} />
+        <SummaryCard label="Уже распределены" value={data.summary.preparedProducts} />
+        <SummaryCard label="Исключены" value={data.summary.excludedProducts} />
+        <SummaryCard label="Будет опубликовано" value={data.summary.willPublishProducts} />
       </section>
 
-      <section className="mt-5 rounded-card border border-[#243249] bg-[#101827] p-5">
-        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div>
-            <h2 className="text-lg font-semibold">Версия каталога</h2>
-            <p className="mt-2 text-sm leading-6 text-[#8FA1B8]">
-              По умолчанию показан черновик последнего импорта. Active и смешанный режим доступны
-              отдельно, чтобы не разбирать разные версии без явной подписи.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <ScopeLink
-              href={reviewHref(data.params, { scope: "draft", page: 1, group: "" })}
-              active={data.params.scope === "draft"}
-            >
-              Черновик текущего импорта · {numberFormatter.format(data.summary.latestDraftOpen)}
-            </ScopeLink>
-            <ScopeLink
-              href={reviewHref(data.params, { scope: "active", page: 1, group: "" })}
-              active={data.params.scope === "active"}
-            >
-              Активный каталог · {numberFormatter.format(data.summary.activeOpen)}
-            </ScopeLink>
-            <ScopeLink
-              href={reviewHref(data.params, { scope: "all", page: 1, group: "" })}
-              active={data.params.scope === "all"}
-            >
-              Все записи
-            </ScopeLink>
-          </div>
-        </div>
-        <p className="mt-4 text-sm text-[#C8D1DF]">
-          Сейчас: <span className="font-semibold">{scopeDescription(data)}</span>
-        </p>
-      </section>
-
+      <WorkspacePanel data={data} />
       <FilterPanel data={data} />
 
       <section className="mt-6">
@@ -134,8 +121,8 @@ export default async function AdminReviewPage({ searchParams }: ReviewPageProps)
           <div>
             <h2 className="text-xl font-semibold">Группы похожих товаров</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[#8FA1B8]">
-              Группы строятся по нормализованному ключевому токену из названия. Это не идеальная
-              классификация, но она превращает тысячи карточек в рабочие пачки.
+              Группы строятся по нормализованным контекстным словам, существующим правилам и
+              безопасным подсказкам. Общие слова сами по себе не создают массовое правило.
             </p>
           </div>
           {data.selectedGroup ? (
@@ -171,12 +158,20 @@ export default async function AdminReviewPage({ searchParams }: ReviewPageProps)
                   <div>
                     <h3 className="text-lg font-semibold">{group.label}</h3>
                     <p className="mt-1 text-sm text-[#8FA1B8]">
-                      {numberFormatter.format(group.count)} товаров
+                      {numberFormatter.format(group.count)} товаров в группе
                     </p>
                   </div>
-                  <Badge>{group.suggestedCount > 0 ? "Есть предложение" : "Нет предложения"}</Badge>
+                  <Badge>{suggestionLevelLabels[group.level]}</Badge>
                 </div>
-                <p className="mt-4 line-clamp-2 text-sm leading-6 text-[#8FA1B8]">{group.reason}</p>
+                <p className="mt-4 line-clamp-3 text-sm leading-6 text-[#8FA1B8]">
+                  {group.explanation}
+                </p>
+                <dl className="mt-4 grid gap-2 text-sm text-[#C8D1DF]">
+                  <CompactRow label="Preview" value={`${numberFormatter.format(group.impactedProductCount)} безопасно`} />
+                  <CompactRow label="Категория" value={formatTarget(group.suggestedCategoryName, group.suggestedSubcategoryName)} />
+                  <CompactRow label="Уверенность" value={`${group.confidenceLabel} · ${Math.round(group.confidence * 100)}%`} />
+                  <CompactRow label="Конфликты" value={numberFormatter.format(group.conflictingCount)} />
+                </dl>
                 <ul className="mt-4 space-y-2 text-sm text-[#C8D1DF]">
                   {group.examples.map((example) => (
                     <li key={example} className="truncate">
@@ -184,16 +179,12 @@ export default async function AdminReviewPage({ searchParams }: ReviewPageProps)
                     </li>
                   ))}
                 </ul>
-                <div className="mt-5 flex flex-wrap items-center gap-2">
-                  <Badge>Без категории: {numberFormatter.format(group.missingCategoryCount)}</Badge>
-                  <Badge>Без подкатегории: {numberFormatter.format(group.missingSubcategoryCount)}</Badge>
-                </div>
                 {group.ruleWarning ? <p className="mt-4 text-sm text-[#FDE68A]">{group.ruleWarning}</p> : null}
                 <Link
                   href={reviewHref(data.params, { group: group.key, page: 1 })}
                   className="mt-5 inline-flex h-10 items-center justify-center rounded-card bg-[#73A0F5] px-4 text-sm font-semibold text-[#07101F] transition hover:bg-[#9DBDFB]"
                 >
-                  Открыть группу
+                  Открыть preview
                 </Link>
               </article>
             ))}
@@ -206,7 +197,7 @@ export default async function AdminReviewPage({ searchParams }: ReviewPageProps)
           <div>
             <h2 className="text-xl font-semibold">Товары в проверке</h2>
             <p className="mt-2 text-sm text-[#8FA1B8]">
-              Показано {numberFormatter.format(data.pagination.from)}–{numberFormatter.format(data.pagination.to)} из{" "}
+              Показано {numberFormatter.format(data.pagination.from)}-{numberFormatter.format(data.pagination.to)} из{" "}
               {numberFormatter.format(data.pagination.total)}.
             </p>
           </div>
@@ -225,7 +216,7 @@ export default async function AdminReviewPage({ searchParams }: ReviewPageProps)
                   item={item}
                   categories={data.categories}
                   filters={filters}
-                  bulkActionsDisabled={filters.scope !== "draft"}
+                  bulkActionsDisabled={filters.scope !== "workspace"}
                   autoFocus={index === 0}
                 />
               ))}
@@ -242,19 +233,85 @@ export default async function AdminReviewPage({ searchParams }: ReviewPageProps)
       </section>
 
       <section className="mt-8 grid gap-4 lg:grid-cols-3">
-        <InfoBlock title="Почему товар здесь?">
-          Товар попал в проверку, потому что система не смогла уверенно определить категорию или
-          подкатегорию.
+        <InfoBlock title="Что меняется сразу?">
+          Только рабочая сессия проверки. Active-товары, публичный каталог и поиск не меняются до
+          финальной публикации.
         </InfoBlock>
-        <InfoBlock title="Что значит создать правило?">
-          Правило поможет автоматически распределять похожие товары сейчас и при следующих загрузках прайса.
+        <InfoBlock title="Что значит правило?">
+          Постоянное правило создаётся только для безопасного шаблона и используется при следующих
+          импортах. Слишком широкие слова блокируются.
         </InfoBlock>
-        <InfoBlock title="Что будет после применения?">
-          Товары получат выбранную категорию и исчезнут из очереди проверки, но каталог не будет
-          опубликован автоматически.
+        <InfoBlock title="Когда будет видно на сайте?">
+          После кнопки «Опубликовать рабочую сессию»: создаётся новая версия каталога, затем
+          обновляется поиск через безопасный индекс.
         </InfoBlock>
       </section>
     </div>
+  );
+}
+
+function WorkspacePanel({ data }: { data: Awaited<ReturnType<typeof getAdminReviewPageData>> }) {
+  const canPublish = data.summary.willPublishProducts > 0;
+  const canUndo = Boolean(data.workspace.lastActionId);
+
+  return (
+    <section className="mt-5 rounded-card border border-[#243249] bg-[#101827] p-5">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+        <div>
+          <h2 className="text-lg font-semibold">Публикация рабочей сессии</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#8FA1B8]">
+            Сейчас: <span className="font-semibold text-[#C8D1DF]">{scopeDescription(data)}</span>.
+            Подготовленные изменения не видны покупателям и не попадают в Meilisearch до публикации.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Badge>Workspace: {data.workspace.status}</Badge>
+            <Badge>Действий: {numberFormatter.format(data.workspace.actionCount)}</Badge>
+            <Badge>К публикации: {numberFormatter.format(data.summary.willPublishProducts)}</Badge>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <form action={undoLastReviewWorkspaceAction}>
+            <button
+              type="submit"
+              disabled={!canUndo}
+              className="inline-flex h-11 items-center justify-center rounded-card border border-[#4169A8] px-5 text-sm font-semibold text-white transition hover:border-[#73A0F5] hover:bg-[#1A2740] disabled:cursor-not-allowed disabled:border-[#243249] disabled:text-[#536174]"
+            >
+              Отменить последнее
+            </button>
+          </form>
+          <form action={publishReviewWorkspaceAction}>
+            <button
+              type="submit"
+              disabled={!canPublish}
+              className="inline-flex h-11 items-center justify-center rounded-card bg-[#73A0F5] px-5 text-sm font-semibold text-[#07101F] transition hover:bg-[#9DBDFB] disabled:cursor-not-allowed disabled:bg-[#31415F] disabled:text-[#8FA1B8]"
+            >
+              Опубликовать рабочую сессию
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {data.changes.length > 0 ? (
+        <div className="mt-5 border-t border-[#243249] pt-4">
+          <p className="text-sm font-semibold text-[#C8D1DF]">Последние неопубликованные действия</p>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            {data.changes.slice(0, 4).map((change) => (
+              <div key={change.id} className="rounded-card border border-[#243249] bg-[#0B1220] p-4 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold text-[#C8D1DF]">
+                    {formatTarget(change.categoryName, change.subcategoryName)}
+                  </span>
+                  <Badge>{numberFormatter.format(change.productCount)} товаров</Badge>
+                </div>
+                <p className="mt-2 text-[#8FA1B8]">
+                  {change.rulePattern ? `Правило: ${change.rulePattern}` : "Временное распределение"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -269,10 +326,12 @@ function Notices({ params }: { params: Record<string, string | string[] | undefi
   const rulesBefore = readParam(params.rulesBefore);
   const rulesResolved = readParam(params.rulesResolved);
   const rulesAfter = readParam(params.rulesAfter);
+  const undoCount = readParam(params.undoCount);
+  const publishedCount = readParam(params.publishedCount);
 
   return (
     <>
-      {resolved ? <Notice>Товар обновлён, запись проверки закрыта.</Notice> : null}
+      {resolved ? <Notice>Изменение подготовлено в рабочей сессии. Публичный каталог пока не изменён.</Notice> : null}
       {rule ? <Notice>Правило категоризации создано или уточнено.</Notice> : null}
       {ruleSkipped ? (
         <Notice tone="warning">
@@ -281,16 +340,18 @@ function Notices({ params }: { params: Record<string, string | string[] | undefi
       ) : null}
       {bulkProcessed ? (
         <Notice>
-          Готово: обработано {bulkProcessed} товаров, осталось на проверке {bulkRemaining || "0"}.
+          Готово: подготовлено {bulkProcessed} товаров, осталось в выбранном наборе {bulkRemaining || "0"}.
           Создано правило: {bulkRule === "yes" ? "да" : "нет"}.
         </Notice>
       ) : null}
       {rulesBefore ? (
         <Notice>
-          До применения правил: {rulesBefore}. Автоматически распределено: {rulesResolved || "0"}.
+          До применения правил: {rulesBefore}. Подготовлено автоматически: {rulesResolved || "0"}.
           Осталось: {rulesAfter || "0"}.
         </Notice>
       ) : null}
+      {undoCount ? <Notice>Отменено последнее неопубликованное действие: {undoCount} товаров.</Notice> : null}
+      {publishedCount ? <Notice>Рабочая сессия опубликована: {publishedCount} товаров переведены в active.</Notice> : null}
       {error ? <Notice tone="danger">{errorLabels[error] ?? "Не удалось выполнить действие."}</Notice> : null}
     </>
   );
@@ -301,11 +362,11 @@ function FilterPanel({ data }: { data: Awaited<ReturnType<typeof getAdminReviewP
     <form method="get" className="mt-6 rounded-card border border-[#243249] bg-[#101827] p-5">
       <div className="grid gap-4 xl:grid-cols-[180px_220px_1fr_240px_140px_auto] xl:items-end">
         <label>
-          <span className="text-sm font-medium text-[#C8D1DF]">Версия</span>
+          <span className="text-sm font-medium text-[#C8D1DF]">Режим</span>
           <select name="scope" defaultValue={data.params.scope} className={inputClassName}>
-            <option value="draft">Только draft-версия</option>
-            <option value="active">Только active-версия</option>
-            <option value="all">Все записи</option>
+            <option value="workspace">Рабочая сессия</option>
+            <option value="active">Активная очередь</option>
+            <option value="all">Все открытые</option>
           </select>
         </label>
         <label>
@@ -323,7 +384,7 @@ function FilterPanel({ data }: { data: Awaited<ReturnType<typeof getAdminReviewP
           <input
             name="q"
             defaultValue={data.params.query}
-            placeholder="болт, Toyota, ГСМ-01328"
+            placeholder="болт суппорта, Toyota, ГСМ-01328"
             className={inputClassName}
           />
         </label>
@@ -382,13 +443,19 @@ function SelectedGroupPanel({
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#9DBDFB]">
-              Открытая группа
+              Preview группы
             </p>
             <h3 className="mt-2 text-2xl font-semibold">{group.label}</h3>
           </div>
-          <Badge>{numberFormatter.format(group.count)} товаров</Badge>
+          <Badge>{numberFormatter.format(group.impactedProductCount)} безопасно</Badge>
         </div>
-        <p className="mt-4 text-sm leading-6 text-[#8FA1B8]">{group.reason}</p>
+        <p className="mt-4 text-sm leading-6 text-[#8FA1B8]">{group.explanation}</p>
+        <dl className="mt-4 grid gap-2 text-sm text-[#C8D1DF] md:grid-cols-2">
+          <CompactRow label="Всего в группе" value={numberFormatter.format(group.count)} />
+          <CompactRow label="Применится" value={numberFormatter.format(group.impactedProductCount)} />
+          <CompactRow label="Конфликтов" value={numberFormatter.format(group.conflictingCount)} />
+          <CompactRow label="Только вручную" value={numberFormatter.format(group.manualOnlyCount)} />
+        </dl>
         <ul className="mt-4 grid gap-2 text-sm text-[#C8D1DF] md:grid-cols-2">
           {group.examples.map((example) => (
             <li key={example} className="truncate">
@@ -430,15 +497,17 @@ function ReviewCard({
                 value={item.reviewId}
                 form="review-selected-form"
                 data-review-select
-                disabled={bulkActionsDisabled}
+                disabled={bulkActionsDisabled || item.workspaceStatus !== "open"}
                 className="h-4 w-4 accent-[#73A0F5]"
               />
               Выбрать
             </label>
+            <Badge>{workspaceStatusLabels[item.workspaceStatus]}</Badge>
+            <Badge>{suggestionLevelLabels[item.suggestionLevel]}</Badge>
+            <Badge>{item.confidenceLabel} · {Math.round(item.confidence * 100)}%</Badge>
             <Badge>{versionStatusLabels[item.catalogVersionStatus] ?? item.catalogVersionStatus}</Badge>
             <Badge>{item.shopCode}</Badge>
             <Badge>{priceFormatter.format(item.price)}</Badge>
-            {item.importRowNumber ? <Badge>Строка Excel: {item.importRowNumber}</Badge> : null}
           </div>
 
           <h3 className="mt-4 text-xl font-semibold leading-snug">{item.name}</h3>
@@ -450,24 +519,23 @@ function ReviewCard({
             <InfoPair label="Причина проверки" value={item.reason} />
             <InfoPair
               label="Текущая категория"
-              value={
-                item.currentCategoryName || item.currentSubcategoryName
-                  ? [item.currentCategoryName, item.currentSubcategoryName].filter(Boolean).join(" → ")
-                  : "Не назначена"
-              }
+              value={formatTarget(item.currentCategoryName, item.currentSubcategoryName)}
             />
             <InfoPair
               label="Предложение системы"
-              value={
-                item.suggestedCategoryName || item.suggestedSubcategoryName
-                  ? [item.suggestedCategoryName, item.suggestedSubcategoryName].filter(Boolean).join(" → ")
-                  : "Нет уверенного предложения"
-              }
+              value={formatTarget(item.suggestedCategoryName, item.suggestedSubcategoryName)}
             />
             <InfoPair
               label="Версия"
               value={`${versionStatusLabels[item.catalogVersionStatus] ?? item.catalogVersionStatus}, ${dateFormatter.format(item.catalogVersionCreatedAt)}`}
             />
+            {item.pendingCategoryName || item.pendingSubcategoryName ? (
+              <InfoPair
+                label="Подготовлено"
+                value={formatTarget(item.pendingCategoryName, item.pendingSubcategoryName)}
+              />
+            ) : null}
+            <InfoPair label="Объяснение" value={item.explanation} />
           </dl>
         </div>
 
@@ -483,7 +551,8 @@ function ReviewCard({
               defaultValue={defaultCategoryId}
               required
               autoFocus={autoFocus}
-              className={inputClassName}
+              disabled={item.workspaceStatus !== "open"}
+              className={item.workspaceStatus !== "open" ? disabledInputClassName : inputClassName}
             >
               <option value="">Выберите категорию</option>
               {categories.map((category) => (
@@ -496,7 +565,13 @@ function ReviewCard({
 
           <label className="mt-4 block">
             <span className="text-sm font-medium text-[#C8D1DF]">Подкатегория</span>
-            <select name="subcategoryId" defaultValue={defaultSubcategoryId} required className={inputClassName}>
+            <select
+              name="subcategoryId"
+              defaultValue={defaultSubcategoryId}
+              required
+              disabled={item.workspaceStatus !== "open"}
+              className={item.workspaceStatus !== "open" ? disabledInputClassName : inputClassName}
+            >
               <option value="">Выберите подкатегорию</option>
               {categories.map((category) => (
                 <optgroup key={category.id} label={category.name}>
@@ -516,15 +591,15 @@ function ReviewCard({
               name="learnRule"
               value="1"
               defaultChecked={Boolean(item.rulePattern)}
-              className="mt-1 h-4 w-4 accent-[#73A0F5]"
+              disabled={item.workspaceStatus !== "open"}
+              className="mt-1 h-4 w-4 accent-[#73A0F5] disabled:cursor-not-allowed"
             />
             <span>
               <span className="block text-sm font-medium text-[#C8D1DF]">
                 Создать правило для похожих товаров
               </span>
               <span className="mt-1 block text-xs leading-5 text-[#8FA1B8]">
-                Правило создаётся безопасным шаблоном. Уже существующая очередь применяет правила
-                отдельной кнопкой сверху.
+                Правило создаётся только если шаблон достаточно точный.
               </span>
             </span>
           </label>
@@ -535,15 +610,17 @@ function ReviewCard({
               name="rulePattern"
               defaultValue={item.rulePattern ?? ""}
               placeholder="например: фильтр воздушный"
-              className={inputClassName}
+              disabled={item.workspaceStatus !== "open"}
+              className={item.workspaceStatus !== "open" ? disabledInputClassName : inputClassName}
             />
           </label>
 
           <button
             type="submit"
-            className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-card bg-[#73A0F5] px-5 text-sm font-semibold text-[#07101F] transition hover:bg-[#9DBDFB]"
+            disabled={item.workspaceStatus !== "open"}
+            className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-card bg-[#73A0F5] px-5 text-sm font-semibold text-[#07101F] transition hover:bg-[#9DBDFB] disabled:cursor-not-allowed disabled:bg-[#31415F] disabled:text-[#8FA1B8]"
           >
-            Сохранить
+            Подготовить изменение
           </button>
         </form>
       </div>
@@ -590,11 +667,20 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
   );
 }
 
+function CompactRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid gap-1 sm:grid-cols-[120px_1fr]">
+      <dt className="text-[#8FA1B8]">{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
 function InfoPair({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4">
       <dt className="text-sm font-semibold text-[#C8D1DF]">{label}</dt>
-      <dd className="mt-2 text-sm leading-6 text-[#8FA1B8]">{value}</dd>
+      <dd className="mt-2 text-sm leading-6 text-[#8FA1B8]">{value || "Нет данных"}</dd>
     </div>
   );
 }
@@ -633,29 +719,6 @@ function Badge({ children }: { children: ReactNode }) {
   );
 }
 
-function ScopeLink({
-  href,
-  active,
-  children
-}: {
-  href: string;
-  active: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`inline-flex min-h-10 items-center rounded-card border px-4 text-sm font-semibold transition ${
-        active
-          ? "border-[#73A0F5] bg-[#1A2740] text-white"
-          : "border-[#4169A8] text-[#C8D1DF] hover:border-[#73A0F5] hover:bg-[#1A2740] hover:text-white"
-      }`}
-    >
-      {children}
-    </Link>
-  );
-}
-
 function HiddenReviewFilters({ filters }: { filters: AdminReviewActionFilters }) {
   return (
     <>
@@ -669,19 +732,13 @@ function HiddenReviewFilters({ filters }: { filters: AdminReviewActionFilters })
 }
 
 function scopeDescription(data: Awaited<ReturnType<typeof getAdminReviewPageData>>) {
-  if (data.params.scope === "draft") {
-    return data.versionContext.latestDraft
-      ? `Черновик от ${dateFormatter.format(data.versionContext.latestDraft.createdAt)}`
-      : "Черновик не найден";
+  if (!data.versionContext.activeVersion) {
+    return "Активная версия не найдена";
   }
 
-  if (data.params.scope === "active") {
-    return data.versionContext.latestActive
-      ? `Активный каталог от ${dateFormatter.format(data.versionContext.latestActive.publishedAt ?? data.versionContext.latestActive.createdAt)}`
-      : "Активная версия не найдена";
-  }
-
-  return "Все открытые записи из draft и active";
+  return `Активный каталог от ${dateFormatter.format(
+    data.versionContext.activeVersion.publishedAt ?? data.versionContext.activeVersion.createdAt
+  )}`;
 }
 
 function toActionFilters(params: AdminReviewParams): AdminReviewActionFilters {
@@ -698,7 +755,7 @@ function reviewHref(params: AdminReviewParams, overrides: Partial<AdminReviewPar
   const next = { ...params, ...overrides };
   const query = new URLSearchParams();
 
-  if (next.scope !== "draft") query.set("scope", next.scope);
+  if (next.scope !== "workspace") query.set("scope", next.scope);
   if (next.issue !== "all") query.set("issue", next.issue);
   if (next.query) query.set("q", next.query);
   if (next.reason) query.set("reason", next.reason);
@@ -714,5 +771,11 @@ function readParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function formatTarget(categoryName: string | null | undefined, subcategoryName: string | null | undefined) {
+  return [categoryName, subcategoryName].filter(Boolean).join(" -> ") || "Нет данных";
+}
+
 const inputClassName =
   "mt-2 h-11 w-full rounded-card border border-[#2E3A4C] bg-[#0B1220] px-3 text-sm text-white outline-none placeholder:text-[#66758A] focus:border-[#73A0F5]";
+const disabledInputClassName =
+  "mt-2 h-11 w-full cursor-not-allowed rounded-card border border-[#243249] bg-[#101827] px-3 text-sm text-[#536174] outline-none";

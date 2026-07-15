@@ -48,6 +48,12 @@ export interface ReplaceSearchIndexOptions {
   targetIndexUid?: string;
 }
 
+export interface PreparedSearchIndex {
+  targetIndexUid: string;
+  stagingIndexUid: string;
+  indexedCount: number;
+}
+
 export async function ensureSearchIndex(
   synonyms: SearchSynonymRecord[],
   indexUid = SEARCH_INDEX_UID,
@@ -92,6 +98,40 @@ export async function replaceSearchIndexDocumentsWithClient(
   synonyms: SearchSynonymRecord[],
   options: ReplaceSearchIndexOptions = {}
 ) {
+  const prepared = await prepareSearchIndexDocumentsWithClient(
+    client,
+    documents,
+    synonyms,
+    options
+  );
+  await swapPreparedSearchIndexWithClient(client, prepared);
+
+  return {
+    indexUid: prepared.targetIndexUid,
+    stagingIndexUid: prepared.stagingIndexUid,
+    indexedCount: prepared.indexedCount
+  };
+}
+
+export async function prepareSearchIndexDocuments(
+  documents: SearchProductDocument[],
+  synonyms: SearchSynonymRecord[],
+  options: ReplaceSearchIndexOptions = {}
+) {
+  return prepareSearchIndexDocumentsWithClient(
+    getMeiliClient() as SearchIndexClient,
+    documents,
+    synonyms,
+    options
+  );
+}
+
+export async function prepareSearchIndexDocumentsWithClient(
+  client: SearchIndexClient,
+  documents: SearchProductDocument[],
+  synonyms: SearchSynonymRecord[],
+  options: ReplaceSearchIndexOptions = {}
+): Promise<PreparedSearchIndex> {
   const targetIndexUid = options.targetIndexUid ?? SEARCH_INDEX_UID;
   const stagingIndexUid =
     options.stagingIndexUid ?? `${targetIndexUid}__staging__manual`;
@@ -116,14 +156,29 @@ export async function replaceSearchIndexDocumentsWithClient(
     );
   }
 
-  await client.swapIndexes([{ indexes: [targetIndexUid, stagingIndexUid] }]).then((task) =>
-    client.tasks.waitForTask(task)
-  );
-
   return {
-    indexUid: targetIndexUid,
+    targetIndexUid,
     stagingIndexUid,
     indexedCount: documents.length
+  };
+}
+
+export async function swapPreparedSearchIndex(prepared: PreparedSearchIndex) {
+  return swapPreparedSearchIndexWithClient(getMeiliClient() as SearchIndexClient, prepared);
+}
+
+export async function swapPreparedSearchIndexWithClient(
+  client: SearchIndexClient,
+  prepared: PreparedSearchIndex
+) {
+  await client
+    .swapIndexes([{ indexes: [prepared.targetIndexUid, prepared.stagingIndexUid] }])
+    .then((task) => client.tasks.waitForTask(task));
+
+  return {
+    indexUid: prepared.targetIndexUid,
+    stagingIndexUid: prepared.stagingIndexUid,
+    indexedCount: prepared.indexedCount
   };
 }
 

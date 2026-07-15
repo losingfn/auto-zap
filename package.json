@@ -13,6 +13,7 @@
     "assets:prepare": "python3 scripts/prepare-assets.py",
     "import:check": "node --import tsx scripts/check-import.ts",
     "import:diagnose-blockers": "scripts/with-env.sh node --import tsx scripts/diagnose-import-blockers.ts",
+    "review:diagnose": "scripts/with-env.sh node --import tsx scripts/diagnose-review.ts",
     "categorization:check": "node --import tsx scripts/check-categorization.ts",
     "categorization:gaps": "node --import tsx scripts/analyze-categorization-gaps.ts",
     "taxonomy:sync": "scripts/with-env.sh node --import tsx scripts/sync-taxonomy.ts",

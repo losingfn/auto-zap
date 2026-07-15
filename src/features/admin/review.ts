@@ -1,29 +1,55 @@
-import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { createHash, randomUUID } from "node:crypto";
+import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { isPublicTaxonomyTarget } from "@/config/public-taxonomy";
 import { db } from "@/db/client";
 import {
+  adminUsers,
   auditLogs,
   catalogVersions,
   categories,
-  importRows,
+  categorizationRules,
   products,
   reviewQueue,
+  reviewWorkspaceActions,
+  reviewWorkspaceItems,
+  reviewWorkspaces,
   subcategories
 } from "@/db/schema";
-import { categorizeProductName } from "@/features/categorization/engine";
-import { learnSafeCategorizationRule, suggestRulePatternForProduct, validateRulePattern } from "@/features/categorization/learning";
+import {
+  categorizeProductName,
+  normalizeForCategorization
+} from "@/features/categorization/engine";
+import {
+  learnSafeCategorizationRule,
+  suggestRulePatternForProduct,
+  validateRulePattern
+} from "@/features/categorization/learning";
 import { getCategorizationContext } from "@/features/categorization/repository";
+import type {
+  CategorizationContext,
+  CategorizationTarget
+} from "@/features/categorization/types";
 import { buildProductSearchText } from "@/features/search/documents";
+import {
+  activatePreparedCatalogSearchIndex,
+  prepareSearchIndexForCatalogVersion
+} from "@/features/search/indexing";
 import { getSearchSynonyms } from "@/features/search/synonyms";
 
 export const REVIEW_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
-export type AdminReviewVersionScope = "draft" | "active" | "all";
+export type AdminReviewVersionScope = "workspace" | "active" | "all";
 export type AdminReviewIssueFilter =
   | "all"
+  | "ready"
+  | "quick"
+  | "manual"
+  | "prepared"
+  | "excluded"
   | "missing_category"
   | "missing_subcategory"
   | "missing_name"
-  | "no_suggestion";
+  | "conflicting";
 
 export type AdminReviewCategoryOption = {
   id: string;
@@ -44,6 +70,43 @@ export type AdminReviewParams = {
   group: string;
   page: number;
   pageSize: (typeof REVIEW_PAGE_SIZE_OPTIONS)[number];
+};
+
+export type AdminReviewActionFilters = Pick<
+  AdminReviewParams,
+  "scope" | "issue" | "query" | "reason" | "group"
+>;
+
+export type ReviewSuggestionLevel = "ready" | "quick" | "manual";
+
+export type ReviewWorkspaceSummary = {
+  id: string | null;
+  sourceCatalogVersionId: string | null;
+  sourceCatalogVersionStatus: string | null;
+  sourceCatalogVersionPublishedAt: Date | null;
+  status: "logical" | "open" | "publishing" | "published" | "abandoned";
+  preparedProductCount: number;
+  excludedProductCount: number;
+  actionCount: number;
+  lastActionId: string | null;
+};
+
+export type AdminReviewSummary = {
+  total: number;
+  readyGroups: number;
+  readyProducts: number;
+  quickGroups: number;
+  quickProducts: number;
+  manualProducts: number;
+  preparedProducts: number;
+  excludedProducts: number;
+  willPublishProducts: number;
+  missingCategory: number;
+  missingSubcategory: number;
+  missingName: number;
+  conflictingProducts: number;
+  activeOpen: number;
+  latestDraftOpen: number;
 };
 
 export type AdminReviewItem = {
@@ -67,6 +130,17 @@ export type AdminReviewItem = {
   suggestedSubcategoryId: string | null;
   suggestedCategoryName: string | null;
   suggestedSubcategoryName: string | null;
+  confidence: number;
+  confidenceLabel: string;
+  suggestionLevel: ReviewSuggestionLevel;
+  explanation: string;
+  matchedSignals: string[];
+  conflictingSignals: string[];
+  groupKey: string;
+  groupLabel: string;
+  workspaceStatus: "open" | "prepared" | "excluded";
+  pendingCategoryName: string | null;
+  pendingSubcategoryName: string | null;
   rulePattern: string | null;
 };
 
@@ -75,29 +149,67 @@ export type AdminReviewGroup = {
   label: string;
   count: number;
   examples: string[];
-  reason: string;
-  suggestedCount: number;
-  missingCategoryCount: number;
-  missingSubcategoryCount: number;
+  level: ReviewSuggestionLevel;
+  confidence: number;
+  confidenceLabel: string;
+  suggestedCategoryId: string | null;
+  suggestedSubcategoryId: string | null;
+  suggestedCategoryName: string | null;
+  suggestedSubcategoryName: string | null;
+  explanation: string;
+  matchedSignals: string[];
+  conflictingSignals: string[];
+  impactedProductCount: number;
+  excludedCount: number;
+  conflictingCount: number;
+  preparedCount: number;
+  manualOnlyCount: number;
   rulePattern: string | null;
   ruleWarning: string | null;
+  previewToken: string;
+  sampleProducts: Array<{
+    reviewId: string;
+    productId: string;
+    shopCode: string;
+    name: string;
+    reason: string;
+    safeToApply: boolean;
+  }>;
 };
 
-export type AdminReviewActionFilters = Pick<
-  AdminReviewParams,
-  "scope" | "issue" | "query" | "reason" | "group"
->;
+export type ReviewWorkspaceChange = {
+  id: string;
+  actionType: string;
+  status: string;
+  productCount: number;
+  excludedCount: number;
+  categoryName: string | null;
+  subcategoryName: string | null;
+  rulePattern: string | null;
+  createdAt: Date;
+  adminName: string | null;
+  adminEmail: string | null;
+};
 
 export const REVIEW_BULK_DRAFT_ONLY_MESSAGE =
-  "Массовые действия разрешены только для черновика текущего импорта.";
+  "Массовые действия выполняются только внутри текущей рабочей сессии проверки.";
 export const REVIEW_BULK_COUNT_CONFIRMATION_MESSAGE =
   "Для массового действия больше 100 товаров нужно ввести точное количество.";
 export const REVIEW_BULK_RULE_BLOCKED_MESSAGE =
-  "Правило не создано: шаблон слишком широкий или опасный. Массовое действие не выполнено.";
+  "Правило слишком общее. Добавьте уточняющее слово, например узел или модель автомобиля.";
+export const REVIEW_PREVIEW_STALE_MESSAGE =
+  "Состав группы изменился. Обновите preview и повторите действие.";
 
 export class AdminReviewBulkSafetyError extends Error {
   constructor(
-    readonly code: "scope_forbidden" | "count_confirmation_required" | "rule_blocked",
+    readonly code:
+      | "scope_forbidden"
+      | "count_confirmation_required"
+      | "rule_blocked"
+      | "preview_stale"
+      | "empty_workspace"
+      | "invalid_target"
+      | "post_condition_failed",
     message: string,
     readonly ruleSkippedReason?: string
   ) {
@@ -106,88 +218,165 @@ export class AdminReviewBulkSafetyError extends Error {
   }
 }
 
-const OTHER_GROUP_KEY = "other";
+type VersionContext = {
+  activeVersion: {
+    id: string;
+    sourceFileName: string | null;
+    createdAt: Date;
+    publishedAt: Date | null;
+  } | null;
+  latestDraft: {
+    id: string;
+    sourceFileName: string | null;
+    createdAt: Date;
+  } | null;
+};
+
+type ReviewRow = {
+  reviewId: string;
+  reason: string;
+  createdAt: Date;
+  suggestedCategoryId: string | null;
+  suggestedSubcategoryId: string | null;
+  importRowNumber: number | null;
+  productId: string;
+  catalogVersionId: string | null;
+  shopCode: string;
+  name: string;
+  rawName: string;
+  price: string;
+  currentCategoryId: string | null;
+  currentSubcategoryId: string | null;
+  catalogVersionStatus: string;
+  catalogVersionCreatedAt: Date;
+  workspaceItemStatus: string | null;
+  pendingCategoryId: string | null;
+  pendingSubcategoryId: string | null;
+};
+
+type EnrichedReviewRow = ReviewRow & {
+  suggestion: ReviewSuggestion;
+  groupKey: string;
+  groupLabel: string;
+  safeToApply: boolean;
+};
+
+type ReviewSuggestion = {
+  level: ReviewSuggestionLevel;
+  confidence: number;
+  categoryId: string | null;
+  subcategoryId: string | null;
+  categoryName: string | null;
+  subcategoryName: string | null;
+  explanation: string;
+  matchedSignals: string[];
+  conflictingSignals: string[];
+  rulePattern: string | null;
+};
+
 const DEFAULT_PAGE_SIZE = 20;
 const LARGE_ACTION_CONFIRMATION_THRESHOLD = 100;
+const READY_CONFIDENCE_THRESHOLD = 0.92;
+const QUICK_CONFIDENCE_THRESHOLD = 0.85;
+const MAX_GROUPING_ROWS = 5000;
 
 const ISSUE_LABELS: Record<AdminReviewIssueFilter, string> = {
   all: "Все",
+  ready: "Готовые предложения",
+  quick: "Требуют быстрого просмотра",
+  manual: "Только вручную",
+  prepared: "Уже распределены",
+  excluded: "Исключённые",
   missing_category: "Без категории",
   missing_subcategory: "Без подкатегории",
-  missing_name: "Без названия",
-  no_suggestion: "Без уверенного предложения"
+  missing_name: "Пустое название",
+  conflicting: "Конфликтующие правила"
 };
 
-const GROUP_LABELS: Record<string, string> = {
-  болт: "Болты",
-  болты: "Болты",
-  гайка: "Гайки",
-  гайки: "Гайки",
-  шайба: "Шайбы",
-  шайбы: "Шайбы",
-  штуцер: "Штуцеры",
-  штуцеры: "Штуцеры",
-  фитинг: "Фитинги",
-  фитинги: "Фитинги",
-  кольцо: "Кольца",
-  кольца: "Кольца",
-  накладка: "Накладки",
-  накладки: "Накладки",
-  маска: "Маски",
-  маски: "Маски",
-  соединитель: "Соединители",
-  соединители: "Соединители"
-};
+const COMMON_RISK_WORDS = new Set([
+  "болт",
+  "гайка",
+  "шайба",
+  "кольцо",
+  "комплект",
+  "кронштейн",
+  "трубка",
+  "втулка",
+  "палец",
+  "ремкомплект",
+  "корпус",
+  "крышка",
+  "датчик",
+  "клапан",
+  "подшипник",
+  "сальник"
+]);
 
-const GROUP_STOP_WORDS = [
+const STOP_WORDS = new Set([
   "для",
   "под",
   "без",
   "при",
   "над",
   "или",
-  "и",
   "на",
   "в",
   "во",
   "от",
   "до",
   "из",
-  "с",
   "со",
-  "к",
-  "по",
-  "а",
-  "the",
-  "and",
-  "with",
-  "new",
-  "old",
   "передний",
   "передняя",
-  "переднее",
   "задний",
   "задняя",
-  "заднее",
   "левый",
   "левая",
-  "левое",
   "правый",
   "правая",
-  "правое",
   "верхний",
-  "верхняя",
-  "верхнее",
-  "нижний",
-  "нижняя",
-  "нижнее"
+  "нижний"
+]);
+
+const CONTEXT_RULES: Array<{
+  label: string;
+  includeAll: string[];
+  categorySlug: string;
+  subcategorySlug: string;
+  explanation: string;
+}> = [
+  contextRule("Болты суппортов", ["болт", "суппорт"], "tormoznaya-sistema", "supporty"),
+  contextRule("Болты кардана", ["болт", "кардан"], "dvigatel-i-transmissiya", "detali-transmissii"),
+  contextRule("Болты ГБЦ", ["болт", "гбц"], "dvigatel-i-transmissiya", "detali-dvigatelya"),
+  contextRule(
+    "Ремкомплекты суппортов",
+    ["ремкомплект", "суппорт"],
+    "tormoznaya-sistema",
+    "remkomplekty-tormoznoy-sistemy"
+  ),
+  contextRule("Сальники коленвала", ["сальник", "коленвал"], "dvigatel-i-transmissiya", "detali-dvigatelya"),
+  contextRule("Сальники полуоси", ["сальник", "полуось"], "dvigatel-i-transmissiya", "detali-transmissii"),
+  contextRule("Датчики давления масла", ["датчик", "давление", "масло"], "elektrika", "datchiki"),
+  contextRule("Подшипники ступицы", ["подшипник", "ступица"], "podveska", "stupicy"),
+  contextRule("Трос ручного тормоза", ["трос", "ручной", "тормоз"], "tormoznaya-sistema", "ruchnoy-tormoz")
 ];
 
 export function normalizeAdminReviewParams(input: Partial<Record<string, string | string[] | undefined>> = {}): AdminReviewParams {
-  const scope = readEnum(input.scope, ["draft", "active", "all"], "draft");
+  const scope = readEnum(input.scope, ["workspace", "active", "all"], "workspace");
   const issue = readEnum(
     input.issue ?? input.filter,
-    ["all", "missing_category", "missing_subcategory", "missing_name", "no_suggestion"],
+    [
+      "all",
+      "ready",
+      "quick",
+      "manual",
+      "prepared",
+      "excluded",
+      "missing_category",
+      "missing_subcategory",
+      "missing_name",
+      "conflicting"
+    ],
     "all"
   );
   const pageSizeValue = Number(readSingle(input.pageSize));
@@ -201,7 +390,7 @@ export function normalizeAdminReviewParams(input: Partial<Record<string, string 
     issue,
     query: readSingle(input.q).trim().slice(0, 120),
     reason: readSingle(input.reason).trim().slice(0, 300),
-    group: readSingle(input.group).trim().slice(0, 80),
+    group: readSingle(input.group).trim().slice(0, 120),
     page,
     pageSize
   };
@@ -209,109 +398,128 @@ export function normalizeAdminReviewParams(input: Partial<Record<string, string 
 
 export async function getAdminReviewPageData(rawParams: Partial<Record<string, string | string[] | undefined>> = {}) {
   const params = normalizeAdminReviewParams(rawParams);
-  const versionContext = await getReviewVersionContext();
-  const [categoryRows, subcategoryRows] = await Promise.all([getActiveCategories(), getActiveSubcategories()]);
+  const [versionContext, categoryRows, subcategoryRows, categorizationContext] = await Promise.all([
+    getReviewVersionContext(),
+    getActiveCategories(),
+    getActiveSubcategories(),
+    getCategorizationContext()
+  ]);
   const categoryOptions = buildCategoryOptions(categoryRows, subcategoryRows);
+  const targetBySlug = buildTargetBySlug(categoryRows, subcategoryRows);
+  const workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null);
+  const rows = await getWorkspaceReviewRows(versionContext, workspace.id);
+  const enrichedRows = rows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug));
+  const groups = buildReviewGroups(enrichedRows, categoryRows, subcategoryRows);
+  const selectedGroup = params.group
+    ? groups.find((group) => group.key === params.group) ?? null
+    : null;
+  const filteredRows = filterReviewRows(enrichedRows, params);
+  const offset = (params.page - 1) * params.pageSize;
+  const pageRows = filteredRows.slice(offset, offset + params.pageSize);
+  const changes = workspace.id ? await getReviewWorkspaceChanges(workspace.id) : [];
+  const summary = buildReviewQueueSummary(enrichedRows, groups, workspace, versionContext);
+  const reasonOptions = buildReasonOptions(enrichedRows);
   const categoryById = new Map(categoryRows.map((category) => [category.id, category]));
   const subcategoryById = new Map(subcategoryRows.map((subcategory) => [subcategory.id, subcategory]));
-
-  const filteredConditions = buildReviewConditions(params, versionContext);
-  const offset = (params.page - 1) * params.pageSize;
-
-  const [summary, reasonOptions, groupResult, filteredCount, reviewRows] = await Promise.all([
-    getReviewSummary(params, versionContext),
-    getReasonOptions(params, versionContext),
-    getReviewGroupsSafely(params, versionContext),
-    countReviewRows(filteredConditions),
-    db
-      .select({
-        reviewId: reviewQueue.id,
-        reason: reviewQueue.reason,
-        createdAt: reviewQueue.createdAt,
-        suggestedCategoryId: reviewQueue.suggestedCategoryId,
-        suggestedSubcategoryId: reviewQueue.suggestedSubcategoryId,
-        importRowNumber: importRows.rowNumber,
-        productId: products.id,
-        catalogVersionId: reviewQueue.catalogVersionId,
-        shopCode: products.shopCode,
-        name: products.name,
-        rawName: products.rawName,
-        price: products.price,
-        currentCategoryId: products.categoryId,
-        currentSubcategoryId: products.subcategoryId,
-        catalogVersionStatus: catalogVersions.status,
-        catalogVersionCreatedAt: catalogVersions.createdAt
-      })
-      .from(reviewQueue)
-      .innerJoin(products, eq(products.id, reviewQueue.productId))
-      .innerJoin(catalogVersions, eq(catalogVersions.id, reviewQueue.catalogVersionId))
-      .leftJoin(importRows, eq(importRows.id, reviewQueue.importRowId))
-      .where(and(...filteredConditions))
-      .orderBy(desc(catalogVersions.createdAt), asc(reviewQueue.createdAt), asc(products.name))
-      .limit(params.pageSize)
-      .offset(offset)
-  ]);
-
-  const selectedGroupResult = params.group
-    ? await getReviewGroupSummarySafely(params.group, params, versionContext)
-    : { group: null, unavailable: false };
 
   return {
     params,
     issueLabels: ISSUE_LABELS,
     versionContext,
+    workspace,
     summary,
     reasonOptions,
     categories: categoryOptions,
-    groups: groupResult.groups,
-    groupsUnavailable: groupResult.unavailable || selectedGroupResult.unavailable,
-    selectedGroup: selectedGroupResult.group,
+    groups,
+    groupsUnavailable: false,
+    selectedGroup,
     queueCount: summary.total,
-    filteredCount,
+    filteredCount: filteredRows.length,
+    changes,
     pagination: {
       page: params.page,
       pageSize: params.pageSize,
-      total: filteredCount,
-      from: filteredCount === 0 ? 0 : offset + 1,
-      to: Math.min(offset + params.pageSize, filteredCount),
-      pageCount: Math.max(1, Math.ceil(filteredCount / params.pageSize))
+      total: filteredRows.length,
+      from: filteredRows.length === 0 ? 0 : offset + 1,
+      to: Math.min(offset + params.pageSize, filteredRows.length),
+      pageCount: Math.max(1, Math.ceil(filteredRows.length / params.pageSize))
     },
-    items: reviewRows.map((row): AdminReviewItem => {
-      const suggestedCategory = row.suggestedCategoryId
-        ? categoryById.get(row.suggestedCategoryId)
-        : null;
-      const suggestedSubcategory = row.suggestedSubcategoryId
-        ? subcategoryById.get(row.suggestedSubcategoryId)
-        : null;
-      const currentCategory = row.currentCategoryId ? categoryById.get(row.currentCategoryId) : null;
-      const currentSubcategory = row.currentSubcategoryId
-        ? subcategoryById.get(row.currentSubcategoryId)
-        : null;
+    items: pageRows.map((row) => mapReviewItem(row, categoryById, subcategoryById))
+  };
+}
 
-      return {
-        reviewId: row.reviewId,
-        productId: row.productId,
-        reason: row.reason,
-        createdAt: row.createdAt,
-        catalogVersionId: row.catalogVersionId,
-        catalogVersionStatus: row.catalogVersionStatus,
-        catalogVersionCreatedAt: row.catalogVersionCreatedAt,
-        importRowNumber: row.importRowNumber,
-        shopCode: row.shopCode,
-        name: row.name,
-        rawName: row.rawName,
-        price: Number(row.price),
-        currentCategoryId: row.currentCategoryId,
-        currentSubcategoryId: row.currentSubcategoryId,
-        currentCategoryName: currentCategory?.name ?? null,
-        currentSubcategoryName: currentSubcategory?.name ?? null,
-        suggestedCategoryId: row.suggestedCategoryId,
-        suggestedSubcategoryId: row.suggestedSubcategoryId,
-        suggestedCategoryName: suggestedCategory?.name ?? null,
-        suggestedSubcategoryName: suggestedSubcategory?.name ?? null,
-        rulePattern: suggestRulePatternForProduct(row.name)
-      };
+export async function getReviewWorkspace(sourceCatalogVersionId: string | null): Promise<ReviewWorkspaceSummary> {
+  if (!sourceCatalogVersionId) {
+    return emptyWorkspace(null);
+  }
+
+  const [workspace] = await db
+    .select({
+      id: reviewWorkspaces.id,
+      sourceCatalogVersionId: reviewWorkspaces.sourceCatalogVersionId,
+      status: reviewWorkspaces.status,
+      publishedAt: reviewWorkspaces.publishedAt,
+      sourceCatalogVersionStatus: catalogVersions.status,
+      sourceCatalogVersionPublishedAt: catalogVersions.publishedAt
     })
+    .from(reviewWorkspaces)
+    .innerJoin(catalogVersions, eq(catalogVersions.id, reviewWorkspaces.sourceCatalogVersionId))
+    .where(
+      and(
+        eq(reviewWorkspaces.sourceCatalogVersionId, sourceCatalogVersionId),
+        inArray(reviewWorkspaces.status, ["open", "publishing"])
+      )
+    )
+    .orderBy(desc(reviewWorkspaces.createdAt))
+    .limit(1);
+
+  if (!workspace) {
+    return emptyWorkspace(sourceCatalogVersionId);
+  }
+
+  const [preparedProductCount, excludedProductCount, actionCount, latestAction] = await Promise.all([
+    countWorkspaceItems(workspace.id, "pending"),
+    countWorkspaceItems(workspace.id, "excluded"),
+    countWorkspaceActions(workspace.id),
+    getLatestWorkspaceAction(workspace.id)
+  ]);
+
+  return {
+    id: workspace.id,
+    sourceCatalogVersionId: workspace.sourceCatalogVersionId,
+    sourceCatalogVersionStatus: workspace.sourceCatalogVersionStatus,
+    sourceCatalogVersionPublishedAt: workspace.sourceCatalogVersionPublishedAt,
+    status: workspace.status,
+    preparedProductCount,
+    excludedProductCount,
+    actionCount,
+    lastActionId: latestAction?.id ?? null
+  };
+}
+
+export async function previewReviewRuleImpact(input: {
+  filters: AdminReviewActionFilters;
+  categoryId: string;
+  subcategoryId: string;
+  excludedProductIds?: string[];
+}) {
+  const rows = await getActionRows(input.filters);
+  const excluded = new Set(input.excludedProductIds ?? []);
+  const impactedRows = rows.filter((row) => !excluded.has(row.productId));
+  const target = await validateCategoryTarget(input.categoryId, input.subcategoryId);
+
+  return {
+    impactedProductCount: impactedRows.length,
+    unchangedProductCount: rows.length - impactedRows.length,
+    excludedProductCount: excluded.size,
+    categoryName: target.category.name,
+    subcategoryName: target.subcategory.name,
+    previewToken: buildPreviewToken(
+      impactedRows.map((row) => row.productId),
+      input.categoryId,
+      input.subcategoryId
+    ),
+    examples: impactedRows.slice(0, 10).map((row) => `${row.shopCode} · ${row.name}`)
   };
 }
 
@@ -323,26 +531,18 @@ export async function applyReviewGroupCorrection(input: {
   learnRule: boolean;
   rulePattern?: string;
   confirmationCount?: number | null;
+  expectedCount?: number | null;
+  previewToken?: string | null;
+  excludedProductIds?: string[];
 }) {
-  assertDraftBulkScope(input.filters);
-
   if (!input.filters.group) {
     throw new Error("Группа не выбрана.");
   }
 
-  const versionContext = await getReviewVersionContext();
-  const rows = await getReviewRowsForBulkAction(input.filters, versionContext);
-  assertLargeActionConfirmed(rows.length, input.confirmationCount);
-
-  return applyBulkCategorizationCorrection({
-    rows,
-    categoryId: input.categoryId,
-    subcategoryId: input.subcategoryId,
-    adminUserId: input.adminUserId,
-    learnRule: input.learnRule,
-    rulePattern: input.rulePattern,
-    allowProductNounSingleWordRule: true,
-    action: "categorization.group_correction"
+  return applyReviewRuleToWorkspace({
+    ...input,
+    actionType: input.learnRule ? "group_permanent_rule" : "group_temporary",
+    allowProductNounSingleWordRule: false
   });
 }
 
@@ -355,27 +555,49 @@ export async function applySelectedReviewCorrections(input: {
   learnRule: boolean;
   rulePattern?: string;
   confirmationCount?: number | null;
+  expectedCount?: number | null;
+  previewToken?: string | null;
 }) {
-  assertDraftBulkScope(input.filters);
-
   const uniqueIds = [...new Set(input.reviewQueueIds.filter(Boolean))];
   if (uniqueIds.length === 0) {
     throw new Error("Не выбраны товары для обработки.");
   }
 
-  const versionContext = await getReviewVersionContext();
-  const rows = await getReviewRowsByIds(uniqueIds, versionContext);
-  assertLargeActionConfirmed(rows.length, input.confirmationCount);
+  return applyReviewRuleToWorkspace({
+    ...input,
+    filters: { ...input.filters, group: "" },
+    actionType: input.learnRule ? "selected_permanent_rule" : "selected_temporary",
+    reviewQueueIds: uniqueIds,
+    allowProductNounSingleWordRule: false
+  });
+}
 
-  return applyBulkCategorizationCorrection({
-    rows,
+export async function applyManualReviewCorrection(input: {
+  reviewQueueId: string;
+  productId: string;
+  categoryId: string;
+  subcategoryId: string;
+  adminUserId: string;
+  learnRule: boolean;
+  rulePattern?: string;
+}) {
+  return applyReviewRuleToWorkspace({
+    filters: {
+      scope: "workspace",
+      issue: "all",
+      query: "",
+      reason: "",
+      group: ""
+    },
+    reviewQueueIds: [input.reviewQueueId],
     categoryId: input.categoryId,
     subcategoryId: input.subcategoryId,
     adminUserId: input.adminUserId,
     learnRule: input.learnRule,
     rulePattern: input.rulePattern,
-    allowProductNounSingleWordRule: false,
-    action: "categorization.selected_correction"
+    actionType: input.learnRule ? "manual_permanent_rule" : "manual_temporary",
+    expectedCount: 1,
+    allowProductNounSingleWordRule: false
   });
 }
 
@@ -384,85 +606,978 @@ export async function reapplyCategorizationRulesToReviewQueue(input: {
   adminUserId: string;
   confirmationCount?: number | null;
 }) {
-  assertDraftBulkScope(input.filters);
+  const rows = await getActionRows(input.filters);
+  assertLargeActionConfirmed(rows.length, input.confirmationCount);
+  const context = await getCategorizationContext();
+  const targetBySlug = await getTargetBySlugFromDb();
+  const applicable = rows
+    .map((row) => ({
+      row,
+      suggestion: buildCategorySuggestion(row, context, targetBySlug)
+    }))
+    .filter(
+      ({ suggestion }) =>
+        suggestion.level !== "manual" && suggestion.categoryId && suggestion.subcategoryId
+    );
 
-  const versionContext = await getReviewVersionContext();
-  const before = await countReviewRows(buildReviewConditions(input.filters, versionContext));
-  assertLargeActionConfirmed(before, input.confirmationCount);
+  if (applicable.length === 0) {
+    return {
+      before: rows.length,
+      resolved: 0,
+      remaining: rows.length
+    };
+  }
 
-  const rows = await getReviewRowsForBulkAction(input.filters, versionContext);
-  const [categorizationContext, searchSynonyms] = await Promise.all([
-    getCategorizationContext(),
-    getSearchSynonyms()
-  ]);
+  const groupedByTarget = new Map<string, typeof applicable>();
+  for (const item of applicable) {
+    const key = `${item.suggestion.categoryId}:${item.suggestion.subcategoryId}`;
+    const current = groupedByTarget.get(key) ?? [];
+    current.push(item);
+    groupedByTarget.set(key, current);
+  }
 
-  const now = new Date();
   let resolved = 0;
+  for (const [target, items] of groupedByTarget) {
+    const [categoryId, subcategoryId] = target.split(":");
+    const result = await applyReviewRuleToWorkspace({
+      filters: input.filters,
+      reviewQueueIds: items.map((item) => item.row.reviewId),
+      categoryId,
+      subcategoryId,
+      adminUserId: input.adminUserId,
+      learnRule: false,
+      actionType: "rules_reapply_preview",
+      expectedCount: items.length,
+      allowProductNounSingleWordRule: false
+    });
+    resolved += result.processed;
+  }
+
+  return {
+    before: rows.length,
+    resolved,
+    remaining: Math.max(0, rows.length - resolved)
+  };
+}
+
+export async function rollbackReviewAction(input: {
+  adminUserId: string;
+}) {
+  const versionContext = await getReviewVersionContext();
+  const workspace = await ensureReviewWorkspace(versionContext.activeVersion?.id ?? null, input.adminUserId);
+
+  const latestAction = await getLatestWorkspaceAction(workspace.id);
+  if (!latestAction) {
+    throw new Error("В текущей сессии нет действий для отмены.");
+  }
 
   await db.transaction(async (tx) => {
-    for (const row of rows) {
-      const categorization = categorizeProductName(`${row.shopCode} ${row.name || row.rawName}`, categorizationContext);
-      if (
-        categorization.needsReview ||
-        !categorization.target?.categoryId ||
-        !categorization.target.subcategoryId
-      ) {
-        continue;
-      }
+    await tx
+      .update(reviewWorkspaceActions)
+      .set({
+        status: "undone",
+        undoneAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(reviewWorkspaceActions.id, latestAction.id));
 
+    await tx
+      .update(reviewWorkspaceItems)
+      .set({
+        status: "undone",
+        updatedAt: new Date()
+      })
+      .where(eq(reviewWorkspaceItems.actionId, latestAction.id));
+
+    if (latestAction.ruleId) {
       await tx
-        .update(products)
-        .set({
-          categoryId: categorization.target.categoryId,
-          subcategoryId: categorization.target.subcategoryId,
-          status: "active",
-          reviewReason: null,
-          searchText: buildProductSearchText({
-            shopCode: row.shopCode,
-            name: row.name,
-            rawName: row.rawName,
-            categoryName: categorization.target.categoryName,
-            subcategoryName: categorization.target.subcategoryName,
-            synonyms: searchSynonyms
-          }),
-          updatedAt: now
-        })
-        .where(eq(products.id, row.productId));
-
-      await tx
-        .update(reviewQueue)
-        .set({
-          status: "resolved",
-          resolvedBy: input.adminUserId,
-          resolvedAt: now,
-          updatedAt: now
-        })
-        .where(eq(reviewQueue.id, row.reviewId));
-
-      resolved += 1;
+        .update(categorizationRules)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(eq(categorizationRules.id, latestAction.ruleId));
     }
 
     await tx.insert(auditLogs).values({
       adminUserId: input.adminUserId,
-      action: "categorization.rules_reapplied",
-      entityType: "review_queue",
+      action: "review.workspace.undo",
+      entityType: "review_workspace",
+      entityId: workspace.id,
       metadata: {
-        scope: input.filters.scope,
-        issue: input.filters.issue,
-        query: input.filters.query,
-        reason: input.filters.reason,
-        group: input.filters.group,
-        before,
-        resolved
+        actionId: latestAction.id,
+        productCount: latestAction.productCount
       }
     });
   });
 
   return {
-    before,
-    resolved,
-    remaining: Math.max(0, before - resolved)
+    undoneActionId: latestAction.id,
+    productCount: latestAction.productCount
   };
+}
+
+export async function publishReviewWorkspace(input: { adminUserId: string }) {
+  const versionContext = await getReviewVersionContext();
+  const workspace = await getOpenWorkspaceRow(versionContext.activeVersion?.id ?? null);
+  if (!workspace || !versionContext.activeVersion) {
+    throw new AdminReviewBulkSafetyError(
+      "empty_workspace",
+      "Нет рабочей сессии с подготовленными изменениями."
+    );
+  }
+
+  const pendingRows = await getPendingWorkspaceItems(workspace.id);
+  if (pendingRows.length === 0) {
+    throw new AdminReviewBulkSafetyError(
+      "empty_workspace",
+      "Нет подготовленных изменений для публикации."
+    );
+  }
+
+  const searchSynonyms = await getSearchSynonyms();
+  const sourceProducts = await getProductsForVersion(versionContext.activeVersion.id);
+  const pendingByProductId = new Map(pendingRows.map((row) => [row.productId, row]));
+  const oldToNewProductId = new Map<string, string>();
+  const now = new Date();
+  const newVersionId = randomUUID();
+  const remainingReviewCount = sourceProducts.filter((product) => {
+    const pending = pendingByProductId.get(product.id);
+    return !pending && product.status === "needs_review";
+  }).length;
+
+  await db.transaction(async (tx) => {
+    await tx.insert(catalogVersions).values({
+      id: newVersionId,
+      status: "draft",
+      sourceFileName: "review-workspace",
+      totalRows: sourceProducts.length,
+      parsedRows: sourceProducts.length,
+      addedCount: 0,
+      updatedCount: pendingRows.length,
+      archivedCount: 0,
+      reviewCount: remainingReviewCount,
+      errorCount: 0,
+      notes: "Published from admin review workspace",
+      createdBy: input.adminUserId
+    });
+
+    for (const chunk of chunked(sourceProducts, 1000)) {
+      await tx.insert(products).values(
+        chunk.map((product) => {
+          const pending = pendingByProductId.get(product.id);
+          const id = randomUUID();
+          oldToNewProductId.set(product.id, id);
+          const categoryName = pending?.categoryName ?? product.categoryName;
+          const subcategoryName = pending?.subcategoryName ?? product.subcategoryName;
+
+          return {
+            id,
+            catalogVersionId: newVersionId,
+            shopCode: product.shopCode,
+            rawName: product.rawName,
+            name: product.name,
+            slug: product.slug,
+            price: product.price,
+            stockQuantity: product.stockQuantity,
+            stockSum: product.stockSum,
+            categoryId: pending?.categoryId ?? product.categoryId,
+            subcategoryId: pending?.subcategoryId ?? product.subcategoryId,
+            status: pending ? "active" as const : product.status,
+            reviewReason: pending ? null : product.reviewReason,
+            searchText: pending
+              ? buildProductSearchText({
+                  shopCode: product.shopCode,
+                  name: product.name,
+                  rawName: product.rawName,
+                  categoryName,
+                  subcategoryName,
+                  synonyms: searchSynonyms
+                })
+              : product.searchText,
+            createdAt: product.createdAt,
+            updatedAt: now
+          };
+        })
+      );
+    }
+
+    const unresolvedReviewRows = await tx
+      .select({
+        reviewId: reviewQueue.id,
+        productId: products.id,
+        reason: reviewQueue.reason,
+        suggestedCategoryId: reviewQueue.suggestedCategoryId,
+        suggestedSubcategoryId: reviewQueue.suggestedSubcategoryId
+      })
+      .from(reviewQueue)
+      .innerJoin(products, eq(products.id, reviewQueue.productId))
+      .where(
+        and(
+          eq(reviewQueue.catalogVersionId, versionContext.activeVersion!.id),
+          eq(reviewQueue.status, "open"),
+          eq(products.status, "needs_review")
+        )
+      );
+
+    const newReviewValues = unresolvedReviewRows
+      .filter((row) => !pendingByProductId.has(row.productId))
+      .map((row) => ({
+        catalogVersionId: newVersionId,
+        productId: oldToNewProductId.get(row.productId)!,
+        reason: row.reason,
+        status: "open" as const,
+        suggestedCategoryId: row.suggestedCategoryId,
+        suggestedSubcategoryId: row.suggestedSubcategoryId
+      }));
+
+    for (const chunk of chunked(newReviewValues, 1000)) {
+      if (chunk.length > 0) {
+        await tx.insert(reviewQueue).values(chunk);
+      }
+    }
+  });
+
+  const preparedSearchIndex = await prepareSearchIndexForCatalogVersion(newVersionId);
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(catalogVersions)
+      .set({ status: "archived", updatedAt: new Date() })
+      .where(and(eq(catalogVersions.status, "active"), ne(catalogVersions.id, newVersionId)));
+
+    await tx
+      .update(catalogVersions)
+      .set({ status: "active", publishedAt: now, updatedAt: new Date() })
+      .where(eq(catalogVersions.id, newVersionId));
+
+    await tx
+      .update(reviewWorkspaces)
+      .set({
+        status: "published",
+        publishedCatalogVersionId: newVersionId,
+        publishedBy: input.adminUserId,
+        publishedAt: now,
+        updatedAt: new Date()
+      })
+      .where(eq(reviewWorkspaces.id, workspace.id));
+
+    await tx
+      .update(reviewWorkspaceActions)
+      .set({ status: "published", updatedAt: new Date() })
+      .where(and(eq(reviewWorkspaceActions.workspaceId, workspace.id), eq(reviewWorkspaceActions.status, "applied")));
+
+    await tx
+      .update(reviewWorkspaceItems)
+      .set({ status: "published", updatedAt: new Date() })
+      .where(and(eq(reviewWorkspaceItems.workspaceId, workspace.id), eq(reviewWorkspaceItems.status, "pending")));
+
+    await tx
+      .update(reviewQueue)
+      .set({ status: "resolved", resolvedBy: input.adminUserId, resolvedAt: now, updatedAt: now })
+      .where(
+        inArray(
+          reviewQueue.productId,
+          pendingRows.map((row) => row.productId)
+        )
+      );
+
+    await tx.insert(auditLogs).values({
+      adminUserId: input.adminUserId,
+      action: "review.workspace.publish",
+      entityType: "review_workspace",
+      entityId: workspace.id,
+      metadata: {
+        previousActiveVersionId: versionContext.activeVersion!.id,
+        newCatalogVersionId: newVersionId,
+        productCount: pendingRows.length,
+        remainingReviewCount,
+        preparedSearchIndex
+      }
+    });
+  });
+
+  const searchResult = await activatePreparedCatalogSearchIndex(preparedSearchIndex);
+
+  await db.insert(auditLogs).values({
+    adminUserId: input.adminUserId,
+    action: "review.workspace.search_index.swap",
+    entityType: "catalog_version",
+    entityId: newVersionId,
+    metadata: searchResult
+  });
+
+  return {
+    previousActiveVersionId: versionContext.activeVersion.id,
+    catalogVersionId: newVersionId,
+    publishedProductCount: pendingRows.length,
+    remainingReviewCount,
+    searchIndex: searchResult
+  };
+}
+
+export async function getReviewWorkspaceChanges(workspaceId: string): Promise<ReviewWorkspaceChange[]> {
+  return db
+    .select({
+      id: reviewWorkspaceActions.id,
+      actionType: reviewWorkspaceActions.actionType,
+      status: reviewWorkspaceActions.status,
+      productCount: reviewWorkspaceActions.productCount,
+      excludedCount: reviewWorkspaceActions.excludedCount,
+      categoryName: categories.name,
+      subcategoryName: subcategories.name,
+      rulePattern: reviewWorkspaceActions.rulePattern,
+      createdAt: reviewWorkspaceActions.createdAt,
+      adminName: adminUsers.fullName,
+      adminEmail: adminUsers.email
+    })
+    .from(reviewWorkspaceActions)
+    .leftJoin(categories, eq(categories.id, reviewWorkspaceActions.categoryId))
+    .leftJoin(subcategories, eq(subcategories.id, reviewWorkspaceActions.subcategoryId))
+    .leftJoin(adminUsers, eq(adminUsers.id, reviewWorkspaceActions.createdBy))
+    .where(eq(reviewWorkspaceActions.workspaceId, workspaceId))
+    .orderBy(desc(reviewWorkspaceActions.createdAt))
+    .limit(20);
+}
+
+async function applyReviewRuleToWorkspace(input: {
+  filters: AdminReviewActionFilters;
+  reviewQueueIds?: string[];
+  categoryId: string;
+  subcategoryId: string;
+  adminUserId: string;
+  learnRule: boolean;
+  rulePattern?: string;
+  confirmationCount?: number | null;
+  expectedCount?: number | null;
+  previewToken?: string | null;
+  excludedProductIds?: string[];
+  actionType: string;
+  allowProductNounSingleWordRule: boolean;
+}) {
+  await validateCategoryTarget(input.categoryId, input.subcategoryId);
+  const rows = await getActionRows(input.filters, input.reviewQueueIds);
+  const excluded = new Set(input.excludedProductIds ?? []);
+  const impactedRows = rows.filter((row) => !excluded.has(row.productId));
+
+  assertLargeActionConfirmed(impactedRows.length, input.confirmationCount);
+
+  if (input.expectedCount !== null && input.expectedCount !== undefined && input.expectedCount !== impactedRows.length) {
+    throw new AdminReviewBulkSafetyError("preview_stale", REVIEW_PREVIEW_STALE_MESSAGE);
+  }
+
+  if (input.previewToken) {
+    const actualToken = buildPreviewToken(
+      impactedRows.map((row) => row.productId),
+      input.categoryId,
+      input.subcategoryId
+    );
+    if (actualToken !== input.previewToken) {
+      throw new AdminReviewBulkSafetyError("preview_stale", REVIEW_PREVIEW_STALE_MESSAGE);
+    }
+  }
+
+  if (impactedRows.length === 0) {
+    throw new Error("В выбранной очереди нет товаров для применения.");
+  }
+
+  const versionContext = await getReviewVersionContext();
+  const workspace = await ensureReviewWorkspace(versionContext.activeVersion?.id ?? null, input.adminUserId);
+  let learnedRuleId: string | null = null;
+  let learnedRulePattern: string | null = null;
+  let learnedRuleSkippedReason: string | null = input.learnRule ? "no_safe_pattern" : "disabled";
+
+  await db.transaction(async (tx) => {
+    if (input.learnRule) {
+      const learnedRule = await learnSafeCategorizationRule({
+        tx,
+        productName: input.rulePattern || impactedRows[0]?.name || "",
+        categoryId: input.categoryId,
+        subcategoryId: input.subcategoryId,
+        adminUserId: input.adminUserId,
+        requestedPattern: input.rulePattern,
+        allowProductNounSingleWord: input.allowProductNounSingleWordRule
+      });
+
+      learnedRuleId = learnedRule.id;
+      learnedRulePattern = learnedRule.pattern;
+      learnedRuleSkippedReason = learnedRule.skippedReason;
+
+      if (learnedRuleSkippedReason) {
+        throw new AdminReviewBulkSafetyError(
+          "rule_blocked",
+          REVIEW_BULK_RULE_BLOCKED_MESSAGE,
+          learnedRuleSkippedReason
+        );
+      }
+    }
+
+    const [action] = await tx
+      .insert(reviewWorkspaceActions)
+      .values({
+        workspaceId: workspace.id,
+        actionType: input.actionType,
+        categoryId: input.categoryId,
+        subcategoryId: input.subcategoryId,
+        ruleId: learnedRuleId,
+        rulePattern: learnedRulePattern ?? input.rulePattern ?? null,
+        productCount: impactedRows.length,
+        excludedCount: excluded.size,
+        previewToken: buildPreviewToken(
+          impactedRows.map((row) => row.productId),
+          input.categoryId,
+          input.subcategoryId
+        ),
+        createdBy: input.adminUserId,
+        metadata: {
+          filters: input.filters,
+          excludedProductIds: [...excluded]
+        }
+      })
+      .returning({ id: reviewWorkspaceActions.id });
+
+    for (const chunk of chunked(impactedRows, 1000)) {
+      await tx
+        .insert(reviewWorkspaceItems)
+        .values(
+          chunk.map((row) => ({
+            workspaceId: workspace.id,
+            actionId: action.id,
+            reviewQueueId: row.reviewId,
+            productId: row.productId,
+            status: "pending" as const,
+            categoryId: input.categoryId,
+            subcategoryId: input.subcategoryId,
+            originalCategoryId: row.currentCategoryId,
+            originalSubcategoryId: row.currentSubcategoryId,
+            originalStatus: "needs_review",
+            metadata: {
+              source: input.actionType,
+              group: input.filters.group || null
+            }
+          }))
+        )
+        .onConflictDoUpdate({
+          target: [reviewWorkspaceItems.workspaceId, reviewWorkspaceItems.productId],
+          set: {
+            actionId: action.id,
+            status: "pending",
+            categoryId: input.categoryId,
+            subcategoryId: input.subcategoryId,
+            updatedAt: new Date()
+          }
+        });
+    }
+
+    if (excluded.size > 0) {
+      const excludedRows = rows.filter((row) => excluded.has(row.productId));
+      for (const chunk of chunked(excludedRows, 1000)) {
+        await tx
+          .insert(reviewWorkspaceItems)
+          .values(
+            chunk.map((row) => ({
+              workspaceId: workspace.id,
+              actionId: action.id,
+              reviewQueueId: row.reviewId,
+              productId: row.productId,
+              status: "excluded" as const,
+              originalCategoryId: row.currentCategoryId,
+              originalSubcategoryId: row.currentSubcategoryId,
+              originalStatus: "needs_review",
+              metadata: { source: "excluded_from_group" }
+            }))
+          )
+          .onConflictDoUpdate({
+            target: [reviewWorkspaceItems.workspaceId, reviewWorkspaceItems.productId],
+            set: {
+              actionId: action.id,
+              status: "excluded",
+              updatedAt: new Date()
+            }
+          });
+      }
+    }
+
+    await tx.insert(auditLogs).values({
+      adminUserId: input.adminUserId,
+      action: "review.workspace.apply",
+      entityType: "review_workspace",
+      entityId: workspace.id,
+      metadata: {
+        actionId: action.id,
+        actionType: input.actionType,
+        categoryId: input.categoryId,
+        subcategoryId: input.subcategoryId,
+        productCount: impactedRows.length,
+        excludedCount: excluded.size,
+        learnedRuleId,
+        learnedRulePattern,
+        learnedRuleSkippedReason
+      }
+    });
+  });
+
+  const postCount = await countWorkspaceItems(workspace.id, "pending");
+  if (postCount < impactedRows.length) {
+    throw new AdminReviewBulkSafetyError(
+      "post_condition_failed",
+      "Не удалось подтвердить сохранение всех подготовленных изменений."
+    );
+  }
+
+  return {
+    processed: impactedRows.length,
+    remaining: Math.max(0, rows.length - impactedRows.length),
+    learnedRuleId,
+    learnedRulePattern,
+    learnedRuleSkippedReason,
+    workspaceId: workspace.id
+  };
+}
+
+async function getReviewVersionContext(): Promise<VersionContext> {
+  const [latestDraft, latestActive] = await Promise.all([
+    db
+      .select({
+        id: catalogVersions.id,
+        sourceFileName: catalogVersions.sourceFileName,
+        createdAt: catalogVersions.createdAt
+      })
+      .from(catalogVersions)
+      .where(eq(catalogVersions.status, "draft"))
+      .orderBy(desc(catalogVersions.createdAt))
+      .limit(1),
+    db
+      .select({
+        id: catalogVersions.id,
+        sourceFileName: catalogVersions.sourceFileName,
+        createdAt: catalogVersions.createdAt,
+        publishedAt: catalogVersions.publishedAt
+      })
+      .from(catalogVersions)
+      .where(eq(catalogVersions.status, "active"))
+      .orderBy(desc(catalogVersions.publishedAt), desc(catalogVersions.createdAt))
+      .limit(1)
+  ]);
+
+  return {
+    latestDraft: latestDraft[0] ?? null,
+    activeVersion: latestActive[0] ?? null
+  };
+}
+
+async function getWorkspaceReviewRows(versionContext: VersionContext, workspaceId: string | null) {
+  if (!versionContext.activeVersion) {
+    return [];
+  }
+
+  const rows = await db
+    .select({
+      reviewId: reviewQueue.id,
+      reason: reviewQueue.reason,
+      createdAt: reviewQueue.createdAt,
+      suggestedCategoryId: reviewQueue.suggestedCategoryId,
+      suggestedSubcategoryId: reviewQueue.suggestedSubcategoryId,
+      importRowNumber: sql<number | null>`null`,
+      productId: products.id,
+      catalogVersionId: reviewQueue.catalogVersionId,
+      shopCode: products.shopCode,
+      name: products.name,
+      rawName: products.rawName,
+      price: products.price,
+      currentCategoryId: products.categoryId,
+      currentSubcategoryId: products.subcategoryId,
+      catalogVersionStatus: catalogVersions.status,
+      catalogVersionCreatedAt: catalogVersions.createdAt,
+      workspaceItemStatus: reviewWorkspaceItems.status,
+      pendingCategoryId: reviewWorkspaceItems.categoryId,
+      pendingSubcategoryId: reviewWorkspaceItems.subcategoryId
+    })
+    .from(reviewQueue)
+    .innerJoin(products, eq(products.id, reviewQueue.productId))
+    .innerJoin(catalogVersions, eq(catalogVersions.id, reviewQueue.catalogVersionId))
+    .leftJoin(
+      reviewWorkspaceItems,
+      and(
+        workspaceId ? eq(reviewWorkspaceItems.workspaceId, workspaceId) : sql`false`,
+        eq(reviewWorkspaceItems.productId, products.id),
+        inArray(reviewWorkspaceItems.status, ["pending", "excluded"])
+      )
+    )
+    .where(
+      and(
+        eq(reviewQueue.status, "open"),
+        eq(reviewQueue.catalogVersionId, versionContext.activeVersion.id),
+        eq(products.status, "needs_review")
+      )
+    )
+    .orderBy(asc(reviewQueue.createdAt))
+    .limit(MAX_GROUPING_ROWS);
+
+  return rows as ReviewRow[];
+}
+
+async function getActionRows(filters: AdminReviewActionFilters, reviewQueueIds?: string[]) {
+  const [versionContext, categorizationContext, targetBySlug] = await Promise.all([
+    getReviewVersionContext(),
+    getCategorizationContext(),
+    getTargetBySlugFromDb()
+  ]);
+  const workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null);
+  const rows = reviewQueueIds
+    ? await getRowsByReviewIds(reviewQueueIds, workspace.id)
+    : await getWorkspaceReviewRows(versionContext, workspace.id);
+  const params: AdminReviewParams = {
+    ...filters,
+    page: 1,
+    pageSize: DEFAULT_PAGE_SIZE
+  };
+  let filteredRows = filterReviewRows(
+    rows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug)),
+    params
+  ).filter((row) => row.workspaceItemStatus !== "pending" && row.workspaceItemStatus !== "excluded");
+
+  if (!reviewQueueIds && filters.group) {
+    const bestSuggestion = chooseGroupSuggestion(filteredRows);
+    filteredRows = filteredRows.filter(
+      (row) => row.safeToApply && sameTarget(row.suggestion, bestSuggestion)
+    );
+  }
+
+  return filteredRows;
+}
+
+async function getRowsByReviewIds(reviewQueueIds: string[], workspaceId: string | null) {
+  if (reviewQueueIds.length === 0) return [];
+
+  return db
+    .select({
+      reviewId: reviewQueue.id,
+      reason: reviewQueue.reason,
+      createdAt: reviewQueue.createdAt,
+      suggestedCategoryId: reviewQueue.suggestedCategoryId,
+      suggestedSubcategoryId: reviewQueue.suggestedSubcategoryId,
+      importRowNumber: sql<number | null>`null`,
+      productId: products.id,
+      catalogVersionId: reviewQueue.catalogVersionId,
+      shopCode: products.shopCode,
+      name: products.name,
+      rawName: products.rawName,
+      price: products.price,
+      currentCategoryId: products.categoryId,
+      currentSubcategoryId: products.subcategoryId,
+      catalogVersionStatus: catalogVersions.status,
+      catalogVersionCreatedAt: catalogVersions.createdAt,
+      workspaceItemStatus: reviewWorkspaceItems.status,
+      pendingCategoryId: reviewWorkspaceItems.categoryId,
+      pendingSubcategoryId: reviewWorkspaceItems.subcategoryId
+    })
+    .from(reviewQueue)
+    .innerJoin(products, eq(products.id, reviewQueue.productId))
+    .innerJoin(catalogVersions, eq(catalogVersions.id, reviewQueue.catalogVersionId))
+    .leftJoin(
+      reviewWorkspaceItems,
+      and(
+        workspaceId ? eq(reviewWorkspaceItems.workspaceId, workspaceId) : sql`false`,
+        eq(reviewWorkspaceItems.productId, products.id),
+        inArray(reviewWorkspaceItems.status, ["pending", "excluded"])
+      )
+    )
+    .where(
+      and(
+        eq(reviewQueue.status, "open"),
+        eq(products.status, "needs_review"),
+        inArray(reviewQueue.id, reviewQueueIds)
+      )
+    ) as Promise<ReviewRow[]>;
+}
+
+function enrichReviewRow(
+  row: ReviewRow,
+  context: CategorizationContext,
+  targetBySlug: Map<string, CategorizationTarget>
+): EnrichedReviewRow {
+  const suggestion = buildCategorySuggestion(row, context, targetBySlug);
+  const groupKey = buildGroupKey(row, suggestion);
+  const groupLabel = buildGroupLabel(groupKey, row, suggestion);
+
+  return {
+    ...row,
+    suggestion,
+    groupKey,
+    groupLabel,
+    safeToApply:
+      suggestion.level !== "manual" &&
+      Boolean(suggestion.categoryId && suggestion.subcategoryId) &&
+      suggestion.conflictingSignals.length === 0
+  };
+}
+
+export function buildCategorySuggestion(
+  row: Pick<ReviewRow, "shopCode" | "name" | "rawName" | "suggestedCategoryId" | "suggestedSubcategoryId">,
+  context: CategorizationContext,
+  targetBySlug: Map<string, CategorizationTarget>
+): ReviewSuggestion {
+  const normalized = normalizeReviewText(`${row.shopCode} ${row.name || row.rawName}`);
+  const contextRule = CONTEXT_RULES.find((rule) =>
+    rule.includeAll.every((token) => normalized.tokens.includes(token))
+  );
+
+  if (contextRule) {
+    const target = targetBySlug.get(`${contextRule.categorySlug}/${contextRule.subcategorySlug}`);
+    if (target?.categoryId && target.subcategoryId) {
+      return {
+        level: "ready",
+        confidence: 0.96,
+        categoryId: target.categoryId,
+        subcategoryId: target.subcategoryId,
+        categoryName: target.categoryName ?? null,
+        subcategoryName: target.subcategoryName ?? null,
+        explanation: contextRule.explanation,
+        matchedSignals: contextRule.includeAll,
+        conflictingSignals: [],
+        rulePattern: contextRule.includeAll.join(" ")
+      };
+    }
+  }
+
+  const result = categorizeProductName(`${row.shopCode} ${row.name || row.rawName}`, context);
+  const target = result.target;
+  if (!target?.categoryId || !target.subcategoryId) {
+    return manualSuggestion(result.reason, result.matchedSignals.map((signal) => signal.value));
+  }
+
+  const hasBroadSingleSignal =
+    result.matchedSignals.filter((signal) => signal.kind === "token").length === 1 &&
+    result.matchedSignals.some((signal) => COMMON_RISK_WORDS.has(signal.value));
+  const conflictingSignals = findConflictingSignals(normalized.tokens, target.categorySlug, target.subcategorySlug);
+  const confidence = Math.max(0, result.confidence - conflictingSignals.length * 0.08 - (hasBroadSingleSignal ? 0.12 : 0));
+  const level = confidence >= READY_CONFIDENCE_THRESHOLD && conflictingSignals.length === 0
+    ? "ready"
+    : confidence >= QUICK_CONFIDENCE_THRESHOLD
+      ? "quick"
+      : "manual";
+
+  if (level === "manual") {
+    return {
+      level,
+      confidence,
+      categoryId: target.categoryId,
+      subcategoryId: target.subcategoryId,
+      categoryName: target.categoryName ?? null,
+      subcategoryName: target.subcategoryName ?? null,
+      explanation: conflictingSignals.length > 0
+        ? "Есть конфликтующие признаки, товар лучше проверить вручную."
+        : result.reason,
+      matchedSignals: result.matchedSignals.map((signal) => signal.value),
+      conflictingSignals,
+      rulePattern: null
+    };
+  }
+
+  return {
+    level,
+    confidence,
+    categoryId: target.categoryId,
+    subcategoryId: target.subcategoryId,
+    categoryName: target.categoryName ?? null,
+    subcategoryName: target.subcategoryName ?? null,
+    explanation: result.reason,
+    matchedSignals: result.matchedSignals.map((signal) => signal.value),
+    conflictingSignals,
+    rulePattern: suggestRulePatternForProduct(row.name || row.rawName)
+  };
+}
+
+function buildReviewGroups(
+  rows: EnrichedReviewRow[],
+  categoryRows: Awaited<ReturnType<typeof getActiveCategories>>,
+  subcategoryRows: Awaited<ReturnType<typeof getActiveSubcategories>>
+): AdminReviewGroup[] {
+  const categoryById = new Map(categoryRows.map((category) => [category.id, category]));
+  const subcategoryById = new Map(subcategoryRows.map((subcategory) => [subcategory.id, subcategory]));
+  const groups = new Map<string, EnrichedReviewRow[]>();
+
+  for (const row of rows.filter((item) => item.workspaceItemStatus !== "pending" && item.workspaceItemStatus !== "excluded")) {
+    const current = groups.get(row.groupKey) ?? [];
+    current.push(row);
+    groups.set(row.groupKey, current);
+  }
+
+  return [...groups.entries()]
+    .map(([key, groupRows]) => {
+      const bestSuggestion = chooseGroupSuggestion(groupRows);
+      const safeRows = groupRows.filter((row) => row.safeToApply && sameTarget(row.suggestion, bestSuggestion));
+      const conflictingRows = groupRows.filter(
+        (row) => row.suggestion.conflictingSignals.length > 0 || !sameTarget(row.suggestion, bestSuggestion)
+      );
+      const level: ReviewSuggestionLevel =
+        bestSuggestion.level === "ready" && conflictingRows.length === 0
+          ? "ready"
+          : bestSuggestion.level === "manual"
+            ? "manual"
+            : "quick";
+      const examples = groupRows.slice(0, 8).map((row) => `${row.shopCode} · ${row.name}`);
+      const category = bestSuggestion.categoryId ? categoryById.get(bestSuggestion.categoryId) : null;
+      const subcategory = bestSuggestion.subcategoryId ? subcategoryById.get(bestSuggestion.subcategoryId) : null;
+      const rulePattern = bestSuggestion.rulePattern ?? safeRulePatternFromGroup(key);
+      const ruleValidation = rulePattern ? validateRulePattern(rulePattern) : { ok: false as const };
+
+      return {
+        key,
+        label: groupRows[0]?.groupLabel ?? key,
+        count: groupRows.length,
+        examples,
+        level,
+        confidence: bestSuggestion.confidence,
+        confidenceLabel: confidenceLabel(bestSuggestion.confidence),
+        suggestedCategoryId: bestSuggestion.categoryId,
+        suggestedSubcategoryId: bestSuggestion.subcategoryId,
+        suggestedCategoryName: category?.name ?? bestSuggestion.categoryName,
+        suggestedSubcategoryName: subcategory?.name ?? bestSuggestion.subcategoryName,
+        explanation: bestSuggestion.explanation,
+        matchedSignals: bestSuggestion.matchedSignals,
+        conflictingSignals: [...new Set(groupRows.flatMap((row) => row.suggestion.conflictingSignals))],
+        impactedProductCount: safeRows.length,
+        excludedCount: groupRows.filter((row) => row.workspaceItemStatus === "excluded").length,
+        conflictingCount: conflictingRows.length,
+        preparedCount: groupRows.filter((row) => row.workspaceItemStatus === "pending").length,
+        manualOnlyCount: groupRows.filter((row) => row.suggestion.level === "manual").length,
+        rulePattern,
+        ruleWarning:
+          rulePattern && !ruleValidation.ok
+            ? "Правило слишком общее. Добавьте уточняющее слово, например узел или модель автомобиля."
+            : null,
+        previewToken: buildPreviewToken(
+          safeRows.map((row) => row.productId),
+          bestSuggestion.categoryId,
+          bestSuggestion.subcategoryId
+        ),
+        sampleProducts: groupRows.slice(0, 10).map((row) => ({
+          reviewId: row.reviewId,
+          productId: row.productId,
+          shopCode: row.shopCode,
+          name: row.name,
+          reason: row.reason,
+          safeToApply: row.safeToApply && sameTarget(row.suggestion, bestSuggestion)
+        }))
+      };
+    })
+    .sort((a, b) => levelWeight(a.level) - levelWeight(b.level) || b.impactedProductCount - a.impactedProductCount)
+    .slice(0, 80);
+}
+
+function buildReviewQueueSummary(
+  rows: EnrichedReviewRow[],
+  groups: AdminReviewGroup[],
+  workspace: ReviewWorkspaceSummary,
+  versionContext: VersionContext
+): AdminReviewSummary {
+  return {
+    total: rows.filter((row) => row.workspaceItemStatus !== "pending" && row.workspaceItemStatus !== "excluded").length,
+    readyGroups: groups.filter((group) => group.level === "ready").length,
+    readyProducts: groups.filter((group) => group.level === "ready").reduce((sum, group) => sum + group.impactedProductCount, 0),
+    quickGroups: groups.filter((group) => group.level === "quick").length,
+    quickProducts: groups.filter((group) => group.level === "quick").reduce((sum, group) => sum + group.impactedProductCount, 0),
+    manualProducts: rows.filter((row) => row.suggestion.level === "manual").length,
+    preparedProducts: workspace.preparedProductCount,
+    excludedProducts: workspace.excludedProductCount,
+    willPublishProducts: workspace.preparedProductCount,
+    missingCategory: rows.filter((row) => !row.currentCategoryId).length,
+    missingSubcategory: rows.filter((row) => !row.currentSubcategoryId).length,
+    missingName: rows.filter((row) => isMissingName(row)).length,
+    conflictingProducts: rows.filter((row) => row.suggestion.conflictingSignals.length > 0).length,
+    activeOpen: versionContext.activeVersion ? rows.length : 0,
+    latestDraftOpen: 0
+  };
+}
+
+function filterReviewRows(rows: EnrichedReviewRow[], params: AdminReviewParams) {
+  const query = normalizeReviewText(params.query).normalized;
+  return rows.filter((row) => {
+    if (params.issue !== "prepared" && params.issue !== "excluded") {
+      if (row.workspaceItemStatus === "pending" || row.workspaceItemStatus === "excluded") return false;
+    }
+    if (params.issue === "ready" && row.suggestion.level !== "ready") return false;
+    if (params.issue === "quick" && row.suggestion.level !== "quick") return false;
+    if (params.issue === "manual" && row.suggestion.level !== "manual") return false;
+    if (params.issue === "prepared" && row.workspaceItemStatus !== "pending") return false;
+    if (params.issue === "excluded" && row.workspaceItemStatus !== "excluded") return false;
+    if (params.issue === "missing_category" && row.currentCategoryId) return false;
+    if (params.issue === "missing_subcategory" && row.currentSubcategoryId) return false;
+    if (params.issue === "missing_name" && !isMissingName(row)) return false;
+    if (params.issue === "conflicting" && row.suggestion.conflictingSignals.length === 0) return false;
+    if (params.reason && row.reason !== params.reason) return false;
+    if (params.group && row.groupKey !== params.group) return false;
+    if (query) {
+      const haystack = normalizeReviewText(`${row.shopCode} ${row.name} ${row.rawName} ${row.groupLabel} ${row.suggestion.categoryName ?? ""} ${row.suggestion.subcategoryName ?? ""}`).normalized;
+      if (!haystack.includes(query)) return false;
+    }
+    return true;
+  });
+}
+
+function mapReviewItem(
+  row: EnrichedReviewRow,
+  categoryById: Map<string, { name: string }>,
+  subcategoryById: Map<string, { name: string }>
+): AdminReviewItem {
+  return {
+    reviewId: row.reviewId,
+    productId: row.productId,
+    reason: row.reason,
+    createdAt: row.createdAt,
+    catalogVersionId: row.catalogVersionId,
+    catalogVersionStatus: row.catalogVersionStatus,
+    catalogVersionCreatedAt: row.catalogVersionCreatedAt,
+    importRowNumber: row.importRowNumber,
+    shopCode: row.shopCode,
+    name: row.name,
+    rawName: row.rawName,
+    price: Number(row.price),
+    currentCategoryId: row.currentCategoryId,
+    currentSubcategoryId: row.currentSubcategoryId,
+    currentCategoryName: row.currentCategoryId ? categoryById.get(row.currentCategoryId)?.name ?? null : null,
+    currentSubcategoryName: row.currentSubcategoryId ? subcategoryById.get(row.currentSubcategoryId)?.name ?? null : null,
+    suggestedCategoryId: row.suggestion.categoryId,
+    suggestedSubcategoryId: row.suggestion.subcategoryId,
+    suggestedCategoryName: row.suggestion.categoryName,
+    suggestedSubcategoryName: row.suggestion.subcategoryName,
+    confidence: row.suggestion.confidence,
+    confidenceLabel: confidenceLabel(row.suggestion.confidence),
+    suggestionLevel: row.suggestion.level,
+    explanation: row.suggestion.explanation,
+    matchedSignals: row.suggestion.matchedSignals,
+    conflictingSignals: row.suggestion.conflictingSignals,
+    groupKey: row.groupKey,
+    groupLabel: row.groupLabel,
+    workspaceStatus:
+      row.workspaceItemStatus === "pending"
+        ? "prepared"
+        : row.workspaceItemStatus === "excluded"
+          ? "excluded"
+          : "open",
+    pendingCategoryName: row.pendingCategoryId ? categoryById.get(row.pendingCategoryId)?.name ?? null : null,
+    pendingSubcategoryName: row.pendingSubcategoryId
+      ? subcategoryById.get(row.pendingSubcategoryId)?.name ?? null
+      : null,
+    rulePattern: row.suggestion.rulePattern
+  };
+}
+
+function buildCategoryOptions(
+  categoryRows: Awaited<ReturnType<typeof getActiveCategories>>,
+  subcategoryRows: Awaited<ReturnType<typeof getActiveSubcategories>>
+): AdminReviewCategoryOption[] {
+  return categoryRows.map((category) => ({
+    id: category.id,
+    name: category.name,
+    slug: category.slug,
+    subcategories: subcategoryRows
+      .filter((subcategory) => subcategory.categoryId === category.id)
+      .map((subcategory) => ({
+        id: subcategory.id,
+        name: subcategory.name,
+        slug: subcategory.slug
+      }))
+  }));
 }
 
 function getActiveCategories() {
@@ -492,538 +1607,383 @@ function getActiveSubcategories() {
     .orderBy(asc(subcategories.sortOrder), asc(subcategories.name));
 }
 
-async function getReviewVersionContext() {
-  const [latestDraft, latestActive] = await Promise.all([
-    db
-      .select({
-        id: catalogVersions.id,
-        sourceFileName: catalogVersions.sourceFileName,
-        createdAt: catalogVersions.createdAt
-      })
-      .from(catalogVersions)
-      .where(eq(catalogVersions.status, "draft"))
-      .orderBy(desc(catalogVersions.createdAt))
-      .limit(1),
-    db
-      .select({
-        id: catalogVersions.id,
-        sourceFileName: catalogVersions.sourceFileName,
-        createdAt: catalogVersions.createdAt,
-        publishedAt: catalogVersions.publishedAt
-      })
-      .from(catalogVersions)
-      .where(eq(catalogVersions.status, "active"))
-      .orderBy(desc(catalogVersions.publishedAt), desc(catalogVersions.createdAt))
-      .limit(1)
-  ]);
-
-  return {
-    latestDraft: latestDraft[0] ?? null,
-    latestActive: latestActive[0] ?? null
-  };
-}
-
-async function getReviewSummary(params: AdminReviewParams, versionContext: Awaited<ReturnType<typeof getReviewVersionContext>>) {
-  const base = buildReviewConditions(params, versionContext, {
-    includeIssue: false,
-    includeGroup: false
-  });
-  const resolvedToday = buildReviewConditions(params, versionContext, {
-    status: "resolved",
-    includeIssue: false,
-    includeGroup: false
-  });
-
-  const [
-    total,
-    missingCategory,
-    missingSubcategory,
-    missingName,
-    noSuggestion,
-    resolvedTodayCount,
-    latestDraftOpen,
-    activeOpen
-  ] = await Promise.all([
-    countReviewRows(base),
-    countReviewRows([...base, missingCategoryCondition()]),
-    countReviewRows([...base, missingSubcategoryCondition()]),
-    countReviewRows([...base, missingNameCondition()]),
-    countReviewRows([...base, noSuggestionCondition()]),
-    countReviewRows([...resolvedToday, sql`${reviewQueue.resolvedAt} >= date_trunc('day', now())`]),
-    versionContext.latestDraft
-      ? countReviewRows([
-          eq(reviewQueue.status, "open"),
-          eq(reviewQueue.catalogVersionId, versionContext.latestDraft.id)
-        ])
-      : Promise.resolve(0),
-    versionContext.latestActive
-      ? countReviewRows([
-          eq(reviewQueue.status, "open"),
-          eq(reviewQueue.catalogVersionId, versionContext.latestActive.id)
-        ])
-      : Promise.resolve(0)
-  ]);
-
-  return {
-    total,
-    missingCategory,
-    missingSubcategory,
-    missingName,
-    noSuggestion,
-    resolvedToday: resolvedTodayCount,
-    latestDraftOpen,
-    activeOpen
-  };
-}
-
-async function getReasonOptions(params: AdminReviewParams, versionContext: Awaited<ReturnType<typeof getReviewVersionContext>>) {
-  const conditions = buildReviewConditions(params, versionContext, {
-    includeIssue: false,
-    includeReason: false,
-    includeGroup: false
-  });
-
-  const rows = await db
-    .select({
-      reason: reviewQueue.reason,
-      count: sql<number>`count(*)::int`
-    })
-    .from(reviewQueue)
-    .innerJoin(products, eq(products.id, reviewQueue.productId))
-    .innerJoin(catalogVersions, eq(catalogVersions.id, reviewQueue.catalogVersionId))
-    .where(and(...conditions))
-    .groupBy(reviewQueue.reason)
-    .orderBy(desc(sql`count(*)`), asc(reviewQueue.reason))
-    .limit(30);
-
-  return rows.map((row) => ({
-    reason: row.reason,
-    count: Number(row.count)
-  }));
-}
-
-async function getReviewGroups(params: AdminReviewParams, versionContext: Awaited<ReturnType<typeof getReviewVersionContext>>) {
-  const groupBase = reviewGroupBaseQuery(params, versionContext, "review_group_base");
-
-  const rows = await db
-    .select({
-      key: groupBase.groupKey,
-      count: sql<number>`count(*)::int`,
-      examples: sql<string[]>`(array_agg(${groupBase.shopCode} || ' · ' || ${groupBase.name} order by ${groupBase.name}))[1:6]`,
-      reason: sql<string>`min(${groupBase.reason})`,
-      suggestedCount: sql<number>`count(*) filter (where ${groupBase.suggestedCategoryId} is not null or ${groupBase.suggestedSubcategoryId} is not null)::int`,
-      missingCategoryCount: sql<number>`count(*) filter (where ${groupBase.categoryId} is null)::int`,
-      missingSubcategoryCount: sql<number>`count(*) filter (where ${groupBase.subcategoryId} is null)::int`
-    })
-    .from(groupBase)
-    .groupBy(groupBase.groupKey)
-    .orderBy(desc(sql`count(*)`), asc(groupBase.groupKey))
-    .limit(60);
-
-  return rows.map(mapReviewGroupRow);
-}
-
-async function getReviewGroupsSafely(
-  params: AdminReviewParams,
-  versionContext: Awaited<ReturnType<typeof getReviewVersionContext>>
+function buildTargetBySlug(
+  categoryRows: Awaited<ReturnType<typeof getActiveCategories>>,
+  subcategoryRows: Awaited<ReturnType<typeof getActiveSubcategories>>
 ) {
-  try {
-    return {
-      groups: await getReviewGroups(params, versionContext),
-      unavailable: false
-    };
-  } catch (error) {
-    console.error("Admin review groups query failed", error);
-    return {
-      groups: [],
-      unavailable: true
-    };
+  const categoryById = new Map(categoryRows.map((category) => [category.id, category]));
+  const targets = new Map<string, CategorizationTarget>();
+  for (const subcategory of subcategoryRows) {
+    const category = categoryById.get(subcategory.categoryId);
+    if (!category || !isPublicTaxonomyTarget(category.slug, subcategory.slug)) {
+      continue;
+    }
+    targets.set(`${category.slug}/${subcategory.slug}`, {
+      categoryId: category.id,
+      categorySlug: category.slug,
+      categoryName: category.name,
+      subcategoryId: subcategory.id,
+      subcategorySlug: subcategory.slug,
+      subcategoryName: subcategory.name
+    });
   }
+  return targets;
 }
 
-async function getReviewGroupSummary(
-  group: string,
-  params: AdminReviewParams,
-  versionContext: Awaited<ReturnType<typeof getReviewVersionContext>>
-) {
-  const groupBase = reviewGroupBaseQuery({ ...params, group: "" }, versionContext, "review_group_summary_base");
+async function getTargetBySlugFromDb() {
+  const [categoryRows, subcategoryRows] = await Promise.all([getActiveCategories(), getActiveSubcategories()]);
+  return buildTargetBySlug(categoryRows, subcategoryRows);
+}
 
-  const rows = await db
+async function validateCategoryTarget(categoryId: string, subcategoryId: string) {
+  const [row] = await db
     .select({
-      key: groupBase.groupKey,
-      count: sql<number>`count(*)::int`,
-      examples: sql<string[]>`(array_agg(${groupBase.shopCode} || ' · ' || ${groupBase.name} order by ${groupBase.name}))[1:10]`,
-      reason: sql<string>`min(${groupBase.reason})`,
-      suggestedCount: sql<number>`count(*) filter (where ${groupBase.suggestedCategoryId} is not null or ${groupBase.suggestedSubcategoryId} is not null)::int`,
-      missingCategoryCount: sql<number>`count(*) filter (where ${groupBase.categoryId} is null)::int`,
-      missingSubcategoryCount: sql<number>`count(*) filter (where ${groupBase.subcategoryId} is null)::int`
+      category: categories,
+      subcategory: subcategories
     })
-    .from(groupBase)
-    .where(eq(groupBase.groupKey, group))
-    .groupBy(groupBase.groupKey)
+    .from(subcategories)
+    .innerJoin(categories, eq(categories.id, subcategories.categoryId))
+    .where(
+      and(
+        eq(categories.id, categoryId),
+        eq(subcategories.id, subcategoryId),
+        eq(categories.isActive, true),
+        eq(subcategories.isActive, true)
+      )
+    )
     .limit(1);
 
-  return rows[0] ? mapReviewGroupRow(rows[0]) : null;
-}
-
-async function getReviewGroupSummarySafely(
-  group: string,
-  params: AdminReviewParams,
-  versionContext: Awaited<ReturnType<typeof getReviewVersionContext>>
-) {
-  try {
-    return {
-      group: await getReviewGroupSummary(group, params, versionContext),
-      unavailable: false
-    };
-  } catch (error) {
-    console.error("Admin review selected group query failed", error);
-    return {
-      group: null,
-      unavailable: true
-    };
+  if (
+    !row ||
+    !isPublicTaxonomyTarget(row.category.slug, row.subcategory.slug)
+  ) {
+    throw new AdminReviewBulkSafetyError(
+      "invalid_target",
+      "Категория или подкатегория не найдена в согласованной структуре каталога."
+    );
   }
+
+  return row;
 }
 
-function reviewGroupBaseQuery(
-  params: AdminReviewParams,
-  versionContext: Awaited<ReturnType<typeof getReviewVersionContext>>,
-  alias: string
-) {
-  const conditions = buildReviewConditions(params, versionContext, {
-    includeGroup: false
+async function ensureReviewWorkspace(sourceCatalogVersionId: string | null, adminUserId: string) {
+  if (!sourceCatalogVersionId) {
+    throw new Error("Нет активной версии каталога для рабочей сессии.");
+  }
+
+  const existing = await getOpenWorkspaceRow(sourceCatalogVersionId);
+  if (existing) {
+    return existing;
+  }
+
+  const [workspace] = await db
+    .insert(reviewWorkspaces)
+    .values({
+      sourceCatalogVersionId,
+      createdBy: adminUserId,
+      metadata: {
+        createdFrom: "active_needs_review"
+      }
+    })
+    .returning({ id: reviewWorkspaces.id });
+
+  await db.insert(auditLogs).values({
+    adminUserId,
+    action: "review.workspace.create",
+    entityType: "review_workspace",
+    entityId: workspace.id,
+    metadata: { sourceCatalogVersionId }
   });
 
-  return db
-    .select({
-      groupKey: reviewGroupKeySql().as("group_key"),
-      normalizedName: reviewNormalizedNameSql().as("normalized_name"),
-      shopCode: products.shopCode,
-      name: products.name,
-      reason: reviewQueue.reason,
-      suggestedCategoryId: reviewQueue.suggestedCategoryId,
-      suggestedSubcategoryId: reviewQueue.suggestedSubcategoryId,
-      categoryId: products.categoryId,
-      subcategoryId: products.subcategoryId
-    })
-    .from(reviewQueue)
-    .innerJoin(products, eq(products.id, reviewQueue.productId))
-    .innerJoin(catalogVersions, eq(catalogVersions.id, reviewQueue.catalogVersionId))
-    .where(and(...conditions))
-    .as(alias);
+  return workspace;
 }
 
-function mapReviewGroupRow(row: {
-  key: string | null;
-  count: number;
-  examples: string[] | null;
-  reason: string | null;
-  suggestedCount: number;
-  missingCategoryCount: number;
-  missingSubcategoryCount: number;
-}): AdminReviewGroup {
-  const key = row.key || OTHER_GROUP_KEY;
-  const rulePattern = key === OTHER_GROUP_KEY ? null : key;
-  const validation = rulePattern
-    ? validateRulePattern(rulePattern, { allowProductNounSingleWord: true })
-    : { ok: false as const, reason: "too_generic" };
-
-  return {
-    key,
-    label: groupLabel(key),
-    count: Number(row.count),
-    examples: row.examples ?? [],
-    reason: row.reason ?? "Товар требует проверки.",
-    suggestedCount: Number(row.suggestedCount),
-    missingCategoryCount: Number(row.missingCategoryCount),
-    missingSubcategoryCount: Number(row.missingSubcategoryCount),
-    rulePattern,
-    ruleWarning:
-      rulePattern && !validation.ok
-        ? "Это правило может затронуть слишком разные товары. Лучше уточнить условие."
-        : null
-  };
-}
-
-function buildReviewConditions(
-  params: AdminReviewActionFilters,
-  versionContext: Awaited<ReturnType<typeof getReviewVersionContext>>,
-  options: {
-    status?: "open" | "resolved";
-    includeIssue?: boolean;
-    includeReason?: boolean;
-    includeGroup?: boolean;
-  } = {}
-): SQL[] {
-  const conditions: SQL[] = [eq(reviewQueue.status, options.status ?? "open")];
-
-  if (params.scope === "draft") {
-    conditions.push(
-      versionContext.latestDraft
-        ? eq(reviewQueue.catalogVersionId, versionContext.latestDraft.id)
-        : sql`false`
-    );
-  } else if (params.scope === "active") {
-    conditions.push(
-      versionContext.latestActive
-        ? eq(reviewQueue.catalogVersionId, versionContext.latestActive.id)
-        : sql`false`
-    );
-  } else {
-    conditions.push(inArray(catalogVersions.status, ["draft", "active"]));
+async function getOpenWorkspaceRow(sourceCatalogVersionId: string | null) {
+  if (!sourceCatalogVersionId) {
+    return null;
   }
 
-  if (params.query) {
-    const like = `%${params.query}%`;
-    conditions.push(sql`(
-      ${products.shopCode} ILIKE ${like}
-      OR ${products.name} ILIKE ${like}
-      OR ${products.rawName} ILIKE ${like}
-      OR ${products.searchText} ILIKE ${like}
-    )`);
-  }
+  const [workspace] = await db
+    .select({ id: reviewWorkspaces.id })
+    .from(reviewWorkspaces)
+    .where(
+      and(
+        eq(reviewWorkspaces.sourceCatalogVersionId, sourceCatalogVersionId),
+        inArray(reviewWorkspaces.status, ["open", "publishing"])
+      )
+    )
+    .orderBy(desc(reviewWorkspaces.createdAt))
+    .limit(1);
 
-  if (options.includeReason !== false && params.reason) {
-    conditions.push(eq(reviewQueue.reason, params.reason));
-  }
-
-  if (options.includeIssue !== false) {
-    const issueCondition = issueFilterCondition(params.issue);
-    if (issueCondition) {
-      conditions.push(issueCondition);
-    }
-  }
-
-  if (options.includeGroup !== false && params.group) {
-    conditions.push(sql`${reviewGroupKeySql()} = ${params.group}`);
-  }
-
-  return conditions;
+  return workspace ?? null;
 }
 
-function issueFilterCondition(issue: AdminReviewIssueFilter) {
-  if (issue === "missing_category") return missingCategoryCondition();
-  if (issue === "missing_subcategory") return missingSubcategoryCondition();
-  if (issue === "missing_name") return missingNameCondition();
-  if (issue === "no_suggestion") return noSuggestionCondition();
-  return null;
-}
-
-function missingCategoryCondition() {
-  return sql`${products.categoryId} is null`;
-}
-
-function missingSubcategoryCondition() {
-  return sql`${products.subcategoryId} is null`;
-}
-
-function missingNameCondition() {
-  return sql`(
-    nullif(btrim(${products.name}), '') is null
-    OR btrim(${products.name}) = btrim(${products.shopCode})
-    OR btrim(coalesce(${products.rawName}, '')) = btrim(${products.shopCode})
-  )`;
-}
-
-function noSuggestionCondition() {
-  return sql`(${reviewQueue.suggestedCategoryId} is null or ${reviewQueue.suggestedSubcategoryId} is null)`;
-}
-
-function reviewGroupKeySql() {
-  const stopWords = sql.join(GROUP_STOP_WORDS.map((word) => sql`${word}`), sql`, `);
-  const normalizedName = reviewNormalizedNameSql();
-  const firstToken = sql<string>`(regexp_split_to_array(${normalizedName}, '[^0-9a-zа-я]+'))[1]`;
-
-  return sql<string>`case
-    when nullif(${firstToken}, '') is null
-      or char_length(${firstToken}) < 3
-      or ${firstToken} in (${stopWords})
-      or ${firstToken} ~ '^[0-9]+$'
-    then ${OTHER_GROUP_KEY}
-    else ${firstToken}
-  end`;
-}
-
-function reviewNormalizedNameSql() {
-  return sql<string>`replace(lower(${products.name}), 'ё', 'е')`;
-}
-
-async function countReviewRows(conditions: SQL[]) {
+async function countWorkspaceItems(workspaceId: string, status: "pending" | "excluded") {
   const [row] = await db
     .select({ count: sql<number>`count(*)::int` })
-    .from(reviewQueue)
-    .innerJoin(products, eq(products.id, reviewQueue.productId))
-    .innerJoin(catalogVersions, eq(catalogVersions.id, reviewQueue.catalogVersionId))
-    .where(and(...conditions));
-
+    .from(reviewWorkspaceItems)
+    .where(and(eq(reviewWorkspaceItems.workspaceId, workspaceId), eq(reviewWorkspaceItems.status, status)));
   return Number(row?.count ?? 0);
 }
 
-async function getReviewRowsForBulkAction(
-  filters: AdminReviewActionFilters,
-  versionContext: Awaited<ReturnType<typeof getReviewVersionContext>>
-) {
-  return getReviewRows(buildReviewConditions(filters, versionContext));
+async function countWorkspaceActions(workspaceId: string) {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(reviewWorkspaceActions)
+    .where(and(eq(reviewWorkspaceActions.workspaceId, workspaceId), eq(reviewWorkspaceActions.status, "applied")));
+  return Number(row?.count ?? 0);
 }
 
-async function getReviewRowsByIds(
-  reviewQueueIds: string[],
-  versionContext: Awaited<ReturnType<typeof getReviewVersionContext>>
-) {
-  return getReviewRows([
-    eq(reviewQueue.status, "open"),
-    inArray(reviewQueue.id, reviewQueueIds),
-    versionContext.latestDraft
-      ? eq(reviewQueue.catalogVersionId, versionContext.latestDraft.id)
-      : sql`false`
-  ]);
+async function getLatestWorkspaceAction(workspaceId: string) {
+  const [action] = await db
+    .select({
+      id: reviewWorkspaceActions.id,
+      productCount: reviewWorkspaceActions.productCount,
+      ruleId: reviewWorkspaceActions.ruleId
+    })
+    .from(reviewWorkspaceActions)
+    .where(and(eq(reviewWorkspaceActions.workspaceId, workspaceId), eq(reviewWorkspaceActions.status, "applied")))
+    .orderBy(desc(reviewWorkspaceActions.createdAt))
+    .limit(1);
+  return action ?? null;
 }
 
-function getReviewRows(conditions: SQL[]) {
+async function getPendingWorkspaceItems(workspaceId: string) {
   return db
     .select({
-      reviewId: reviewQueue.id,
-      productId: products.id,
-      shopCode: products.shopCode,
-      name: products.name,
-      rawName: products.rawName,
-      catalogVersionId: products.catalogVersionId
+      productId: reviewWorkspaceItems.productId,
+      categoryId: reviewWorkspaceItems.categoryId,
+      subcategoryId: reviewWorkspaceItems.subcategoryId,
+      categoryName: categories.name,
+      subcategoryName: subcategories.name
     })
-    .from(reviewQueue)
-    .innerJoin(products, eq(products.id, reviewQueue.productId))
-    .innerJoin(catalogVersions, eq(catalogVersions.id, reviewQueue.catalogVersionId))
-    .where(and(...conditions))
-    .orderBy(asc(reviewQueue.createdAt));
+    .from(reviewWorkspaceItems)
+    .innerJoin(categories, eq(categories.id, reviewWorkspaceItems.categoryId))
+    .innerJoin(subcategories, eq(subcategories.id, reviewWorkspaceItems.subcategoryId))
+    .where(and(eq(reviewWorkspaceItems.workspaceId, workspaceId), eq(reviewWorkspaceItems.status, "pending")));
 }
 
-async function applyBulkCategorizationCorrection(input: {
-  rows: Awaited<ReturnType<typeof getReviewRows>>;
-  categoryId: string;
-  subcategoryId: string;
-  adminUserId: string;
-  learnRule: boolean;
-  rulePattern?: string;
-  allowProductNounSingleWordRule: boolean;
-  action: string;
-}) {
-  if (input.rows.length === 0) {
-    throw new Error("В выбранной очереди нет открытых товаров.");
-  }
+async function getProductsForVersion(catalogVersionId: string) {
+  return db
+    .select({
+      id: products.id,
+      shopCode: products.shopCode,
+      rawName: products.rawName,
+      name: products.name,
+      slug: products.slug,
+      price: products.price,
+      stockQuantity: products.stockQuantity,
+      stockSum: products.stockSum,
+      categoryId: products.categoryId,
+      subcategoryId: products.subcategoryId,
+      categoryName: categories.name,
+      subcategoryName: subcategories.name,
+      status: products.status,
+      reviewReason: products.reviewReason,
+      searchText: products.searchText,
+      createdAt: products.createdAt
+    })
+    .from(products)
+    .leftJoin(categories, eq(categories.id, products.categoryId))
+    .leftJoin(subcategories, eq(subcategories.id, products.subcategoryId))
+    .where(eq(products.catalogVersionId, catalogVersionId))
+    .orderBy(asc(products.shopCode));
+}
 
-  const [category] = await db
-    .select({ id: categories.id, name: categories.name, slug: categories.slug })
-    .from(categories)
-    .where(eq(categories.id, input.categoryId))
-    .limit(1);
-  const [subcategory] = await db
-    .select({ id: subcategories.id, name: subcategories.name, slug: subcategories.slug })
-    .from(subcategories)
-    .where(and(eq(subcategories.id, input.subcategoryId), eq(subcategories.categoryId, input.categoryId)))
-    .limit(1);
-
-  if (!category || !subcategory) {
-    throw new Error("Категория или подкатегория не найдена.");
-  }
-
-  const searchSynonyms = await getSearchSynonyms();
-  const now = new Date();
-  let learnedRuleId: string | null = null;
-  let learnedRulePattern: string | null = null;
-  let learnedRuleSkippedReason: string | null = input.learnRule ? "no_safe_pattern" : "disabled";
-
-  await db.transaction(async (tx) => {
-    if (input.learnRule) {
-      const learnedRule = await learnSafeCategorizationRule({
-        tx,
-        productName: input.rows[0]?.name ?? "",
-        categoryId: input.categoryId,
-        subcategoryId: input.subcategoryId,
-        adminUserId: input.adminUserId,
-        requestedPattern: input.rulePattern,
-        allowProductNounSingleWord: input.allowProductNounSingleWordRule
-      });
-
-      learnedRuleId = learnedRule.id;
-      learnedRulePattern = learnedRule.pattern;
-      learnedRuleSkippedReason = learnedRule.skippedReason;
-
-      if (learnedRuleSkippedReason) {
-        throw new AdminReviewBulkSafetyError(
-          "rule_blocked",
-          REVIEW_BULK_RULE_BLOCKED_MESSAGE,
-          learnedRuleSkippedReason
-        );
-      }
-    }
-
-    for (const row of input.rows) {
-      await tx
-        .update(products)
-        .set({
-          categoryId: input.categoryId,
-          subcategoryId: input.subcategoryId,
-          status: "active",
-          reviewReason: null,
-          searchText: buildProductSearchText({
-            shopCode: row.shopCode,
-            name: row.name,
-            rawName: row.rawName,
-            categoryName: category.name,
-            subcategoryName: subcategory.name,
-            synonyms: searchSynonyms
-          }),
-          updatedAt: now
-        })
-        .where(eq(products.id, row.productId));
-
-      await tx
-        .update(reviewQueue)
-        .set({
-          status: "resolved",
-          resolvedBy: input.adminUserId,
-          resolvedAt: now,
-          updatedAt: now
-        })
-        .where(eq(reviewQueue.id, row.reviewId));
-    }
-
-    await tx.insert(auditLogs).values({
-      adminUserId: input.adminUserId,
-      action: input.action,
-      entityType: "review_queue",
-      metadata: {
-        categoryId: input.categoryId,
-        subcategoryId: input.subcategoryId,
-        processed: input.rows.length,
-        reviewQueueIdsSample: input.rows.slice(0, 100).map((row) => row.reviewId),
-        learnedRuleId,
-        learnedRulePattern,
-        learnedRuleSkippedReason
-      }
-    });
-  });
-
-  const remaining = await countReviewRows([eq(reviewQueue.status, "open")]);
-
+function emptyWorkspace(sourceCatalogVersionId: string | null): ReviewWorkspaceSummary {
   return {
-    processed: input.rows.length,
-    remaining,
-    learnedRuleId,
-    learnedRulePattern,
-    learnedRuleSkippedReason,
-    categoryName: category.name,
-    subcategoryName: subcategory.name
+    id: null,
+    sourceCatalogVersionId,
+    sourceCatalogVersionStatus: sourceCatalogVersionId ? "active" : null,
+    sourceCatalogVersionPublishedAt: null,
+    status: "logical",
+    preparedProductCount: 0,
+    excludedProductCount: 0,
+    actionCount: 0,
+    lastActionId: null
   };
 }
 
-function assertDraftBulkScope(filters: AdminReviewActionFilters) {
-  if (filters.scope !== "draft") {
-    throw new AdminReviewBulkSafetyError("scope_forbidden", REVIEW_BULK_DRAFT_ONLY_MESSAGE);
+function chooseGroupSuggestion(rows: EnrichedReviewRow[]) {
+  const grouped = new Map<string, { suggestion: ReviewSuggestion; count: number }>();
+  for (const row of rows) {
+    if (!row.suggestion.categoryId || !row.suggestion.subcategoryId) continue;
+    const key = `${row.suggestion.categoryId}:${row.suggestion.subcategoryId}`;
+    const current = grouped.get(key) ?? { suggestion: row.suggestion, count: 0 };
+    current.count += 1;
+    if (row.suggestion.confidence > current.suggestion.confidence) {
+      current.suggestion = row.suggestion;
+    }
+    grouped.set(key, current);
   }
+
+  return [...grouped.values()].sort((a, b) => b.count - a.count || b.suggestion.confidence - a.suggestion.confidence)[0]?.suggestion ??
+    manualSuggestion("Недостаточно данных для безопасной категории.", []);
 }
 
-function assertLargeActionConfirmed(actualCount: number, confirmationCount: number | null | undefined) {
-  if (actualCount > LARGE_ACTION_CONFIRMATION_THRESHOLD && confirmationCount !== actualCount) {
+function buildGroupKey(row: ReviewRow, suggestion: ReviewSuggestion) {
+  if (suggestion.rulePattern) return normalizeReviewText(suggestion.rulePattern).normalized;
+  const normalized = normalizeReviewText(`${row.name} ${row.rawName}`);
+  const context = CONTEXT_RULES.find((rule) => rule.includeAll.every((token) => normalized.tokens.includes(token)));
+  if (context) return context.includeAll.join(" ");
+
+  const ngrams = buildNgrams(normalized.tokens.filter((token) => !STOP_WORDS.has(token)), 3)
+    .concat(buildNgrams(normalized.tokens.filter((token) => !STOP_WORDS.has(token)), 2));
+  return ngrams.find((ngram) => !isUnsafeBroadPattern(ngram)) ?? normalized.tokens.find((token) => !STOP_WORDS.has(token)) ?? "manual";
+}
+
+function buildGroupLabel(key: string, row: ReviewRow, suggestion: ReviewSuggestion) {
+  if (suggestion.rulePattern && suggestion.categoryName) {
+    return capitalizeWords(suggestion.rulePattern);
+  }
+
+  const context = CONTEXT_RULES.find((rule) => rule.includeAll.join(" ") === key);
+  if (context) return context.label;
+
+  return capitalizeWords(key || row.name);
+}
+
+function normalizeReviewText(value: string) {
+  const normalized = normalizeForCategorization(value)
+    .replace(/\bрем\s*\.?\s*к\s*[- ]?\s*т\b/g, "ремкомплект")
+    .replace(/\bрем\s+комплект\b/g, "ремкомплект")
+    .replace(/\bсуппорта\b/g, "суппорт")
+    .replace(/\bсуппортов\b/g, "суппорт")
+    .replace(/\bколенвала\b/g, "коленвал")
+    .replace(/\bполуоси\b/g, "полуось")
+    .replace(/\bступицы\b/g, "ступица")
+    .replace(/\bтормоза\b/g, "тормоз")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return {
+    normalized,
+    tokens: normalized
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 2 && !/^\d+$/.test(token))
+  };
+}
+
+function findConflictingSignals(tokens: string[], categorySlug?: string, subcategorySlug?: string) {
+  const conflicts: string[] = [];
+  const has = (token: string) => tokens.includes(token);
+  if (categorySlug === "tormoznaya-sistema" && (has("кардан") || has("гбц") || has("коленвал") || has("полуось"))) {
+    conflicts.push("Есть признаки двигателя или трансмиссии.");
+  }
+  if (categorySlug === "dvigatel-i-transmissiya" && (has("суппорт") || has("тормоз"))) {
+    conflicts.push("Есть признаки тормозной системы.");
+  }
+  if (subcategorySlug === "datchiki" && !has("датчик")) {
+    conflicts.push("Нет явного слова «датчик».");
+  }
+  return conflicts;
+}
+
+function manualSuggestion(reason: string, signals: string[]): ReviewSuggestion {
+  return {
+    level: "manual",
+    confidence: 0,
+    categoryId: null,
+    subcategoryId: null,
+    categoryName: null,
+    subcategoryName: null,
+    explanation: reason,
+    matchedSignals: signals,
+    conflictingSignals: [],
+    rulePattern: null
+  };
+}
+
+function contextRule(
+  label: string,
+  includeAll: string[],
+  categorySlug: string,
+  subcategorySlug: string,
+  explanation = "Найдена точная контекстная фраза: общее слово дополнено узлом автомобиля."
+) {
+  return { label, includeAll, categorySlug, subcategorySlug, explanation };
+}
+
+function confidenceLabel(confidence: number) {
+  if (confidence >= READY_CONFIDENCE_THRESHOLD) return "Высокая";
+  if (confidence >= QUICK_CONFIDENCE_THRESHOLD) return "Средняя";
+  return "Низкая";
+}
+
+function levelWeight(level: ReviewSuggestionLevel) {
+  if (level === "ready") return 0;
+  if (level === "quick") return 1;
+  return 2;
+}
+
+function sameTarget(a: ReviewSuggestion, b: ReviewSuggestion) {
+  return Boolean(
+    a.categoryId &&
+      a.subcategoryId &&
+      a.categoryId === b.categoryId &&
+      a.subcategoryId === b.subcategoryId
+  );
+}
+
+function safeRulePatternFromGroup(key: string) {
+  if (!key || isUnsafeBroadPattern(key)) return null;
+  return key;
+}
+
+function isUnsafeBroadPattern(pattern: string) {
+  const tokens = normalizeReviewText(pattern).tokens;
+  return tokens.length < 2 && tokens.some((token) => COMMON_RISK_WORDS.has(token));
+}
+
+function buildNgrams(tokens: string[], size: number) {
+  const values: string[] = [];
+  for (let index = 0; index <= tokens.length - size; index += 1) {
+    values.push(tokens.slice(index, index + size).join(" "));
+  }
+  return values;
+}
+
+function buildPreviewToken(productIds: string[], categoryId: string | null, subcategoryId: string | null) {
+  return createHash("sha256")
+    .update([...productIds].sort().join("|"))
+    .update(":")
+    .update(categoryId ?? "")
+    .update(":")
+    .update(subcategoryId ?? "")
+    .digest("hex")
+    .slice(0, 32);
+}
+
+function buildReasonOptions(rows: EnrichedReviewRow[]) {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    counts.set(row.reason, (counts.get(row.reason) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 30)
+    .map(([reason, count]) => ({ reason, count }));
+}
+
+function isMissingName(row: Pick<ReviewRow, "name" | "rawName" | "shopCode">) {
+  return (
+    !row.name.trim() ||
+    row.name.trim() === row.shopCode.trim() ||
+    row.rawName.trim() === row.shopCode.trim()
+  );
+}
+
+function capitalizeWords(value: string) {
+  return value
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.slice(0, 1).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function assertLargeActionConfirmed(count: number, confirmationCount?: number | null) {
+  if (count > LARGE_ACTION_CONFIRMATION_THRESHOLD && confirmationCount !== count) {
     throw new AdminReviewBulkSafetyError(
       "count_confirmation_required",
       REVIEW_BULK_COUNT_CONFIRMATION_MESSAGE
@@ -1031,55 +1991,34 @@ function assertLargeActionConfirmed(actualCount: number, confirmationCount: numb
   }
 }
 
-function buildCategoryOptions(
-  categoryRows: {
-    id: string;
-    name: string;
-    slug: string;
-  }[],
-  subcategoryRows: {
-    id: string;
-    categoryId: string;
-    name: string;
-    slug: string;
-  }[]
-): AdminReviewCategoryOption[] {
-  const subcategoriesByCategory = new Map<string, AdminReviewCategoryOption["subcategories"]>();
-  for (const subcategory of subcategoryRows) {
-    const items = subcategoriesByCategory.get(subcategory.categoryId) ?? [];
-    items.push({
-      id: subcategory.id,
-      name: subcategory.name,
-      slug: subcategory.slug
-    });
-    subcategoriesByCategory.set(subcategory.categoryId, items);
-  }
-
-  return categoryRows.map((category) => ({
-    id: category.id,
-    name: category.name,
-    slug: category.slug,
-    subcategories: subcategoriesByCategory.get(category.id) ?? []
-  }));
-}
-
-function groupLabel(key: string) {
-  if (key === OTHER_GROUP_KEY) {
-    return "Остальные / Не сгруппировано";
-  }
-
-  return GROUP_LABELS[key] ?? key.charAt(0).toUpperCase() + key.slice(1);
+function readEnum<T extends string>(value: string | string[] | undefined, allowed: readonly T[], fallback: T): T {
+  const raw = readSingle(value);
+  return allowed.includes(raw as T) ? (raw as T) : fallback;
 }
 
 function readSingle(value: string | string[] | undefined) {
-  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
 }
 
-function readEnum<T extends string>(
-  value: string | string[] | undefined,
-  allowed: readonly T[],
-  fallback: T
-) {
-  const single = readSingle(value);
-  return allowed.includes(single as T) ? (single as T) : fallback;
+function chunked<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+export function getReviewDiagnosticFromRows(rows: Array<Pick<EnrichedReviewRow, "suggestion" | "workspaceItemStatus" | "currentCategoryId" | "currentSubcategoryId" | "name" | "rawName" | "shopCode">>) {
+  return {
+    reviewProductCount: rows.length,
+    preparedProductCount: rows.filter((row) => row.workspaceItemStatus === "pending").length,
+    excludedProductCount: rows.filter((row) => row.workspaceItemStatus === "excluded").length,
+    missingCategoryCount: rows.filter((row) => !row.currentCategoryId).length,
+    missingSubcategoryCount: rows.filter((row) => !row.currentSubcategoryId).length,
+    emptyNameCount: rows.filter((row) => isMissingName(row)).length,
+    conflictingSignalCount: rows.filter((row) => row.suggestion.conflictingSignals.length > 0).length,
+    highConfidenceCount: rows.filter((row) => row.suggestion.level === "ready").length,
+    mediumConfidenceCount: rows.filter((row) => row.suggestion.level === "quick").length,
+    manualOnlyProductCount: rows.filter((row) => row.suggestion.level === "manual").length
+  };
 }

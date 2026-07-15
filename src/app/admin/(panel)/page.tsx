@@ -1,4 +1,5 @@
 import { getAdminDashboardStats } from "@/features/admin/dashboard";
+import Link from "next/link";
 
 const numberFormatter = new Intl.NumberFormat("ru-RU");
 const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
@@ -33,7 +34,7 @@ export default async function AdminDashboardPage() {
         <h1 className="mt-2 text-3xl font-semibold">Сводка по каталогу</h1>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <StatCard label="Товаров" value={numberFormatter.format(stats.productCount)} />
         <StatCard label="Категорий" value={numberFormatter.format(stats.categoryCount)} />
         <StatCard label="Подкатегорий" value={numberFormatter.format(stats.subcategoryCount)} />
@@ -42,11 +43,35 @@ export default async function AdminDashboardPage() {
           value={numberFormatter.format(stats.reviewQueueCount)}
         />
         <StatCard
+          label="Подготовлено"
+          value={numberFormatter.format(stats.reviewPreparedCount)}
+        />
+        <StatCard
           label="Обновление каталога"
           value={stats.lastCatalogUpdate ? dateFormatter.format(stats.lastCatalogUpdate) : "Нет данных"}
           compact
         />
       </section>
+
+      {stats.reviewQueueCount > 0 || stats.reviewPreparedCount > 0 ? (
+        <section className="mt-6 rounded-card border border-[#243249] bg-[#101827] p-5">
+          <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center">
+            <div>
+              <h2 className="text-lg font-semibold">Проверка каталога</h2>
+              <p className="mt-2 text-sm leading-6 text-[#8FA1B8]">
+                В очереди {numberFormatter.format(stats.reviewQueueCount)} товаров,
+                подготовлено к публикации {numberFormatter.format(stats.reviewPreparedCount)}.
+              </p>
+            </div>
+            <Link
+              href="/admin/review"
+              className="inline-flex h-11 items-center justify-center rounded-card bg-[#73A0F5] px-5 text-sm font-semibold text-[#07101F] transition hover:bg-[#9DBDFB]"
+            >
+              Продолжить проверку
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       <section className="mt-8 rounded-card border border-[#243249] bg-[#101827]">
         <div className="border-b border-[#243249] px-5 py-4">

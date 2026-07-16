@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { catalogTaxonomy, defaultCategorizationRules } from "../src/config/catalog-taxonomy";
 import { isPublicTaxonomyTarget } from "../src/config/public-taxonomy";
 import { buildDefaultCategorizationContext, categorizeProductName } from "../src/features/categorization/engine";
+import { validateRulePattern } from "../src/features/categorization/learning";
 import type { CategorizationResult } from "../src/features/categorization/types";
 import { createAdminRedirectUrlFromParts } from "../src/middleware";
 import {
@@ -32,11 +33,17 @@ import { buildImportReport, buildPriceChangeReport } from "../src/features/impor
 import { evaluateImportSafety } from "../src/features/import/safety";
 import { SEARCH_INDEX_PREPARE_FAILED_MESSAGE } from "../src/features/search/indexing";
 import {
+  prepareSearchIndexDocumentsWithClient,
   replaceSearchIndexDocumentsWithClient,
   SEARCH_INDEX_UID,
+  swapPreparedSearchIndexWithClient,
   type SearchIndex,
   type SearchIndexClient
 } from "../src/features/search/meilisearch";
+import {
+  buildCategorySuggestion,
+  getReviewDiagnosticFromRows
+} from "../src/features/admin/review";
 import type {
   AnalyzedImportRow,
   ExistingProductSnapshot,
@@ -340,6 +347,59 @@ run("diagnostic blocker script is read-only and reports selected/blocking ids", 
   assert.match(source, /recommendedSafeAction/);
 });
 
+run("review diagnostic script is read-only and reports workspace signals", () => {
+  const source = readFileSync(
+    new URL("../scripts/diagnose-review.ts", import.meta.url),
+    "utf8"
+  );
+
+  assert.doesNotMatch(source, /\.insert\(|\.update\(|\.delete\(/);
+  assert.match(source, /activeVersionId/);
+  assert.match(source, /reviewVersionId/);
+  assert.match(source, /preparedProductCount/);
+  assert.match(source, /unsafeBroadRuleCount/);
+  assert.match(source, /recommendedAction/);
+});
+
+run("review workspace migration has production concurrency guards", () => {
+  const source = readFileSync(
+    new URL("../db/migrations/0005_review_workspaces.sql", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(source, /review_workspaces_one_open_source_idx/);
+  assert.match(source, /status IN \('open', 'publishing'\)/);
+  assert.match(source, /review_workspace_actions_preview_token_idx/);
+  assert.match(source, /WHERE preview_token IS NOT NULL/);
+  assert.doesNotMatch(source, /\bDELETE\s+FROM\b|\bDROP TABLE\b|\bTRUNCATE\b/i);
+});
+
+run("review workflow source has signed preview and publish guards", () => {
+  const source = readFileSync(
+    new URL("../src/features/admin/review.ts", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(source, /createHmac\("sha256", getAdminSessionSecret\(\)\)/);
+  assert.match(source, /workspaceId/);
+  assert.match(source, /excludedProductIds/);
+  assert.match(source, /onConflictDoNothing\(\)/);
+  assert.match(source, /status: "publishing"/);
+  assert.match(source, /search_index\.prepare_failed/);
+  assert.match(source, /search_index\.swap_failed/);
+});
+
+run("review write actions have same-origin guard", () => {
+  const source = readFileSync(
+    new URL("../src/app/admin/(panel)/review/actions.ts", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(source, /assertSameOriginReviewAction/);
+  assert.match(source, /headers\(\)/);
+  assert.match(source, /Cross-origin admin review action rejected/);
+});
+
 run("public taxonomy excludes fasteners category and rules", () => {
   assert.equal(getStaticPublicCategories().some((category) => category.slug === "krepezh"), false);
   assert.equal(catalogTaxonomy.some((category) => String(category.slug) === "krepezh"), false);
@@ -355,6 +415,84 @@ run("fastener-like single token is not auto-published as a new public category",
 
   assert.notEqual(result.target?.categorySlug, "krepezh");
   assert.equal(needsProductReview(row({ shopCode: "B-1", name: "болт м8" }), result), true);
+});
+
+run("broad review rule words are rejected across casing punctuation and forms", () => {
+  for (const pattern of [
+    "БОЛТ",
+    "гайка",
+    "шайба!!!",
+    "кольца",
+    "комплект",
+    "кронштейн",
+    "трубки",
+    "втулка",
+    "пальцы",
+    "ремкомплекты",
+    "корпуса",
+    "крышка",
+    "датчики",
+    "клапан",
+    "подшипник",
+    "сальники"
+  ]) {
+    assert.equal(validateRulePattern(pattern).ok, false, pattern);
+  }
+
+  assert.equal(validateRulePattern("болт суппорт").ok, true);
+});
+
+run("review suggestion uses contextual group instead of broad single word", () => {
+  const context = buildDefaultCategorizationContext();
+  const targetBySlug = new Map([
+    [
+      "tormoznaya-sistema/supporty",
+      {
+        categoryId: "cat-brakes",
+        categorySlug: "tormoznaya-sistema",
+        categoryName: "Тормозная система",
+        subcategoryId: "sub-calipers",
+        subcategorySlug: "supporty",
+        subcategoryName: "Суппорты"
+      }
+    ]
+  ]);
+
+  const suggestion = buildCategorySuggestion(
+    {
+      shopCode: "ТС-1",
+      name: "Болт суппорт передний",
+      rawName: "Болт суппорт передний",
+      suggestedCategoryId: null,
+      suggestedSubcategoryId: null
+    },
+    context,
+    targetBySlug
+  );
+
+  assert.equal(suggestion.level, "ready");
+  assert.equal(suggestion.categoryId, "cat-brakes");
+  assert.equal(suggestion.subcategoryId, "sub-calipers");
+  assert.equal(suggestion.rulePattern, "болт суппорт");
+});
+
+run("review diagnostics count prepared excluded and manual rows", () => {
+  const rows = [
+    reviewDiagnosticRow({ level: "ready", currentCategoryId: null, currentSubcategoryId: null }),
+    reviewDiagnosticRow({ level: "quick", workspaceItemStatus: "pending" }),
+    reviewDiagnosticRow({ level: "manual", workspaceItemStatus: "excluded", conflictingSignals: ["conflict"] })
+  ];
+  const diagnostic = getReviewDiagnosticFromRows(rows);
+
+  assert.equal(diagnostic.reviewProductCount, 3);
+  assert.equal(diagnostic.preparedProductCount, 1);
+  assert.equal(diagnostic.excludedProductCount, 1);
+  assert.equal(diagnostic.missingCategoryCount, 1);
+  assert.equal(diagnostic.missingSubcategoryCount, 1);
+  assert.equal(diagnostic.conflictingSignalCount, 1);
+  assert.equal(diagnostic.highConfidenceCount, 1);
+  assert.equal(diagnostic.mediumConfidenceCount, 1);
+  assert.equal(diagnostic.manualOnlyProductCount, 1);
 });
 
 run("new high-confidence product becomes active", () => {
@@ -588,6 +726,33 @@ async function runSearchIndexChecks() {
     assert.deepEqual(client.swaps, [[SEARCH_INDEX_UID, stagingIndexUid]]);
   });
 
+  await runAsync("prepared staging index does not change active search until swap", async () => {
+    const oldDocument = searchDocument({ id: "old-product", name: "Old product" });
+    const newDocument = searchDocument({ id: "new-product", name: "New product" });
+    const stagingIndexUid = `${SEARCH_INDEX_UID}__staging__prepared`;
+    const client = new FakeSearchIndexClient([oldDocument]);
+
+    const prepared = await prepareSearchIndexDocumentsWithClient(client, [newDocument], [], {
+      expectedDocumentCount: 1,
+      stagingIndexUid
+    });
+
+    assert.deepEqual(getFakeIndex(client, SEARCH_INDEX_UID).documents.map((document) => document.id), [
+      "old-product"
+    ]);
+    assert.deepEqual(getFakeIndex(client, stagingIndexUid).documents.map((document) => document.id), [
+      "new-product"
+    ]);
+    assert.equal(client.swaps.length, 0);
+
+    await swapPreparedSearchIndexWithClient(client, prepared);
+
+    assert.deepEqual(getFakeIndex(client, SEARCH_INDEX_UID).documents.map((document) => document.id), [
+      "new-product"
+    ]);
+    assert.deepEqual(client.swaps, [[SEARCH_INDEX_UID, stagingIndexUid]]);
+  });
+
   await runAsync("staging count mismatch blocks swap and keeps active search index", async () => {
     const oldDocument = searchDocument({ id: "old-product", name: "Old product" });
     const newDocument = searchDocument({ id: "new-product", name: "New product" });
@@ -757,6 +922,35 @@ function categorization(overrides: Partial<CategorizationResult> = {}): Categori
     needsReview: false,
     reviewReason: null,
     ...overrides
+  };
+}
+
+function reviewDiagnosticRow(overrides: {
+  level: "ready" | "quick" | "manual";
+  workspaceItemStatus?: string | null;
+  currentCategoryId?: string | null;
+  currentSubcategoryId?: string | null;
+  conflictingSignals?: string[];
+}) {
+  return {
+    suggestion: {
+      level: overrides.level,
+      confidence: overrides.level === "ready" ? 0.95 : overrides.level === "quick" ? 0.88 : 0,
+      categoryId: overrides.level === "manual" ? null : "cat-1",
+      subcategoryId: overrides.level === "manual" ? null : "sub-1",
+      categoryName: overrides.level === "manual" ? null : "Категория",
+      subcategoryName: overrides.level === "manual" ? null : "Подкатегория",
+      explanation: "test",
+      matchedSignals: [],
+      conflictingSignals: overrides.conflictingSignals ?? [],
+      rulePattern: null
+    },
+    workspaceItemStatus: overrides.workspaceItemStatus ?? null,
+    currentCategoryId: "currentCategoryId" in overrides ? overrides.currentCategoryId ?? null : "cat-1",
+    currentSubcategoryId: "currentSubcategoryId" in overrides ? overrides.currentSubcategoryId ?? null : "sub-1",
+    name: "Товар",
+    rawName: "Товар",
+    shopCode: "A-1"
   };
 }
 

@@ -1,5 +1,11 @@
 import { getSearchDocumentsForCatalogVersion, getActiveCatalogVersionId } from "./documents";
-import { buildStagingSearchIndexUid, replaceSearchIndexDocuments } from "./meilisearch";
+import {
+  buildStagingSearchIndexUid,
+  prepareSearchIndexDocuments,
+  replaceSearchIndexDocuments,
+  swapPreparedSearchIndex,
+  type PreparedSearchIndex
+} from "./meilisearch";
 import { getSearchSynonyms } from "./synonyms";
 
 export const SEARCH_INDEX_PREPARE_FAILED_MESSAGE =
@@ -11,6 +17,10 @@ export interface SyncSearchIndexResult {
   stagingIndexUid: string;
   indexedCount: number;
 }
+
+export type PreparedCatalogSearchIndex = PreparedSearchIndex & {
+  catalogVersionId: string;
+};
 
 export async function syncSearchIndexForActiveCatalog() {
   const activeVersionId = await getActiveCatalogVersionId();
@@ -39,6 +49,40 @@ export async function syncSearchIndexForCatalogVersion(
 
   return {
     catalogVersionId,
+    indexUid: result.indexUid,
+    stagingIndexUid: result.stagingIndexUid,
+    indexedCount: result.indexedCount
+  };
+}
+
+export async function prepareSearchIndexForCatalogVersion(
+  catalogVersionId: string
+): Promise<PreparedCatalogSearchIndex> {
+  const synonyms = await getSearchSynonyms();
+  const documents = await getSearchDocumentsForCatalogVersion(catalogVersionId, synonyms);
+
+  try {
+    const prepared = await prepareSearchIndexDocuments(documents, synonyms, {
+      expectedDocumentCount: documents.length,
+      stagingIndexUid: buildStagingSearchIndexUid(catalogVersionId)
+    });
+
+    return {
+      ...prepared,
+      catalogVersionId
+    };
+  } catch (error) {
+    throw new Error(SEARCH_INDEX_PREPARE_FAILED_MESSAGE, { cause: error });
+  }
+}
+
+export async function activatePreparedCatalogSearchIndex(
+  prepared: PreparedCatalogSearchIndex
+): Promise<SyncSearchIndexResult> {
+  const result = await swapPreparedSearchIndex(prepared);
+
+  return {
+    catalogVersionId: prepared.catalogVersionId,
     indexUid: result.indexUid,
     stagingIndexUid: result.stagingIndexUid,
     indexedCount: result.indexedCount

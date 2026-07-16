@@ -11,6 +11,7 @@ import {
   time,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   varchar
 } from "drizzle-orm/pg-core";
@@ -45,6 +46,23 @@ export const importStatus = pgEnum("import_status", [
   "failed"
 ]);
 export const reviewStatus = pgEnum("review_status", ["open", "resolved", "ignored"]);
+export const reviewWorkspaceStatus = pgEnum("review_workspace_status", [
+  "open",
+  "publishing",
+  "published",
+  "abandoned"
+]);
+export const reviewWorkspaceActionStatus = pgEnum("review_workspace_action_status", [
+  "applied",
+  "undone",
+  "published"
+]);
+export const reviewWorkspaceItemStatus = pgEnum("review_workspace_item_status", [
+  "pending",
+  "excluded",
+  "undone",
+  "published"
+]);
 export const ruleMatchType = pgEnum("rule_match_type", [
   "contains",
   "starts_with",
@@ -369,6 +387,117 @@ export const reviewQueue = pgTable(
   (table) => ({
     statusIdx: index("review_queue_status_idx").on(table.status),
     versionIdx: index("review_queue_version_idx").on(table.catalogVersionId)
+  })
+);
+
+export const reviewWorkspaces = pgTable(
+  "review_workspaces",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sourceCatalogVersionId: uuid("source_catalog_version_id").references(
+      () => catalogVersions.id,
+      { onDelete: "set null" }
+    ),
+    publishedCatalogVersionId: uuid("published_catalog_version_id").references(
+      () => catalogVersions.id,
+      { onDelete: "set null" }
+    ),
+    status: reviewWorkspaceStatus("status").notNull().default("open"),
+    createdBy: uuid("created_by").references(() => adminUsers.id, { onDelete: "set null" }),
+    publishedBy: uuid("published_by").references(() => adminUsers.id, { onDelete: "set null" }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    ...timestamps
+  },
+  (table) => ({
+    sourceStatusIdx: index("review_workspaces_source_status_idx").on(
+      table.sourceCatalogVersionId,
+      table.status
+    ),
+    oneOpenSourceIdx: uniqueIndex("review_workspaces_one_open_source_idx")
+      .on(table.sourceCatalogVersionId)
+      .where(
+        sql`${table.sourceCatalogVersionId} IS NOT NULL AND ${table.status} IN ('open', 'publishing')`
+      )
+  })
+);
+
+export const reviewWorkspaceActions = pgTable(
+  "review_workspace_actions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => reviewWorkspaces.id, { onDelete: "cascade" }),
+    actionType: varchar("action_type", { length: 80 }).notNull(),
+    status: reviewWorkspaceActionStatus("status").notNull().default("applied"),
+    categoryId: uuid("category_id").references(() => categories.id, { onDelete: "set null" }),
+    subcategoryId: uuid("subcategory_id").references(() => subcategories.id, {
+      onDelete: "set null"
+    }),
+    ruleId: uuid("rule_id").references(() => categorizationRules.id, { onDelete: "set null" }),
+    rulePattern: varchar("rule_pattern", { length: 255 }),
+    productCount: integer("product_count").notNull().default(0),
+    excludedCount: integer("excluded_count").notNull().default(0),
+    previewToken: varchar("preview_token", { length: 128 }),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdBy: uuid("created_by").references(() => adminUsers.id, { onDelete: "set null" }),
+    undoneAt: timestamp("undone_at", { withTimezone: true }),
+    ...timestamps
+  },
+  (table) => ({
+    workspaceStatusIdx: index("review_workspace_actions_workspace_status_idx").on(
+      table.workspaceId,
+      table.status,
+      table.createdAt
+    ),
+    previewTokenIdx: uniqueIndex("review_workspace_actions_preview_token_idx")
+      .on(table.workspaceId, table.previewToken)
+      .where(sql`${table.previewToken} IS NOT NULL`)
+  })
+);
+
+export const reviewWorkspaceItems = pgTable(
+  "review_workspace_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => reviewWorkspaces.id, { onDelete: "cascade" }),
+    actionId: uuid("action_id").references(() => reviewWorkspaceActions.id, {
+      onDelete: "set null"
+    }),
+    reviewQueueId: uuid("review_queue_id").references(() => reviewQueue.id, {
+      onDelete: "set null"
+    }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    status: reviewWorkspaceItemStatus("status").notNull().default("pending"),
+    categoryId: uuid("category_id").references(() => categories.id, { onDelete: "set null" }),
+    subcategoryId: uuid("subcategory_id").references(() => subcategories.id, {
+      onDelete: "set null"
+    }),
+    originalCategoryId: uuid("original_category_id").references(() => categories.id, {
+      onDelete: "set null"
+    }),
+    originalSubcategoryId: uuid("original_subcategory_id").references(() => subcategories.id, {
+      onDelete: "set null"
+    }),
+    originalStatus: varchar("original_status", { length: 64 }),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    ...timestamps
+  },
+  (table) => ({
+    workspaceProductUnique: unique("review_workspace_items_workspace_product_unique").on(
+      table.workspaceId,
+      table.productId
+    ),
+    workspaceStatusIdx: index("review_workspace_items_workspace_status_idx").on(
+      table.workspaceId,
+      table.status
+    ),
+    productIdx: index("review_workspace_items_product_idx").on(table.productId)
   })
 );
 

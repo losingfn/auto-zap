@@ -1,19 +1,24 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireAdminSession } from "@/features/admin/auth";
+import { env } from "@/lib/env";
 import {
   AdminReviewBulkSafetyError,
+  applyManualReviewCorrection,
   applyReviewGroupCorrection,
   applySelectedReviewCorrections,
   normalizeAdminReviewParams,
+  publishReviewWorkspace,
   reapplyCategorizationRulesToReviewQueue,
+  rollbackReviewAction,
   type AdminReviewActionFilters
 } from "@/features/admin/review";
-import { applyManualCategorizationCorrection } from "@/features/categorization/learning";
 
 export async function resolveReviewItemAction(formData: FormData) {
+  await assertSameOriginReviewAction();
   const session = await requireAdminSession();
   const reviewQueueId = String(formData.get("reviewQueueId") ?? "");
   const productId = String(formData.get("productId") ?? "");
@@ -25,7 +30,7 @@ export async function resolveReviewItemAction(formData: FormData) {
   let target = buildReviewRedirect(filters);
 
   try {
-    const result = await applyManualCategorizationCorrection({
+    const result = await applyManualReviewCorrection({
       reviewQueueId,
       productId,
       categoryId,
@@ -55,6 +60,7 @@ export async function resolveReviewItemAction(formData: FormData) {
 }
 
 export async function applyReviewGroupAction(formData: FormData) {
+  await assertSameOriginReviewAction();
   const session = await requireAdminSession();
   const filters = readReviewActionFilters(formData);
   let target = buildReviewRedirect(filters);
@@ -67,7 +73,10 @@ export async function applyReviewGroupAction(formData: FormData) {
       adminUserId: session.user.id,
       learnRule: formData.get("learnRule") === "1",
       rulePattern: String(formData.get("rulePattern") ?? "").trim(),
-      confirmationCount: readConfirmationCount(formData)
+      confirmationCount: readConfirmationCount(formData),
+      expectedCount: readNumberField(formData, "expectedCount"),
+      previewToken: readStringField(formData, "previewToken"),
+      excludedProductIds: formData.getAll("excludedProductId").map((value) => String(value))
     });
 
     revalidatePath("/admin/review");
@@ -91,6 +100,7 @@ export async function applyReviewGroupAction(formData: FormData) {
 }
 
 export async function applySelectedReviewItemsAction(formData: FormData) {
+  await assertSameOriginReviewAction();
   const session = await requireAdminSession();
   const filters = readReviewActionFilters(formData);
   let target = buildReviewRedirect(filters);
@@ -104,7 +114,8 @@ export async function applySelectedReviewItemsAction(formData: FormData) {
       adminUserId: session.user.id,
       learnRule: formData.get("learnRule") === "1",
       rulePattern: String(formData.get("rulePattern") ?? "").trim(),
-      confirmationCount: readConfirmationCount(formData)
+      confirmationCount: readConfirmationCount(formData),
+      expectedCount: readNumberField(formData, "expectedCount")
     });
 
     revalidatePath("/admin/review");
@@ -128,6 +139,7 @@ export async function applySelectedReviewItemsAction(formData: FormData) {
 }
 
 export async function reapplyReviewRulesAction(formData: FormData) {
+  await assertSameOriginReviewAction();
   const session = await requireAdminSession();
   const filters = readReviewActionFilters(formData);
   let target = buildReviewRedirect(filters);
@@ -154,6 +166,64 @@ export async function reapplyReviewRulesAction(formData: FormData) {
   redirect(target);
 }
 
+export async function undoLastReviewWorkspaceAction() {
+  await assertSameOriginReviewAction();
+  const session = await requireAdminSession();
+  let target = "/admin/review";
+
+  try {
+    const result = await rollbackReviewAction({ adminUserId: session.user.id });
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
+    target = `/admin/review?undone=${encodeURIComponent(result.undoneActionId)}&undoCount=${result.productCount}`;
+  } catch {
+    target = "/admin/review?error=undo_failed";
+  }
+
+  redirect(target);
+}
+
+export async function publishReviewWorkspaceAction() {
+  await assertSameOriginReviewAction();
+  const session = await requireAdminSession();
+  let target = "/admin/review";
+
+  try {
+    const result = await publishReviewWorkspace({ adminUserId: session.user.id });
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
+    target = `/admin/review?published=${encodeURIComponent(result.catalogVersionId)}&publishedCount=${result.publishedProductCount}`;
+  } catch {
+    target = "/admin/review?error=publish_failed";
+  }
+
+  redirect(target);
+}
+
+async function assertSameOriginReviewAction() {
+  const headerList = await headers();
+  const origin = headerList.get("origin");
+  if (!origin || origin === "null") {
+    return;
+  }
+
+  const allowedOrigins = new Set<string>();
+  const host = headerList.get("x-forwarded-host") ?? headerList.get("host");
+  const proto = headerList.get("x-forwarded-proto") ?? (host?.startsWith("localhost") ? "http" : "https");
+
+  if (host) {
+    allowedOrigins.add(`${proto}://${host}`);
+  }
+
+  if (env.APP_URL) {
+    allowedOrigins.add(new URL(env.APP_URL).origin);
+  }
+
+  if (!allowedOrigins.has(new URL(origin).origin)) {
+    throw new Error("Cross-origin admin review action rejected.");
+  }
+}
+
 function readConfirmationCount(formData: FormData) {
   const value = String(formData.get("confirmationCount") ?? "").trim();
   if (!value) {
@@ -164,6 +234,18 @@ function readConfirmationCount(formData: FormData) {
   return Number.isInteger(parsed) ? parsed : null;
 }
 
+function readNumberField(formData: FormData, name: string) {
+  const value = String(formData.get(name) ?? "").trim();
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function readStringField(formData: FormData, name: string) {
+  const value = String(formData.get(name) ?? "").trim();
+  return value || null;
+}
+
 function errorParamsForBulkFailure(error: unknown, fallback: string) {
   if (error instanceof AdminReviewBulkSafetyError) {
     const params: Record<string, string> = {
@@ -172,7 +254,9 @@ function errorParamsForBulkFailure(error: unknown, fallback: string) {
           ? "bulk_scope_forbidden"
           : error.code === "count_confirmation_required"
             ? "bulk_confirmation_required"
-            : "bulk_rule_blocked"
+            : error.code === "preview_stale"
+              ? "bulk_preview_stale"
+              : "bulk_rule_blocked"
     };
 
     if (error.ruleSkippedReason) {
@@ -215,7 +299,7 @@ function buildReviewRedirect(filters: AdminReviewActionFilters, extra?: Record<s
 
 function buildReviewSearchParams(filters: AdminReviewActionFilters) {
   const params = new URLSearchParams();
-  if (filters.scope !== "draft") params.set("scope", filters.scope);
+  if (filters.scope !== "workspace") params.set("scope", filters.scope);
   if (filters.issue !== "all") params.set("issue", filters.issue);
   if (filters.query) params.set("q", filters.query);
   if (filters.reason) params.set("reason", filters.reason);

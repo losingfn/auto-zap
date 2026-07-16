@@ -11,6 +11,7 @@ import {
   time,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   varchar
 } from "drizzle-orm/pg-core";
@@ -412,7 +413,12 @@ export const reviewWorkspaces = pgTable(
     sourceStatusIdx: index("review_workspaces_source_status_idx").on(
       table.sourceCatalogVersionId,
       table.status
-    )
+    ),
+    oneOpenSourceIdx: uniqueIndex("review_workspaces_one_open_source_idx")
+      .on(table.sourceCatalogVersionId)
+      .where(
+        sql`${table.sourceCatalogVersionId} IS NOT NULL AND ${table.status} IN ('open', 'publishing')`
+      )
   })
 );
 
@@ -444,7 +450,10 @@ export const reviewWorkspaceActions = pgTable(
       table.workspaceId,
       table.status,
       table.createdAt
-    )
+    ),
+    previewTokenIdx: uniqueIndex("review_workspace_actions_preview_token_idx")
+      .on(table.workspaceId, table.previewToken)
+      .where(sql`${table.previewToken} IS NOT NULL`)
   })
 );
 

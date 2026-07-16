@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireAdminSession } from "@/features/admin/auth";
+import { env } from "@/lib/env";
 import {
   AdminReviewBulkSafetyError,
   applyManualReviewCorrection,
@@ -16,6 +18,7 @@ import {
 } from "@/features/admin/review";
 
 export async function resolveReviewItemAction(formData: FormData) {
+  await assertSameOriginReviewAction();
   const session = await requireAdminSession();
   const reviewQueueId = String(formData.get("reviewQueueId") ?? "");
   const productId = String(formData.get("productId") ?? "");
@@ -57,6 +60,7 @@ export async function resolveReviewItemAction(formData: FormData) {
 }
 
 export async function applyReviewGroupAction(formData: FormData) {
+  await assertSameOriginReviewAction();
   const session = await requireAdminSession();
   const filters = readReviewActionFilters(formData);
   let target = buildReviewRedirect(filters);
@@ -96,6 +100,7 @@ export async function applyReviewGroupAction(formData: FormData) {
 }
 
 export async function applySelectedReviewItemsAction(formData: FormData) {
+  await assertSameOriginReviewAction();
   const session = await requireAdminSession();
   const filters = readReviewActionFilters(formData);
   let target = buildReviewRedirect(filters);
@@ -134,6 +139,7 @@ export async function applySelectedReviewItemsAction(formData: FormData) {
 }
 
 export async function reapplyReviewRulesAction(formData: FormData) {
+  await assertSameOriginReviewAction();
   const session = await requireAdminSession();
   const filters = readReviewActionFilters(formData);
   let target = buildReviewRedirect(filters);
@@ -161,6 +167,7 @@ export async function reapplyReviewRulesAction(formData: FormData) {
 }
 
 export async function undoLastReviewWorkspaceAction() {
+  await assertSameOriginReviewAction();
   const session = await requireAdminSession();
   let target = "/admin/review";
 
@@ -177,6 +184,7 @@ export async function undoLastReviewWorkspaceAction() {
 }
 
 export async function publishReviewWorkspaceAction() {
+  await assertSameOriginReviewAction();
   const session = await requireAdminSession();
   let target = "/admin/review";
 
@@ -190,6 +198,30 @@ export async function publishReviewWorkspaceAction() {
   }
 
   redirect(target);
+}
+
+async function assertSameOriginReviewAction() {
+  const headerList = await headers();
+  const origin = headerList.get("origin");
+  if (!origin || origin === "null") {
+    return;
+  }
+
+  const allowedOrigins = new Set<string>();
+  const host = headerList.get("x-forwarded-host") ?? headerList.get("host");
+  const proto = headerList.get("x-forwarded-proto") ?? (host?.startsWith("localhost") ? "http" : "https");
+
+  if (host) {
+    allowedOrigins.add(`${proto}://${host}`);
+  }
+
+  if (env.APP_URL) {
+    allowedOrigins.add(new URL(env.APP_URL).origin);
+  }
+
+  if (!allowedOrigins.has(new URL(origin).origin)) {
+    throw new Error("Cross-origin admin review action rejected.");
+  }
 }
 
 function readConfirmationCount(formData: FormData) {

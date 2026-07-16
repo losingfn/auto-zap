@@ -66,8 +66,17 @@ CREATE TABLE IF NOT EXISTS review_workspace_items (
 CREATE INDEX IF NOT EXISTS review_workspaces_source_status_idx
   ON review_workspaces(source_catalog_version_id, status);
 
+CREATE UNIQUE INDEX IF NOT EXISTS review_workspaces_one_open_source_idx
+  ON review_workspaces(source_catalog_version_id)
+  WHERE source_catalog_version_id IS NOT NULL
+    AND status IN ('open', 'publishing');
+
 CREATE INDEX IF NOT EXISTS review_workspace_actions_workspace_status_idx
   ON review_workspace_actions(workspace_id, status, created_at);
+
+CREATE UNIQUE INDEX IF NOT EXISTS review_workspace_actions_preview_token_idx
+  ON review_workspace_actions(workspace_id, preview_token)
+  WHERE preview_token IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS review_workspace_items_workspace_status_idx
   ON review_workspace_items(workspace_id, status);

@@ -209,12 +209,12 @@ export async function learnSafeCategorizationRule({
 }) {
   const candidate = requestedPattern?.trim() || suggestRulePatternForProduct(productName);
   if (!candidate) {
-    return { id: null, pattern: null, skippedReason: "no_safe_pattern" };
+    return { id: null, pattern: null, skippedReason: "no_safe_pattern", created: false };
   }
 
   const validation = validateRulePattern(candidate, { allowProductNounSingleWord });
   if (!validation.ok) {
-    return { id: null, pattern: null, skippedReason: validation.reason };
+    return { id: null, pattern: null, skippedReason: validation.reason, created: false };
   }
 
   const conflictingRules = await tx
@@ -237,7 +237,20 @@ export async function learnSafeCategorizationRule({
   );
 
   if (hasConflict) {
-    return { id: null, pattern: validation.pattern, skippedReason: "conflicting_rule" };
+    return { id: null, pattern: validation.pattern, skippedReason: "conflicting_rule", created: false };
+  }
+
+  const existingSameTarget = conflictingRules.find(
+    (rule) => rule.categoryId === categoryId && rule.subcategoryId === subcategoryId
+  );
+
+  if (existingSameTarget) {
+    return {
+      id: existingSameTarget.id,
+      pattern: validation.pattern,
+      skippedReason: null,
+      created: false
+    };
   }
 
   const [rule] = await tx
@@ -267,7 +280,8 @@ export async function learnSafeCategorizationRule({
   return {
     id: rule.id,
     pattern: validation.pattern,
-    skippedReason: null
+    skippedReason: null,
+    created: true
   };
 }
 
@@ -323,8 +337,40 @@ const UNSAFE_RULE_WORDS = new Set([
 ]);
 
 const DANGEROUS_RULE_WORDS = new Set([
+  "болт",
+  "болты",
+  "гайка",
+  "гайки",
+  "шайба",
+  "шайбы",
+  "кольцо",
+  "кольца",
   "комплект",
+  "комплекты",
+  "кронштейн",
+  "кронштейны",
+  "трубка",
+  "трубки",
+  "втулка",
+  "втулки",
+  "палец",
+  "пальцы",
   "ремкомплект",
+  "ремкомплекты",
+  "корпус",
+  "корпуса",
+  "крышка",
+  "крышки",
+  "датчик",
+  "датчики",
+  "клапан",
+  "клапаны",
+  "подшипник",
+  "подшипники",
+  "сальник",
+  "сальники",
+  "крепеж",
+  "крепёж",
   "передний",
   "передняя",
   "переднее",
@@ -361,13 +407,40 @@ const UNSAFE_SINGLE_WORD_RULES = new Set([
   "уплотнитель",
   "уплотнительное",
   "болт",
+  "болты",
   "гайка",
+  "гайки",
   "шайба",
+  "шайбы",
+  "кольца",
+  "комплект",
+  "комплекты",
+  "кронштейн",
+  "кронштейны",
+  "трубка",
+  "трубки",
   "втулка",
+  "втулки",
+  "палец",
+  "пальцы",
   "крышка",
+  "крышки",
+  "датчик",
+  "датчики",
+  "клапан",
+  "клапаны",
+  "подшипник",
+  "подшипники",
+  "сальник",
+  "сальники",
   "держатель",
   "крепление",
-  "ремкомплект"
+  "ремкомплект",
+  "ремкомплекты",
+  "корпус",
+  "корпуса",
+  "крепеж",
+  "крепёж"
 ]);
 
 const SAFE_SINGLE_WORD_RULES = new Set([

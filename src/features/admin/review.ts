@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { isPublicTaxonomyTarget } from "@/config/public-taxonomy";
 import { db } from "@/db/client";
@@ -35,6 +35,7 @@ import {
   prepareSearchIndexForCatalogVersion
 } from "@/features/search/indexing";
 import { getSearchSynonyms } from "@/features/search/synonyms";
+import { getAdminSessionSecret } from "@/features/admin/session-cookie";
 
 export const REVIEW_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
@@ -274,6 +275,8 @@ type ReviewSuggestion = {
   rulePattern: string | null;
 };
 
+type ReviewDbClient = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 const DEFAULT_PAGE_SIZE = 20;
 const LARGE_ACTION_CONFIRMATION_THRESHOLD = 100;
 const READY_CONFIDENCE_THRESHOLD = 0.92;
@@ -396,7 +399,10 @@ export function normalizeAdminReviewParams(input: Partial<Record<string, string 
   };
 }
 
-export async function getAdminReviewPageData(rawParams: Partial<Record<string, string | string[] | undefined>> = {}) {
+export async function getAdminReviewPageData(
+  rawParams: Partial<Record<string, string | string[] | undefined>> = {},
+  options: { adminUserId?: string; createWorkspaceIfNeeded?: boolean } = {}
+) {
   const params = normalizeAdminReviewParams(rawParams);
   const [versionContext, categoryRows, subcategoryRows, categorizationContext] = await Promise.all([
     getReviewVersionContext(),
@@ -406,12 +412,42 @@ export async function getAdminReviewPageData(rawParams: Partial<Record<string, s
   ]);
   const categoryOptions = buildCategoryOptions(categoryRows, subcategoryRows);
   const targetBySlug = buildTargetBySlug(categoryRows, subcategoryRows);
-  const workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null);
-  const rows = await getWorkspaceReviewRows(versionContext, workspace.id);
+  let workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null);
+  let rows = await getWorkspaceReviewRows(versionContext, workspace.id);
+
+  if (
+    options.createWorkspaceIfNeeded &&
+    options.adminUserId &&
+    !workspace.id &&
+    rows.length > 0
+  ) {
+    await ensureReviewWorkspace(versionContext.activeVersion?.id ?? null, options.adminUserId);
+    workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null);
+    rows = await getWorkspaceReviewRows(versionContext, workspace.id);
+  }
+
   const enrichedRows = rows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug));
-  const groups = buildReviewGroups(enrichedRows, categoryRows, subcategoryRows);
+  const groups = buildReviewGroups(enrichedRows, categoryRows, subcategoryRows, workspace.id, {
+    scope: "workspace",
+    issue: "all",
+    query: "",
+    reason: "",
+    group: ""
+  });
   const selectedGroup = params.group
-    ? groups.find((group) => group.key === params.group) ?? null
+    ? buildReviewGroups(
+        filterReviewRows(enrichedRows, params),
+        categoryRows,
+        subcategoryRows,
+        workspace.id,
+        {
+          scope: params.scope,
+          issue: params.issue,
+          query: params.query,
+          reason: params.reason,
+          group: params.group
+        }
+      ).find((group) => group.key === params.group) ?? null
     : null;
   const filteredRows = filterReviewRows(enrichedRows, params);
   const offset = (params.page - 1) * params.pageSize;
@@ -503,7 +539,9 @@ export async function previewReviewRuleImpact(input: {
   subcategoryId: string;
   excludedProductIds?: string[];
 }) {
-  const rows = await getActionRows(input.filters);
+  const versionContext = await getReviewVersionContext();
+  const workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null);
+  const rows = await getActionRows(input.filters, undefined, workspace.id);
   const excluded = new Set(input.excludedProductIds ?? []);
   const impactedRows = rows.filter((row) => !excluded.has(row.productId));
   const target = await validateCategoryTarget(input.categoryId, input.subcategoryId);
@@ -514,11 +552,14 @@ export async function previewReviewRuleImpact(input: {
     excludedProductCount: excluded.size,
     categoryName: target.category.name,
     subcategoryName: target.subcategory.name,
-    previewToken: buildPreviewToken(
-      impactedRows.map((row) => row.productId),
-      input.categoryId,
-      input.subcategoryId
-    ),
+    previewToken: buildPreviewToken({
+      workspaceId: workspace.id,
+      filters: input.filters,
+      productIds: impactedRows.map((row) => row.productId),
+      excludedProductIds: [...excluded],
+      categoryId: input.categoryId,
+      subcategoryId: input.subcategoryId
+    }),
     examples: impactedRows.slice(0, 10).map((row) => `${row.shopCode} · ${row.name}`)
   };
 }
@@ -689,7 +730,7 @@ export async function rollbackReviewAction(input: {
       })
       .where(eq(reviewWorkspaceItems.actionId, latestAction.id));
 
-    if (latestAction.ruleId) {
+    if (latestAction.ruleId && wasRuleCreatedByReviewAction(latestAction.metadata)) {
       await tx
         .update(categorizationRules)
         .set({ isActive: false, updatedAt: new Date() })
@@ -744,6 +785,19 @@ export async function publishReviewWorkspace(input: { adminUserId: string }) {
   }).length;
 
   await db.transaction(async (tx) => {
+    const [claimedWorkspace] = await tx
+      .update(reviewWorkspaces)
+      .set({ status: "publishing", updatedAt: new Date() })
+      .where(and(eq(reviewWorkspaces.id, workspace.id), eq(reviewWorkspaces.status, "open")))
+      .returning({ id: reviewWorkspaces.id });
+
+    if (!claimedWorkspace) {
+      throw new AdminReviewBulkSafetyError(
+        "preview_stale",
+        "Рабочая сессия уже публикуется или была опубликована."
+      );
+    }
+
     await tx.insert(catalogVersions).values({
       id: newVersionId,
       status: "draft",
@@ -835,66 +889,146 @@ export async function publishReviewWorkspace(input: { adminUserId: string }) {
     }
   });
 
-  const preparedSearchIndex = await prepareSearchIndexForCatalogVersion(newVersionId);
+  let preparedSearchIndex: Awaited<ReturnType<typeof prepareSearchIndexForCatalogVersion>>;
+  try {
+    preparedSearchIndex = await prepareSearchIndexForCatalogVersion(newVersionId);
+  } catch (error) {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(catalogVersions)
+        .set({ status: "rolled_back", updatedAt: new Date() })
+        .where(eq(catalogVersions.id, newVersionId));
 
-  await db.transaction(async (tx) => {
-    await tx
-      .update(catalogVersions)
-      .set({ status: "archived", updatedAt: new Date() })
-      .where(and(eq(catalogVersions.status, "active"), ne(catalogVersions.id, newVersionId)));
+      await tx
+        .update(reviewWorkspaces)
+        .set({ status: "open", updatedAt: new Date() })
+        .where(eq(reviewWorkspaces.id, workspace.id));
 
-    await tx
-      .update(catalogVersions)
-      .set({ status: "active", publishedAt: now, updatedAt: new Date() })
-      .where(eq(catalogVersions.id, newVersionId));
+      await tx.insert(auditLogs).values({
+        adminUserId: input.adminUserId,
+        action: "review.workspace.search_index.prepare_failed",
+        entityType: "review_workspace",
+        entityId: workspace.id,
+        metadata: {
+          catalogVersionId: newVersionId,
+          error: error instanceof Error ? error.message : String(error)
+        }
+      });
+    });
 
-    await tx
-      .update(reviewWorkspaces)
-      .set({
-        status: "published",
-        publishedCatalogVersionId: newVersionId,
-        publishedBy: input.adminUserId,
-        publishedAt: now,
-        updatedAt: new Date()
-      })
-      .where(eq(reviewWorkspaces.id, workspace.id));
+    throw error;
+  }
 
-    await tx
-      .update(reviewWorkspaceActions)
-      .set({ status: "published", updatedAt: new Date() })
-      .where(and(eq(reviewWorkspaceActions.workspaceId, workspace.id), eq(reviewWorkspaceActions.status, "applied")));
+  try {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(catalogVersions)
+        .set({ status: "archived", updatedAt: new Date() })
+        .where(and(eq(catalogVersions.status, "active"), ne(catalogVersions.id, newVersionId)));
 
-    await tx
-      .update(reviewWorkspaceItems)
-      .set({ status: "published", updatedAt: new Date() })
-      .where(and(eq(reviewWorkspaceItems.workspaceId, workspace.id), eq(reviewWorkspaceItems.status, "pending")));
+      await tx
+        .update(catalogVersions)
+        .set({ status: "active", publishedAt: now, updatedAt: new Date() })
+        .where(eq(catalogVersions.id, newVersionId));
 
-    await tx
-      .update(reviewQueue)
-      .set({ status: "resolved", resolvedBy: input.adminUserId, resolvedAt: now, updatedAt: now })
-      .where(
-        inArray(
-          reviewQueue.productId,
-          pendingRows.map((row) => row.productId)
-        )
-      );
+      const [publishedWorkspace] = await tx
+        .update(reviewWorkspaces)
+        .set({
+          status: "published",
+          publishedCatalogVersionId: newVersionId,
+          publishedBy: input.adminUserId,
+          publishedAt: now,
+          updatedAt: new Date()
+        })
+        .where(and(eq(reviewWorkspaces.id, workspace.id), eq(reviewWorkspaces.status, "publishing")))
+        .returning({ id: reviewWorkspaces.id });
 
-    await tx.insert(auditLogs).values({
+      if (!publishedWorkspace) {
+        throw new AdminReviewBulkSafetyError(
+          "preview_stale",
+          "Рабочая сессия уже была изменена во время публикации."
+        );
+      }
+
+      await tx
+        .update(reviewWorkspaceActions)
+        .set({ status: "published", updatedAt: new Date() })
+        .where(and(eq(reviewWorkspaceActions.workspaceId, workspace.id), eq(reviewWorkspaceActions.status, "applied")));
+
+      await tx
+        .update(reviewWorkspaceItems)
+        .set({ status: "published", updatedAt: new Date() })
+        .where(and(eq(reviewWorkspaceItems.workspaceId, workspace.id), eq(reviewWorkspaceItems.status, "pending")));
+
+      await tx
+        .update(reviewQueue)
+        .set({ status: "resolved", resolvedBy: input.adminUserId, resolvedAt: now, updatedAt: now })
+        .where(
+          inArray(
+            reviewQueue.productId,
+            pendingRows.map((row) => row.productId)
+          )
+        );
+
+      await tx.insert(auditLogs).values({
+        adminUserId: input.adminUserId,
+        action: "review.workspace.publish",
+        entityType: "review_workspace",
+        entityId: workspace.id,
+        metadata: {
+          previousActiveVersionId: versionContext.activeVersion!.id,
+          newCatalogVersionId: newVersionId,
+          productCount: pendingRows.length,
+          remainingReviewCount,
+          preparedSearchIndex
+        }
+      });
+    });
+  } catch (error) {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(catalogVersions)
+        .set({ status: "rolled_back", updatedAt: new Date() })
+        .where(eq(catalogVersions.id, newVersionId));
+
+      await tx
+        .update(reviewWorkspaces)
+        .set({ status: "open", updatedAt: new Date() })
+        .where(eq(reviewWorkspaces.id, workspace.id));
+
+      await tx.insert(auditLogs).values({
+        adminUserId: input.adminUserId,
+        action: "review.workspace.publish_db_failed",
+        entityType: "review_workspace",
+        entityId: workspace.id,
+        metadata: {
+          catalogVersionId: newVersionId,
+          preparedSearchIndex,
+          error: error instanceof Error ? error.message : String(error)
+        }
+      });
+    });
+
+    throw error;
+  }
+
+  let searchResult: Awaited<ReturnType<typeof activatePreparedCatalogSearchIndex>>;
+  try {
+    searchResult = await activatePreparedCatalogSearchIndex(preparedSearchIndex);
+  } catch (error) {
+    await db.insert(auditLogs).values({
       adminUserId: input.adminUserId,
-      action: "review.workspace.publish",
-      entityType: "review_workspace",
-      entityId: workspace.id,
+      action: "review.workspace.search_index.swap_failed",
+      entityType: "catalog_version",
+      entityId: newVersionId,
       metadata: {
-        previousActiveVersionId: versionContext.activeVersion!.id,
-        newCatalogVersionId: newVersionId,
-        productCount: pendingRows.length,
-        remainingReviewCount,
-        preparedSearchIndex
+        preparedSearchIndex,
+        error: error instanceof Error ? error.message : String(error)
       }
     });
-  });
 
-  const searchResult = await activatePreparedCatalogSearchIndex(preparedSearchIndex);
+    throw error;
+  }
 
   await db.insert(auditLogs).values({
     adminUserId: input.adminUserId,
@@ -953,8 +1087,33 @@ async function applyReviewRuleToWorkspace(input: {
   allowProductNounSingleWordRule: boolean;
 }) {
   await validateCategoryTarget(input.categoryId, input.subcategoryId);
-  const rows = await getActionRows(input.filters, input.reviewQueueIds);
+  const versionContext = await getReviewVersionContext();
+  const workspace = await ensureReviewWorkspace(versionContext.activeVersion?.id ?? null, input.adminUserId);
+
+  if (input.previewToken) {
+    const existingAction = await getWorkspaceActionByPreviewToken(workspace.id, input.previewToken);
+    if (existingAction?.status === "applied") {
+      return {
+        processed: existingAction.productCount,
+        remaining: 0,
+        learnedRuleId: existingAction.ruleId,
+        learnedRulePattern: existingAction.rulePattern,
+        learnedRuleSkippedReason: "duplicate_submit",
+        workspaceId: workspace.id
+      };
+    }
+
+    if (existingAction) {
+      throw new AdminReviewBulkSafetyError("preview_stale", REVIEW_PREVIEW_STALE_MESSAGE);
+    }
+  }
+
+  const rows = await getActionRows(input.filters, input.reviewQueueIds, workspace.id);
   const excluded = new Set(input.excludedProductIds ?? []);
+  const excludedRows = rows.filter((row) => excluded.has(row.productId));
+  if (excluded.size !== excludedRows.length) {
+    throw new AdminReviewBulkSafetyError("preview_stale", REVIEW_PREVIEW_STALE_MESSAGE);
+  }
   const impactedRows = rows.filter((row) => !excluded.has(row.productId));
 
   assertLargeActionConfirmed(impactedRows.length, input.confirmationCount);
@@ -963,28 +1122,64 @@ async function applyReviewRuleToWorkspace(input: {
     throw new AdminReviewBulkSafetyError("preview_stale", REVIEW_PREVIEW_STALE_MESSAGE);
   }
 
+  const previewToken = buildPreviewToken({
+    workspaceId: workspace.id,
+    filters: input.filters,
+    productIds: impactedRows.map((row) => row.productId),
+    excludedProductIds: [...excluded],
+    categoryId: input.categoryId,
+    subcategoryId: input.subcategoryId
+  });
+
   if (input.previewToken) {
-    const actualToken = buildPreviewToken(
-      impactedRows.map((row) => row.productId),
-      input.categoryId,
-      input.subcategoryId
-    );
-    if (actualToken !== input.previewToken) {
+    if (previewToken !== input.previewToken) {
       throw new AdminReviewBulkSafetyError("preview_stale", REVIEW_PREVIEW_STALE_MESSAGE);
     }
+  } else if (!input.reviewQueueIds) {
+    throw new AdminReviewBulkSafetyError("preview_stale", REVIEW_PREVIEW_STALE_MESSAGE);
   }
 
   if (impactedRows.length === 0) {
     throw new Error("В выбранной очереди нет товаров для применения.");
   }
 
-  const versionContext = await getReviewVersionContext();
-  const workspace = await ensureReviewWorkspace(versionContext.activeVersion?.id ?? null, input.adminUserId);
   let learnedRuleId: string | null = null;
   let learnedRulePattern: string | null = null;
+  let learnedRuleCreated = false;
   let learnedRuleSkippedReason: string | null = input.learnRule ? "no_safe_pattern" : "disabled";
+  const duplicateAction = await db.transaction(async (tx) => {
+    const [action] = await tx
+      .insert(reviewWorkspaceActions)
+      .values({
+        workspaceId: workspace.id,
+        actionType: input.actionType,
+        categoryId: input.categoryId,
+        subcategoryId: input.subcategoryId,
+        productCount: impactedRows.length,
+        excludedCount: excluded.size,
+        previewToken,
+        createdBy: input.adminUserId,
+        metadata: {
+          filters: input.filters,
+          excludedProductIds: [...excluded]
+        }
+      })
+      .onConflictDoNothing()
+      .returning({ id: reviewWorkspaceActions.id });
 
-  await db.transaction(async (tx) => {
+    if (!action) {
+      const existingAction = await getWorkspaceActionByPreviewToken(workspace.id, previewToken, tx);
+      if (existingAction?.status === "applied") {
+        return {
+          productCount: existingAction.productCount,
+          ruleId: existingAction.ruleId,
+          rulePattern: existingAction.rulePattern
+        };
+      }
+
+      throw new AdminReviewBulkSafetyError("preview_stale", REVIEW_PREVIEW_STALE_MESSAGE);
+    }
+
     if (input.learnRule) {
       const learnedRule = await learnSafeCategorizationRule({
         tx,
@@ -998,6 +1193,7 @@ async function applyReviewRuleToWorkspace(input: {
 
       learnedRuleId = learnedRule.id;
       learnedRulePattern = learnedRule.pattern;
+      learnedRuleCreated = learnedRule.created;
       learnedRuleSkippedReason = learnedRule.skippedReason;
 
       if (learnedRuleSkippedReason) {
@@ -1007,31 +1203,34 @@ async function applyReviewRuleToWorkspace(input: {
           learnedRuleSkippedReason
         );
       }
-    }
 
-    const [action] = await tx
-      .insert(reviewWorkspaceActions)
-      .values({
-        workspaceId: workspace.id,
-        actionType: input.actionType,
-        categoryId: input.categoryId,
-        subcategoryId: input.subcategoryId,
-        ruleId: learnedRuleId,
-        rulePattern: learnedRulePattern ?? input.rulePattern ?? null,
-        productCount: impactedRows.length,
-        excludedCount: excluded.size,
-        previewToken: buildPreviewToken(
-          impactedRows.map((row) => row.productId),
-          input.categoryId,
-          input.subcategoryId
-        ),
-        createdBy: input.adminUserId,
-        metadata: {
-          filters: input.filters,
-          excludedProductIds: [...excluded]
-        }
-      })
-      .returning({ id: reviewWorkspaceActions.id });
+      await tx
+        .update(reviewWorkspaceActions)
+        .set({
+          ruleId: learnedRuleId,
+          rulePattern: learnedRulePattern,
+          metadata: {
+            filters: input.filters,
+            excludedProductIds: [...excluded],
+            learnedRuleCreated
+          },
+          updatedAt: new Date()
+        })
+        .where(eq(reviewWorkspaceActions.id, action.id));
+    } else if (input.rulePattern) {
+      await tx
+        .update(reviewWorkspaceActions)
+        .set({
+          rulePattern: input.rulePattern,
+          metadata: {
+            filters: input.filters,
+            excludedProductIds: [...excluded],
+            learnedRuleCreated: false
+          },
+          updatedAt: new Date()
+        })
+        .where(eq(reviewWorkspaceActions.id, action.id));
+    }
 
     for (const chunk of chunked(impactedRows, 1000)) {
       await tx
@@ -1067,7 +1266,6 @@ async function applyReviewRuleToWorkspace(input: {
     }
 
     if (excluded.size > 0) {
-      const excludedRows = rows.filter((row) => excluded.has(row.productId));
       for (const chunk of chunked(excludedRows, 1000)) {
         await tx
           .insert(reviewWorkspaceItems)
@@ -1109,10 +1307,24 @@ async function applyReviewRuleToWorkspace(input: {
         excludedCount: excluded.size,
         learnedRuleId,
         learnedRulePattern,
+        learnedRuleCreated,
         learnedRuleSkippedReason
       }
     });
+
+    return null;
   });
+
+  if (duplicateAction) {
+    return {
+      processed: duplicateAction.productCount,
+      remaining: 0,
+      learnedRuleId: duplicateAction.ruleId,
+      learnedRulePattern: duplicateAction.rulePattern,
+      learnedRuleSkippedReason: "duplicate_submit",
+      workspaceId: workspace.id
+    };
+  }
 
   const postCount = await countWorkspaceItems(workspace.id, "pending");
   if (postCount < impactedRows.length) {
@@ -1214,13 +1426,19 @@ async function getWorkspaceReviewRows(versionContext: VersionContext, workspaceI
   return rows as ReviewRow[];
 }
 
-async function getActionRows(filters: AdminReviewActionFilters, reviewQueueIds?: string[]) {
+async function getActionRows(
+  filters: AdminReviewActionFilters,
+  reviewQueueIds?: string[],
+  workspaceIdOverride?: string | null
+) {
   const [versionContext, categorizationContext, targetBySlug] = await Promise.all([
     getReviewVersionContext(),
     getCategorizationContext(),
     getTargetBySlugFromDb()
   ]);
-  const workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null);
+  const workspace = workspaceIdOverride === undefined
+    ? await getReviewWorkspace(versionContext.activeVersion?.id ?? null)
+    : { id: workspaceIdOverride };
   const rows = reviewQueueIds
     ? await getRowsByReviewIds(reviewQueueIds, workspace.id)
     : await getWorkspaceReviewRows(versionContext, workspace.id);
@@ -1389,7 +1607,9 @@ export function buildCategorySuggestion(
 function buildReviewGroups(
   rows: EnrichedReviewRow[],
   categoryRows: Awaited<ReturnType<typeof getActiveCategories>>,
-  subcategoryRows: Awaited<ReturnType<typeof getActiveSubcategories>>
+  subcategoryRows: Awaited<ReturnType<typeof getActiveSubcategories>>,
+  workspaceId: string | null,
+  filters: AdminReviewActionFilters
 ): AdminReviewGroup[] {
   const categoryById = new Map(categoryRows.map((category) => [category.id, category]));
   const subcategoryById = new Map(subcategoryRows.map((subcategory) => [subcategory.id, subcategory]));
@@ -1446,9 +1666,14 @@ function buildReviewGroups(
             ? "Правило слишком общее. Добавьте уточняющее слово, например узел или модель автомобиля."
             : null,
         previewToken: buildPreviewToken(
-          safeRows.map((row) => row.productId),
-          bestSuggestion.categoryId,
-          bestSuggestion.subcategoryId
+          {
+            workspaceId,
+            filters: { ...filters, group: key },
+            productIds: safeRows.map((row) => row.productId),
+            excludedProductIds: [],
+            categoryId: bestSuggestion.categoryId,
+            subcategoryId: bestSuggestion.subcategoryId
+          }
         ),
         sampleProducts: groupRows.slice(0, 10).map((row) => ({
           reviewId: row.reviewId,
@@ -1685,7 +1910,17 @@ async function ensureReviewWorkspace(sourceCatalogVersionId: string | null, admi
         createdFrom: "active_needs_review"
       }
     })
+    .onConflictDoNothing()
     .returning({ id: reviewWorkspaces.id });
+
+  if (!workspace) {
+    const existingAfterConflict = await getOpenWorkspaceRow(sourceCatalogVersionId);
+    if (existingAfterConflict) {
+      return existingAfterConflict;
+    }
+
+    throw new Error("Не удалось создать рабочую сессию проверки.");
+  }
 
   await db.insert(auditLogs).values({
     adminUserId,
@@ -1739,12 +1974,38 @@ async function getLatestWorkspaceAction(workspaceId: string) {
     .select({
       id: reviewWorkspaceActions.id,
       productCount: reviewWorkspaceActions.productCount,
-      ruleId: reviewWorkspaceActions.ruleId
+      ruleId: reviewWorkspaceActions.ruleId,
+      metadata: reviewWorkspaceActions.metadata
     })
     .from(reviewWorkspaceActions)
     .where(and(eq(reviewWorkspaceActions.workspaceId, workspaceId), eq(reviewWorkspaceActions.status, "applied")))
     .orderBy(desc(reviewWorkspaceActions.createdAt))
     .limit(1);
+  return action ?? null;
+}
+
+async function getWorkspaceActionByPreviewToken(
+  workspaceId: string,
+  previewToken: string,
+  client: ReviewDbClient = db
+) {
+  const [action] = await client
+    .select({
+      id: reviewWorkspaceActions.id,
+      status: reviewWorkspaceActions.status,
+      productCount: reviewWorkspaceActions.productCount,
+      ruleId: reviewWorkspaceActions.ruleId,
+      rulePattern: reviewWorkspaceActions.rulePattern
+    })
+    .from(reviewWorkspaceActions)
+    .where(
+      and(
+        eq(reviewWorkspaceActions.workspaceId, workspaceId),
+        eq(reviewWorkspaceActions.previewToken, previewToken)
+      )
+    )
+    .limit(1);
+
   return action ?? null;
 }
 
@@ -1926,6 +2187,15 @@ function sameTarget(a: ReviewSuggestion, b: ReviewSuggestion) {
   );
 }
 
+function wasRuleCreatedByReviewAction(metadata: unknown) {
+  return (
+    typeof metadata === "object" &&
+    metadata !== null &&
+    "learnedRuleCreated" in metadata &&
+    (metadata as { learnedRuleCreated?: unknown }).learnedRuleCreated === true
+  );
+}
+
 function safeRulePatternFromGroup(key: string) {
   if (!key || isUnsafeBroadPattern(key)) return null;
   return key;
@@ -1944,15 +2214,35 @@ function buildNgrams(tokens: string[], size: number) {
   return values;
 }
 
-function buildPreviewToken(productIds: string[], categoryId: string | null, subcategoryId: string | null) {
-  return createHash("sha256")
-    .update([...productIds].sort().join("|"))
-    .update(":")
-    .update(categoryId ?? "")
-    .update(":")
-    .update(subcategoryId ?? "")
+function buildPreviewToken(input: {
+  workspaceId: string | null;
+  filters: AdminReviewActionFilters;
+  productIds: string[];
+  excludedProductIds: string[];
+  categoryId: string | null;
+  subcategoryId: string | null;
+}) {
+  const payload = {
+    version: 2,
+    workspaceId: input.workspaceId ?? "no-workspace",
+    filters: {
+      scope: input.filters.scope,
+      issue: input.filters.issue,
+      query: input.filters.query,
+      reason: input.filters.reason,
+      group: input.filters.group
+    },
+    productIds: [...input.productIds].sort(),
+    excludedProductIds: [...input.excludedProductIds].sort(),
+    count: input.productIds.length,
+    categoryId: input.categoryId ?? "",
+    subcategoryId: input.subcategoryId ?? ""
+  };
+
+  return createHmac("sha256", getAdminSessionSecret())
+    .update(JSON.stringify(payload))
     .digest("hex")
-    .slice(0, 32);
+    .slice(0, 48);
 }
 
 function buildReasonOptions(rows: EnrichedReviewRow[]) {

@@ -9,6 +9,7 @@ import {
   type AdminReviewItem,
   type AdminReviewParams
 } from "@/features/admin/review";
+import { requireAdminSession } from "@/features/admin/auth";
 import {
   publishReviewWorkspaceAction,
   resolveReviewItemAction,
@@ -80,8 +81,12 @@ const errorLabels: Record<string, string> = {
 };
 
 export default async function AdminReviewPage({ searchParams }: ReviewPageProps) {
+  const session = await requireAdminSession();
   const params = await searchParams;
-  const data = await getAdminReviewPageData(params);
+  const data = await getAdminReviewPageData(params, {
+    adminUserId: session.user.id,
+    createWorkspaceIfNeeded: true
+  });
   const filters = toActionFilters(data.params);
 
   return (

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { catalogTaxonomy, defaultCategorizationRules } from "../src/config/catalog-taxonomy";
 import { isPublicTaxonomyTarget } from "../src/config/public-taxonomy";
 import { buildDefaultCategorizationContext, categorizeProductName } from "../src/features/categorization/engine";
+import { validateRulePattern } from "../src/features/categorization/learning";
 import type { CategorizationResult } from "../src/features/categorization/types";
 import { createAdminRedirectUrlFromParts } from "../src/middleware";
 import {
@@ -360,6 +361,45 @@ run("review diagnostic script is read-only and reports workspace signals", () =>
   assert.match(source, /recommendedAction/);
 });
 
+run("review workspace migration has production concurrency guards", () => {
+  const source = readFileSync(
+    new URL("../db/migrations/0005_review_workspaces.sql", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(source, /review_workspaces_one_open_source_idx/);
+  assert.match(source, /status IN \('open', 'publishing'\)/);
+  assert.match(source, /review_workspace_actions_preview_token_idx/);
+  assert.match(source, /WHERE preview_token IS NOT NULL/);
+  assert.doesNotMatch(source, /\bDELETE\s+FROM\b|\bDROP TABLE\b|\bTRUNCATE\b/i);
+});
+
+run("review workflow source has signed preview and publish guards", () => {
+  const source = readFileSync(
+    new URL("../src/features/admin/review.ts", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(source, /createHmac\("sha256", getAdminSessionSecret\(\)\)/);
+  assert.match(source, /workspaceId/);
+  assert.match(source, /excludedProductIds/);
+  assert.match(source, /onConflictDoNothing\(\)/);
+  assert.match(source, /status: "publishing"/);
+  assert.match(source, /search_index\.prepare_failed/);
+  assert.match(source, /search_index\.swap_failed/);
+});
+
+run("review write actions have same-origin guard", () => {
+  const source = readFileSync(
+    new URL("../src/app/admin/(panel)/review/actions.ts", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(source, /assertSameOriginReviewAction/);
+  assert.match(source, /headers\(\)/);
+  assert.match(source, /Cross-origin admin review action rejected/);
+});
+
 run("public taxonomy excludes fasteners category and rules", () => {
   assert.equal(getStaticPublicCategories().some((category) => category.slug === "krepezh"), false);
   assert.equal(catalogTaxonomy.some((category) => String(category.slug) === "krepezh"), false);
@@ -375,6 +415,31 @@ run("fastener-like single token is not auto-published as a new public category",
 
   assert.notEqual(result.target?.categorySlug, "krepezh");
   assert.equal(needsProductReview(row({ shopCode: "B-1", name: "болт м8" }), result), true);
+});
+
+run("broad review rule words are rejected across casing punctuation and forms", () => {
+  for (const pattern of [
+    "БОЛТ",
+    "гайка",
+    "шайба!!!",
+    "кольца",
+    "комплект",
+    "кронштейн",
+    "трубки",
+    "втулка",
+    "пальцы",
+    "ремкомплекты",
+    "корпуса",
+    "крышка",
+    "датчики",
+    "клапан",
+    "подшипник",
+    "сальники"
+  ]) {
+    assert.equal(validateRulePattern(pattern).ok, false, pattern);
+  }
+
+  assert.equal(validateRulePattern("болт суппорт").ok, true);
 });
 
 run("review suggestion uses contextual group instead of broad single word", () => {

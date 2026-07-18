@@ -5,12 +5,13 @@ import {
   defaultCategorizationRules,
   deprecatedCategorizationRules
 } from "../src/config/catalog-taxonomy";
+import { isHiddenPublicSubcategory } from "../src/config/public-taxonomy";
 
 const outputPath = path.resolve("db/seeds/002_taxonomy_rules.sql");
 
 const subcategoryValues = catalogTaxonomy.flatMap((category) =>
   category.subcategories.map(([slug, name], index) =>
-    tuple([category.slug, slug, name, (index + 1) * 10])
+    tuple([category.slug, slug, name, (index + 1) * 10, isHiddenPublicSubcategory(category.slug, slug)])
   )
 );
 
@@ -27,18 +28,19 @@ const deprecatedRuleValues = deprecatedCategorizationRules.map((rule) =>
   ])
 );
 
-const contents = `WITH subcategory_seed(category_slug, slug, name, sort_order) AS (
+const contents = `WITH subcategory_seed(category_slug, slug, name, sort_order, is_hidden) AS (
   VALUES
 ${subcategoryValues.join(",\n")}
 )
-INSERT INTO subcategories (category_id, slug, name, sort_order)
-SELECT categories.id, subcategory_seed.slug, subcategory_seed.name, subcategory_seed.sort_order
+INSERT INTO subcategories (category_id, slug, name, sort_order, is_hidden)
+SELECT categories.id, subcategory_seed.slug, subcategory_seed.name, subcategory_seed.sort_order, subcategory_seed.is_hidden
 FROM subcategory_seed
 JOIN categories ON categories.slug = subcategory_seed.category_slug
 ON CONFLICT (category_id, slug) DO UPDATE
 SET
   name = EXCLUDED.name,
   sort_order = EXCLUDED.sort_order,
+  is_hidden = EXCLUDED.is_hidden,
   updated_at = now();
 
 WITH rule_seed(pattern, category_slug, subcategory_slug, priority) AS (
@@ -93,13 +95,17 @@ WHERE
 writeFileSync(outputPath, contents);
 console.log(`Updated ${path.relative(process.cwd(), outputPath)}`);
 
-function tuple(values: Array<string | number | null>) {
+function tuple(values: Array<string | number | boolean | null>) {
   return `    (${values.map(toSqlValue).join(", ")})`;
 }
 
-function toSqlValue(value: string | number | null) {
+function toSqlValue(value: string | number | boolean | null) {
   if (value === null) {
     return "NULL";
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
   }
 
   return typeof value === "number" ? String(value) : sqlString(value);

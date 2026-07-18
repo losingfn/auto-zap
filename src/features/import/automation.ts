@@ -4,6 +4,10 @@ import {
 } from "@/features/categorization/types";
 import type { AnalyzedImportRow, ExistingProductSnapshot } from "./types";
 
+export function isDoNotPublishCategorization(categorization: CategorizationResult) {
+  return categorization.decisionStatus === "DO_NOT_PUBLISH";
+}
+
 export function needsProductReview(
   row: Pick<AnalyzedImportRow, "status">,
   categorization: CategorizationResult
@@ -12,11 +16,41 @@ export function needsProductReview(
     return false;
   }
 
+  if (categorization.decisionStatus === "AUTO_READY") {
+    return false;
+  }
+
+  if (isDoNotPublishCategorization(categorization)) {
+    return true;
+  }
+
+  if (
+    categorization.decisionStatus === "GROUP_REVIEW" ||
+    categorization.decisionStatus === "MANUAL_REVIEW" ||
+    categorization.decisionStatus === "BLOCKED_CONFLICT" ||
+    categorization.decisionStatus === "INVALID_INPUT"
+  ) {
+    return true;
+  }
+
   if (row.status === "needs_review" || categorization.needsReview) {
     return true;
   }
 
   return !isHighConfidencePublishableCategorization(categorization);
+}
+
+export function resolveDraftProductStatus(
+  row: Pick<AnalyzedImportRow, "status">,
+  categorization: CategorizationResult
+) {
+  if (isDoNotPublishCategorization(categorization)) {
+    return "invalid" as const;
+  }
+
+  return needsProductReview(row, categorization)
+    ? ("needs_review" as const)
+    : ("active" as const);
 }
 
 export function resolveImportProductName(

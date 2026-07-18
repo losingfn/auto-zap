@@ -1,0 +1,4355 @@
+{
+  "count": 1159,
+  "byReason": [
+    {
+      "key": "no_candidate",
+      "count": 769
+    },
+    {
+      "key": "CODE_ONLY",
+      "count": 125
+    },
+    {
+      "key": "UNKNOWN_PRODUCT_TYPE",
+      "count": 122
+    },
+    {
+      "key": "close_candidates",
+      "count": 99
+    },
+    {
+      "key": "negative_evidence",
+      "count": 43
+    },
+    {
+      "key": "SIZE_ONLY",
+      "count": 1
+    }
+  ],
+  "byFamily": [
+    {
+      "key": "other",
+      "count": 840
+    },
+    {
+      "key": "socket_head_fasteners",
+      "count": 40
+    },
+    {
+      "key": "pneumatic_fittings",
+      "count": 38
+    },
+    {
+      "key": "screws",
+      "count": 33
+    },
+    {
+      "key": "caps_plugs",
+      "count": 31
+    },
+    {
+      "key": "hoses",
+      "count": 23
+    },
+    {
+      "key": "fittings",
+      "count": 20
+    },
+    {
+      "key": "personal_accessories",
+      "count": 15
+    },
+    {
+      "key": "bolts",
+      "count": 14
+    },
+    {
+      "key": "ventilation",
+      "count": 12
+    },
+    {
+      "key": "body_clips",
+      "count": 11
+    },
+    {
+      "key": "bushings",
+      "count": 11
+    },
+    {
+      "key": "seat_parts",
+      "count": 9
+    },
+    {
+      "key": "conditioner_parts",
+      "count": 8
+    },
+    {
+      "key": "nuts",
+      "count": 8
+    },
+    {
+      "key": "driver_electronics",
+      "count": 7
+    },
+    {
+      "key": "tow_hardware",
+      "count": 7
+    },
+    {
+      "key": "electrical_consumer",
+      "count": 6
+    },
+    {
+      "key": "ignition_distributor",
+      "count": 5
+    },
+    {
+      "key": "studs",
+      "count": 5
+    },
+    {
+      "key": "clamps",
+      "count": 4
+    },
+    {
+      "key": "pins",
+      "count": 4
+    },
+    {
+      "key": "washing_sponges",
+      "count": 4
+    },
+    {
+      "key": "adhesive_tapes",
+      "count": 2
+    },
+    {
+      "key": "child_seats",
+      "count": 1
+    },
+    {
+      "key": "rings",
+      "count": 1
+    }
+  ],
+  "activeAnalogPareto": [
+    {
+      "family": "other",
+      "residualCount": 840,
+      "activeAnalogCount": 0,
+      "topActiveTargets": [],
+      "residualExamples": [
+        "А-00278 Собака маленькая",
+        "А-00369 Люк",
+        "А-00404 Собака (очень большая)",
+        "А-00526 Обезьяна на присоске",
+        "А-00543 \"КОТО\" Разветвитель двойной 201",
+        "А-00548 Тюнинг Нива-Тайга",
+        "А-00573 Прожектор",
+        "А-00616 Аппликатор \"Доктор ВАКС\""
+      ]
+    },
+    {
+      "family": "socket_head_fasteners",
+      "residualCount": 40,
+      "activeAnalogCount": 37,
+      "topActiveTargets": [
+        {
+          "key": "aksessuary/instrumenty",
+          "count": 34
+        },
+        {
+          "key": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "count": 1
+        },
+        {
+          "key": "dvigatel-i-transmissiya/kpp",
+          "count": 1
+        },
+        {
+          "key": "elektrika/datchiki",
+          "count": 1
+        }
+      ],
+      "residualExamples": [
+        "КГ-00431 DIN912 M10*11 с внутренним шестигранником",
+        "КГ-00422 DIN912 M10*25 с внутренним шестигранником",
+        "КГ-00423 DIN912 M10*35 с внутренним шестигранником",
+        "КГ-00424 DIN912 M10*45 с внутренним шестигранником",
+        "КГ-00425 DIN912 M10*55 с внутренним шестигранником",
+        "КГ-00426 DIN912 M10*0 с внутренним шестигранником",
+        "КГ-00427 DIN912 M10*65 с внутренним шестигранником",
+        "КГ-00428 DIN912 M10*70 с внутренним шестигранником"
+      ]
+    },
+    {
+      "family": "pneumatic_fittings",
+      "residualCount": 38,
+      "activeAnalogCount": 1,
+      "topActiveTargets": [
+        {
+          "key": "kuzov-i-optika/kuzovnye-detali",
+          "count": 1
+        }
+      ],
+      "residualExamples": [
+        "КГ-01086 Соединитель шлангов Г-образный метал. д.1",
+        "КГ-00160 Соединитель шлангов прямой д.12",
+        "КГ-00175 Соединитель шлангов прямой д.6",
+        "КГ-00331 Соединитель шлангов переходной 8х10",
+        "КГ-00467 Соединитель шлангов переходной 10х12",
+        "КГ-00611 Соединитель шлангов 27х27",
+        "КГ-00674 Соединитель шлангов д.12х12",
+        "КГ-00675 Соединитель шлангов метал 14х14"
+      ]
+    },
+    {
+      "family": "screws",
+      "residualCount": 33,
+      "activeAnalogCount": 4,
+      "topActiveTargets": [
+        {
+          "key": "aksessuary/instrumenty",
+          "count": 2
+        },
+        {
+          "key": "kuzov-i-optika/bampery",
+          "count": 1
+        },
+        {
+          "key": "kuzov-i-optika/podkrylki-i-bryzgoviki",
+          "count": 1
+        }
+      ],
+      "residualExamples": [
+        "К-00054 Саморезы Н-2093",
+        "К-00078 Саморезы SK-0985",
+        "К-00102 Саморезы SK-0986",
+        "К-00113 Саморезы SK-5263",
+        "К-00127 Саморезы SK-0992",
+        "К-00146 Саморез длинный",
+        "К-00148 Саморезы SK-0991",
+        "К-00152 Саморезы SK-5129"
+      ]
+    },
+    {
+      "family": "caps_plugs",
+      "residualCount": 31,
+      "activeAnalogCount": 403,
+      "topActiveTargets": [
+        {
+          "key": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "count": 88
+        },
+        {
+          "key": "dvigatel-i-transmissiya/ohlazhdenie",
+          "count": 37
+        },
+        {
+          "key": "kuzov-i-optika/zamki-i-ruchki",
+          "count": 33
+        },
+        {
+          "key": "aksessuary/instrumenty",
+          "count": 23
+        },
+        {
+          "key": "dvigatel-i-transmissiya/kpp",
+          "count": 23
+        },
+        {
+          "key": "kuzov-i-optika/kuzovnye-detali",
+          "count": 22
+        },
+        {
+          "key": "filtry-i-masla/masla",
+          "count": 19
+        },
+        {
+          "key": "aksessuary/prochie-aksessuary",
+          "count": 14
+        }
+      ],
+      "residualExamples": [
+        "ЗЧМ-00186 Крышка поддона Москвич",
+        "К-00422 Заглушка воздуховода 2110",
+        "К-00457 Заглушка под мовиль (пластмасса)",
+        "А-00460 Заглушка бокса 2107 нижняя",
+        "А-00689 Заглушка радиобокса 2107",
+        "А-01561 Заглушка-удлинитель ремня",
+        "А-02301 Заглушка-переходник ремня (с логотипом) 1 шт",
+        "ДВ-00432 Заглушка вместо трамб. 2108"
+      ]
+    },
+    {
+      "family": "hoses",
+      "residualCount": 23,
+      "activeAnalogCount": 982,
+      "topActiveTargets": [
+        {
+          "key": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "count": 351
+        },
+        {
+          "key": "tormoznaya-sistema/prochaya-tormoznaya-sistema",
+          "count": 153
+        },
+        {
+          "key": "dvigatel-i-transmissiya/ohlazhdenie",
+          "count": 125
+        },
+        {
+          "key": "aksessuary/instrumenty",
+          "count": 111
+        },
+        {
+          "key": "kuzov-i-optika/kuzovnye-detali",
+          "count": 55
+        },
+        {
+          "key": "dvigatel-i-transmissiya/sceplenie",
+          "count": 39
+        },
+        {
+          "key": "podveska/ressory",
+          "count": 36
+        },
+        {
+          "key": "dvigatel-i-transmissiya/nasosy",
+          "count": 30
+        }
+      ],
+      "residualExamples": [
+        "Г-00595 Патрубок КАМАЗ-ЕВРО прием. ТКР корот. пр. (завод)",
+        "ДВ-00603 Трубка пластмассовая Лада-Гранта 2190",
+        "КГ-00287 Насадка на шланг подкачки",
+        "Р-00043 Шланги воздушные прицепа",
+        "Р-00044 Шланг воздушный прицепа в сборе",
+        "Р-00075 Шланги воздушные",
+        "А-00339 Шланг-груша силиконовый",
+        "Г-00347 Патрубок (инжектор крив.) 5320 КАМАЗ"
+      ]
+    },
+    {
+      "family": "fittings",
+      "residualCount": 20,
+      "activeAnalogCount": 272,
+      "topActiveTargets": [
+        {
+          "key": "tormoznaya-sistema/prochaya-tormoznaya-sistema",
+          "count": 107
+        },
+        {
+          "key": "aksessuary/instrumenty",
+          "count": 32
+        },
+        {
+          "key": "dvigatel-i-transmissiya/kpp",
+          "count": 21
+        },
+        {
+          "key": "filtry-i-masla/maslyanye-filtry",
+          "count": 19
+        },
+        {
+          "key": "kuzov-i-optika/kuzovnye-detali",
+          "count": 16
+        },
+        {
+          "key": "dvigatel-i-transmissiya/ohlazhdenie",
+          "count": 12
+        },
+        {
+          "key": "aksessuary/prochie-aksessuary",
+          "count": 10
+        },
+        {
+          "key": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "count": 9
+        }
+      ],
+      "residualExamples": [
+        "РДГ-00065 Тройник ручки УАЗ",
+        "ИН-00171 Штуцер прокачки М6*1*29 (AUDI,BMW,SAABVW)",
+        "ИН-00172 Штуцер прокачки М6*1*38 (AUDI,SUBARU,VW)",
+        "ИН-00173 Штуцер прокачки М8*1*32 (FORD,MAZDA)",
+        "ИН-00174 Штуцер прокачки М8*1*33 (MAZDA,OPEL)",
+        "ИН-00175 Штуцер прокачки М8*1*38 (MAZDA)",
+        "ИН-01561 87703 Штуцер прокачки М7х1",
+        "К-00035 Штуцер прокачки ВАЗ 01-08"
+      ]
+    },
+    {
+      "family": "personal_accessories",
+      "residualCount": 15,
+      "activeAnalogCount": 4,
+      "topActiveTargets": [
+        {
+          "key": "aksessuary/chehly",
+          "count": 2
+        },
+        {
+          "key": "aksessuary/instrumenty",
+          "count": 1
+        },
+        {
+          "key": "elektrika/signalizatsii",
+          "count": 1
+        }
+      ],
+      "residualExamples": [
+        "А-00246 Смайлики силикон, 4 шт",
+        "А-00502 Брелок",
+        "А-00511 Перчатки",
+        "А-01036 Брелок",
+        "А-01280 Перчатки зимние п/шерсть черные с ПВХ",
+        "А-01287 Бумажник водителя BLACK натур. кожа",
+        "А-02108 Брелок \"Россия\"",
+        "А-02200 FELIX Перчатки хлопковые с ПВХ-покрытием 10 класс"
+      ]
+    },
+    {
+      "family": "bolts",
+      "residualCount": 14,
+      "activeAnalogCount": 407,
+      "topActiveTargets": [
+        {
+          "key": "aksessuary/shiny-i-diski",
+          "count": 71
+        },
+        {
+          "key": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "count": 68
+        },
+        {
+          "key": "dvigatel-i-transmissiya/detali-transmissii",
+          "count": 30
+        },
+        {
+          "key": "podveska/ressory",
+          "count": 21
+        },
+        {
+          "key": "kuzov-i-optika/kuzovnye-detali",
+          "count": 15
+        },
+        {
+          "key": "dvigatel-i-transmissiya/kpp",
+          "count": 14
+        },
+        {
+          "key": "elektrika/generatory",
+          "count": 13
+        },
+        {
+          "key": "tormoznaya-sistema/prochaya-tormoznaya-sistema",
+          "count": 12
+        }
+      ],
+      "residualExamples": [
+        "К-00341 Болт салазки сиденья 2110",
+        "К-00002 Болт крепления сиденья ВАЗ 01-07",
+        "К-00196 Болт регулир. фар ВАЗ (2 шт)",
+        "К-00242 Болт прокачки ВАЗ (латунь)",
+        "К-00472 Болт кронштейна приемной трубы 2101-07",
+        "К-00498 Болт М5х10 с гров. регулятора тормозов",
+        "К-00519 Болт М8х16 с буртом салазок кресла 2108-09",
+        "К-00528 Болт М8х22.3 салазки кресла 2110"
+      ]
+    },
+    {
+      "family": "ventilation",
+      "residualCount": 12,
+      "activeAnalogCount": 117,
+      "topActiveTargets": [
+        {
+          "key": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "count": 61
+        },
+        {
+          "key": "elektrika/prochaya-elektrika",
+          "count": 26
+        },
+        {
+          "key": "aksessuary/instrumenty",
+          "count": 6
+        },
+        {
+          "key": "dvigatel-i-transmissiya/remni",
+          "count": 6
+        },
+        {
+          "key": "dvigatel-i-transmissiya/ohlazhdenie",
+          "count": 4
+        },
+        {
+          "key": "elektrika/datchiki",
+          "count": 4
+        },
+        {
+          "key": "elektrika/provodka",
+          "count": 3
+        },
+        {
+          "key": "kuzov-i-optika/kuzovnye-detali",
+          "count": 2
+        }
+      ],
+      "residualExamples": [
+        "А-00004 Вентилятор ALCO",
+        "А-00979 Вентилятор \"Valgo\"",
+        "ОК-00319 Кожух электровентилятора ОКА",
+        "А-00372 Вентилятор",
+        "А-00554 Вентилятор бол. 12В/24В",
+        "А-00615 Вентилятор (Россия)",
+        "А-01102 Вентилятор автомобил. JT Comfort 9041J 12В 5\"",
+        "А-02339 Вентилятор двойной JT Comfort 8062J 12В"
+      ]
+    },
+    {
+      "family": "body_clips",
+      "residualCount": 11,
+      "activeAnalogCount": 39,
+      "topActiveTargets": [
+        {
+          "key": "kuzov-i-optika/kuzovnye-detali",
+          "count": 23
+        },
+        {
+          "key": "aksessuary/instrumenty",
+          "count": 4
+        },
+        {
+          "key": "aksessuary/prochie-aksessuary",
+          "count": 3
+        },
+        {
+          "key": "kuzov-i-optika/podkrylki-i-bryzgoviki",
+          "count": 3
+        },
+        {
+          "key": "kuzov-i-optika/bampery",
+          "count": 2
+        },
+        {
+          "key": "kuzov-i-optika/moldingi",
+          "count": 2
+        },
+        {
+          "key": "tormoznaya-sistema/prochaya-tormoznaya-sistema",
+          "count": 2
+        }
+      ],
+      "residualExamples": [
+        "К-00611 Набор пистонов ВАЗ-Калина 1118",
+        "К-00189 Пистоны",
+        "К-00222 Пистоны",
+        "К-00355 Пистоны потолка 2110",
+        "К-00610 Набор пистонов ВАЗ-2113, 2114, 2115",
+        "К-00612 Набор пистонов Шеви Нива 2123",
+        "К-00631 Пистоны универсал",
+        "К-00682 Пистоны для иномарок (за 1 шт)"
+      ]
+    },
+    {
+      "family": "bushings",
+      "residualCount": 11,
+      "activeAnalogCount": 129,
+      "topActiveTargets": [
+        {
+          "key": "podveska/prochaya-podveska",
+          "count": 32
+        },
+        {
+          "key": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "count": 18
+        },
+        {
+          "key": "podveska/amortizatory",
+          "count": 14
+        },
+        {
+          "key": "dvigatel-i-transmissiya/detali-transmissii",
+          "count": 11
+        },
+        {
+          "key": "podveska/ressory",
+          "count": 8
+        },
+        {
+          "key": "dvigatel-i-transmissiya/kpp",
+          "count": 6
+        },
+        {
+          "key": "podveska/rychagi",
+          "count": 6
+        },
+        {
+          "key": "dvigatel-i-transmissiya/sceplenie",
+          "count": 5
+        }
+      ],
+      "residualExamples": [
+        "ОК-00181 Втулка верхней опоры Ока",
+        "ХСГ-01047 Втулка-бочонок МАЗ д.55",
+        "ХСГ-01048 Втулка передней подвески МАЗ-6430 н. обр",
+        "ДВ-00040 Втулка грибка трамблера",
+        "ЗЧМ-00065 Втулка маятника Москвич",
+        "ЗЧМ-00572 Втулка маятника Москвич (силикон)",
+        "К-00137 Втулка реактивных тяг ВАЗ",
+        "К-00622 Втулка для эмблем"
+      ]
+    },
+    {
+      "family": "seat_parts",
+      "residualCount": 9,
+      "activeAnalogCount": 19,
+      "topActiveTargets": [
+        {
+          "key": "kuzov-i-optika/kuzovnye-detali",
+          "count": 8
+        },
+        {
+          "key": "elektrika/prochaya-elektrika",
+          "count": 5
+        },
+        {
+          "key": "aksessuary/chehly",
+          "count": 4
+        },
+        {
+          "key": "aksessuary/kovriki",
+          "count": 1
+        },
+        {
+          "key": "aksessuary/prochie-aksessuary",
+          "count": 1
+        }
+      ],
+      "residualExamples": [
+        "А-02175 Накладки сидений PSV KROCUS (все сидения)",
+        "А-01025 \"HR\" К-т накидок на все сиденья \"ROMB PLUS\"",
+        "А-02154 Накидка на сиденье с функцией подогрева AVS HC-175,180",
+        "А-02393 Защита спинки сиденья Автобра 5109",
+        "КР-00266 Ремкомплект гребенок сиденья 2101-07 (1 ш",
+        "КР-00314 Защелка заднего сиденья 2108",
+        "КР-00318 Облицовка сиденья 2101-07",
+        "КР-00335 Крепление сиденья 2108 (за 2 шт)"
+      ]
+    },
+    {
+      "family": "conditioner_parts",
+      "residualCount": 8,
+      "activeAnalogCount": 40,
+      "topActiveTargets": [
+        {
+          "key": "filtry-i-masla/zhidkosti",
+          "count": 12
+        },
+        {
+          "key": "dvigatel-i-transmissiya/ohlazhdenie",
+          "count": 8
+        },
+        {
+          "key": "dvigatel-i-transmissiya/remni",
+          "count": 7
+        },
+        {
+          "key": "elektrika/generatory",
+          "count": 3
+        },
+        {
+          "key": "podveska/podshipniki",
+          "count": 3
+        },
+        {
+          "key": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "count": 2
+        },
+        {
+          "key": "elektrika/prochaya-elektrika",
+          "count": 2
+        },
+        {
+          "key": "dvigatel-i-transmissiya/kpp",
+          "count": 1
+        }
+      ],
+      "residualExamples": [
+        "ДВ-00637 Трубки кондиционера до 2015 г. (к-т) 2190",
+        "ДВ-00638 Трубки кондиционера Приора 2170 (к-т)",
+        "ДВ-00639 Трубки кондиционера Калина ст. обр. (к-т)",
+        "ДВ-00640 Трубки кондиционера Нива Урбан (к-т)",
+        "ДВ-00641 Трубки кондиционера Нива 2123 ст. обр. (к",
+        "ДВ-00642 Трубки кондиционера Шеви Нива 2123 н. обр",
+        "ДВ-00645 К-т трубок кондиционера Калина после 2015",
+        "ДВ-00685 Комплект трубок кондиционера Веста"
+      ]
+    },
+    {
+      "family": "nuts",
+      "residualCount": 8,
+      "activeAnalogCount": 111,
+      "topActiveTargets": [
+        {
+          "key": "aksessuary/shiny-i-diski",
+          "count": 20
+        },
+        {
+          "key": "podveska/stupicy",
+          "count": 20
+        },
+        {
+          "key": "podveska/rulevye-nakonechniki",
+          "count": 19
+        },
+        {
+          "key": "dvigatel-i-transmissiya/detali-transmissii",
+          "count": 10
+        },
+        {
+          "key": "podveska/ressory",
+          "count": 7
+        },
+        {
+          "key": "dvigatel-i-transmissiya/sceplenie",
+          "count": 4
+        },
+        {
+          "key": "podveska/podshipniki",
+          "count": 4
+        },
+        {
+          "key": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "count": 3
+        }
+      ],
+      "residualExamples": [
+        "К-00015 Гайка М 8 д. приёмной трубы ВАЗ 01-08",
+        "К-00305 Гайка приемной трубы на 2110",
+        "К-00574 Гайка сиденья 2101-07 М8 квадрат",
+        "К-00923 Гайка М8*1,25 приёмной трубы с буртиком \"Веста\", \"Ларгус\"",
+        "КГ-00016 Гайка приемной трубы Волга",
+        "КГ-00069 Гайка приемной трубы ГАЗ",
+        "КГ-00142 Гайка стопорная блока шестерен ГАЗ-53",
+        "КГ-00784 Гайка М10*1.25 приемной трубы КАМАЗ (лату"
+      ]
+    },
+    {
+      "family": "driver_electronics",
+      "residualCount": 7,
+      "activeAnalogCount": 6,
+      "topActiveTargets": [
+        {
+          "key": "elektrika/prochaya-elektrika",
+          "count": 6
+        }
+      ],
+      "residualExamples": [
+        "А-01058 Рация \"АЛАН-100\"",
+        "А-01099 Рация \"Мега-Джет\" 300,100",
+        "А-01159 Рация \"Алан-48 плюс\"",
+        "А-01437 Рация OPTIM 270",
+        "А-01142 Рация MEGA SET 300",
+        "А-01205 Рация \"ALBRECHT\" 4200",
+        "А-01536 Рация MOTOROLLA Т-50"
+      ]
+    },
+    {
+      "family": "tow_hardware",
+      "residualCount": 7,
+      "activeAnalogCount": 0,
+      "topActiveTargets": [],
+      "residualExamples": [
+        "КГ-01323 Скоба такелажная М 10",
+        "КГ-01324 Скоба такелажная М 12",
+        "КГ-01325 Скоба такелажная М 14",
+        "КГ-01326 Скоба такелажная М 16",
+        "КГ-01327 Скоба такелажная М 18",
+        "КГ-01328 Скоба такелажная М 20",
+        "КГ-01329 Скоба такелажная М 22"
+      ]
+    },
+    {
+      "family": "electrical_consumer",
+      "residualCount": 6,
+      "activeAnalogCount": 24,
+      "topActiveTargets": [
+        {
+          "key": "elektrika/prochaya-elektrika",
+          "count": 9
+        },
+        {
+          "key": "aksessuary/instrumenty",
+          "count": 4
+        },
+        {
+          "key": "aksessuary/prochie-aksessuary",
+          "count": 4
+        },
+        {
+          "key": "elektrika/provodka",
+          "count": 4
+        },
+        {
+          "key": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "count": 2
+        },
+        {
+          "key": "podveska/rulevye-nakonechniki",
+          "count": 1
+        }
+      ],
+      "residualExamples": [
+        "А-01332 \"Банка\" радио+флешка (воспроизв.)",
+        "А-01460 Тепловентилятор автомобильный AVS Comfort ТЕ-310 12В (2 реж.) 150W",
+        "А-01522 KOTO EFB-211 Тепловентилятор",
+        "А-01650 Флешка 8 Гб",
+        "А-01687 USB флешка 32 Гб",
+        "А-02382 ЗУ Eplutus-211 36W 2 USB"
+      ]
+    },
+    {
+      "family": "ignition_distributor",
+      "residualCount": 5,
+      "activeAnalogCount": 63,
+      "topActiveTargets": [
+        {
+          "key": "elektrika/prochaya-elektrika",
+          "count": 45
+        },
+        {
+          "key": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "count": 7
+        },
+        {
+          "key": "podveska/podshipniki",
+          "count": 4
+        },
+        {
+          "key": "dvigatel-i-transmissiya/prokladki",
+          "count": 3
+        },
+        {
+          "key": "aksessuary/instrumenty",
+          "count": 2
+        },
+        {
+          "key": "dvigatel-i-transmissiya/kpp",
+          "count": 1
+        },
+        {
+          "key": "filtry-i-masla/masla",
+          "count": 1
+        }
+      ],
+      "residualExamples": [
+        "ЗЧМ-00072 Уголёк трамблера Москвич",
+        "ЗЧМ-00465 Манжет трамблера Москвич (1 шт)",
+        "ИН-00222 Трамблер Дэу-Нексиа",
+        "ИН-00971 Трамблёр Дэу Матиз",
+        "К-00129 Уголёк трамблера ВАЗ 01-07"
+      ]
+    },
+    {
+      "family": "studs",
+      "residualCount": 5,
+      "activeAnalogCount": 64,
+      "topActiveTargets": [
+        {
+          "key": "aksessuary/shiny-i-diski",
+          "count": 17
+        },
+        {
+          "key": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "count": 15
+        },
+        {
+          "key": "dvigatel-i-transmissiya/kpp",
+          "count": 8
+        },
+        {
+          "key": "dvigatel-i-transmissiya/toplivnaya-sistema",
+          "count": 6
+        },
+        {
+          "key": "podveska/stupicy",
+          "count": 5
+        },
+        {
+          "key": "aksessuary/instrumenty",
+          "count": 2
+        },
+        {
+          "key": "dvigatel-i-transmissiya/detali-transmissii",
+          "count": 2
+        },
+        {
+          "key": "dvigatel-i-transmissiya/nasosy",
+          "count": 2
+        }
+      ],
+      "residualExamples": [
+        "КГ-00601 Шпилька приемной трубы ЗИЛ-130",
+        "К-00572 Шпилька М10*28 подвески дв. 2108-2110",
+        "К-00853 Шпилька М10*47 крепл. подвески дв.-ля КАЛИНА",
+        "КГ-00290 Шпилька 10*30 картера сцепл. (шаг 1Х1.5)",
+        "КГ-00379 Шпилька М16*45*1.5 передней подвески Кам"
+      ]
+    },
+    {
+      "family": "clamps",
+      "residualCount": 4,
+      "activeAnalogCount": 106,
+      "topActiveTargets": [
+        {
+          "key": "dvigatel-i-transmissiya/vyhlopnaya-sistema",
+          "count": 34
+        },
+        {
+          "key": "podveska/pruzhiny",
+          "count": 20
+        },
+        {
+          "key": "dvigatel-i-transmissiya/detali-transmissii",
+          "count": 15
+        },
+        {
+          "key": "aksessuary/instrumenty",
+          "count": 7
+        },
+        {
+          "key": "kuzov-i-optika/kuzovnye-detali",
+          "count": 7
+        },
+        {
+          "key": "dvigatel-i-transmissiya/ohlazhdenie",
+          "count": 4
+        },
+        {
+          "key": "podveska/rulevye-nakonechniki",
+          "count": 4
+        },
+        {
+          "key": "dvigatel-i-transmissiya/toplivnaya-sistema",
+          "count": 3
+        }
+      ],
+      "residualExamples": [
+        "ЗЧМ-00376 Хомуты приемной трубы 2141",
+        "ЗЧМ-00507 Хомут приёмной трубы (Святогор)",
+        "КГ-00143 Хомут патрубков КАМАЗ",
+        "КГ-01259 Хомут приёмной трубы силовой Г-3302 NEXT (дв. Камминс 2,8;3,8) Е-4"
+      ]
+    },
+    {
+      "family": "pins",
+      "residualCount": 4,
+      "activeAnalogCount": 8,
+      "topActiveTargets": [
+        {
+          "key": "podveska/pruzhiny",
+          "count": 6
+        },
+        {
+          "key": "podveska/rulevye-nakonechniki",
+          "count": 1
+        },
+        {
+          "key": "tormoznaya-sistema/supporty",
+          "count": 1
+        }
+      ],
+      "residualExamples": [
+        "К-00155 Шплинты малые",
+        "КГ-00002 Шплинты ГАЗ",
+        "КГ-00049 Шплинты большие ГАЗ",
+        "КГ-00755 Шплинты (за 1 шт)"
+      ]
+    },
+    {
+      "family": "washing_sponges",
+      "residualCount": 4,
+      "activeAnalogCount": 1,
+      "topActiveTargets": [
+        {
+          "key": "filtry-i-masla/zhidkosti",
+          "count": 1
+        }
+      ],
+      "residualExamples": [
+        "А-00194 Швабра № 613 (с резинкой)",
+        "А-00617 Губка \"Доктор ВАКС\" DW8611, 8612R",
+        "А-01461 Швабра большая (Польша)",
+        "А-01566 Швабра большая № 636"
+      ]
+    },
+    {
+      "family": "adhesive_tapes",
+      "residualCount": 2,
+      "activeAnalogCount": 3,
+      "topActiveTargets": [
+        {
+          "key": "filtry-i-masla/zhidkosti",
+          "count": 3
+        }
+      ],
+      "residualExamples": [
+        "А-01855 ЗМ Скотч профессиональный 30 м",
+        "А-02130 Скотч 2-х стор. \"3М\" 20мм"
+      ]
+    },
+    {
+      "family": "child_seats",
+      "residualCount": 1,
+      "activeAnalogCount": 0,
+      "topActiveTargets": [],
+      "residualExamples": [
+        "А-01910 Кресло бескаркасное"
+      ]
+    },
+    {
+      "family": "rings",
+      "residualCount": 1,
+      "activeAnalogCount": 229,
+      "topActiveTargets": [
+        {
+          "key": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "count": 100
+        },
+        {
+          "key": "dvigatel-i-transmissiya/detali-transmissii",
+          "count": 29
+        },
+        {
+          "key": "dvigatel-i-transmissiya/kpp",
+          "count": 21
+        },
+        {
+          "key": "podveska/stupicy",
+          "count": 13
+        },
+        {
+          "key": "dvigatel-i-transmissiya/nasosy",
+          "count": 7
+        },
+        {
+          "key": "podveska/podshipniki",
+          "count": 6
+        },
+        {
+          "key": "tormoznaya-sistema/cilindry",
+          "count": 6
+        },
+        {
+          "key": "dvigatel-i-transmissiya/ohlazhdenie",
+          "count": 5
+        }
+      ],
+      "residualExamples": [
+        "ДВ-00289 Кольцо стопорное d47,5 гайки трубы картер"
+      ]
+    }
+  ],
+  "examples": [
+    {
+      "rowNumber": 7,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00004",
+      "name": "Вентилятор ALCO",
+      "price": 300,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "ventilation",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|ventilation|ventilation",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 64,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00246",
+      "name": "Смайлики силикон, 4 шт",
+      "price": 130,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "personal_accessories",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|personal_accessories|personal-accessories",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 73,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00278",
+      "name": "Собака маленькая",
+      "price": 80,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 90,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00369",
+      "name": "Люк",
+      "price": 2500,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Тип товара не распознан по текущим данным. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "UNKNOWN_PRODUCT_TYPE",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:UNKNOWN_PRODUCT_TYPE"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 102,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00404",
+      "name": "Собака (очень большая)",
+      "price": 500,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 126,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00502",
+      "name": "Брелок",
+      "price": 50,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "personal_accessories",
+      "reason": "Тип товара не распознан по текущим данным. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "UNKNOWN_PRODUCT_TYPE",
+      "groupKey": "do_not_publish|personal_accessories|personal-accessories",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:UNKNOWN_PRODUCT_TYPE"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 131,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00511",
+      "name": "Перчатки",
+      "price": 40,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "personal_accessories",
+      "reason": "Тип товара не распознан по текущим данным. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "UNKNOWN_PRODUCT_TYPE",
+      "groupKey": "do_not_publish|personal_accessories|personal-accessories",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:UNKNOWN_PRODUCT_TYPE"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 138,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00526",
+      "name": "Обезьяна на присоске",
+      "price": 180,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 141,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00543",
+      "name": "\"КОТО\" Разветвитель двойной 201",
+      "price": 330,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 145,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00548",
+      "name": "Тюнинг Нива-Тайга",
+      "price": 8500,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 152,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00573",
+      "name": "Прожектор",
+      "price": 650,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Тип товара не распознан по текущим данным. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "UNKNOWN_PRODUCT_TYPE",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:UNKNOWN_PRODUCT_TYPE"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 163,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00616",
+      "name": "Аппликатор \"Доктор ВАКС\"",
+      "price": 150,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 186,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00703",
+      "name": "Такси",
+      "price": 210,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Тип товара не распознан по текущим данным. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "UNKNOWN_PRODUCT_TYPE",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:UNKNOWN_PRODUCT_TYPE"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 189,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00711",
+      "name": "Покрытие пола (линолеум)",
+      "price": 350,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 192,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00718",
+      "name": "Мячик-дезодорант (1 шт)",
+      "price": 70,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Тип товара не распознан по текущим данным. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "UNKNOWN_PRODUCT_TYPE",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:UNKNOWN_PRODUCT_TYPE"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 195,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00723",
+      "name": "Автопарфюм 7 мл",
+      "price": 310,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 196,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00726",
+      "name": "Бокс 2101-07 Люкс",
+      "price": 295,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 212,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00775",
+      "name": "А-00775",
+      "price": 160,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 257,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00894",
+      "name": "Рысь (большая)",
+      "price": 140,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 259,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00896",
+      "name": "Опора полки 2108 (2 шт)",
+      "price": 800,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 268,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00918",
+      "name": "Поросенок (большой)",
+      "price": 80,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 275,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00936",
+      "name": "Стакан (нержавейка)",
+      "price": 10,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 280,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00946",
+      "name": "Мышь музыкальная",
+      "price": 60,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 298,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00979",
+      "name": "Вентилятор \"Valgo\"",
+      "price": 460,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "ventilation",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|ventilation|ventilation",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 301,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-00986",
+      "name": "Подарочный набор",
+      "price": 525,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Тип товара не распознан по текущим данным. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "UNKNOWN_PRODUCT_TYPE",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:UNKNOWN_PRODUCT_TYPE"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 319,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01033",
+      "name": "Игрушка-корова на присоске",
+      "price": 50,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 321,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01036",
+      "name": "Брелок",
+      "price": 70,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "personal_accessories",
+      "reason": "Тип товара не распознан по текущим данным. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "UNKNOWN_PRODUCT_TYPE",
+      "groupKey": "do_not_publish|personal_accessories|personal-accessories",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:UNKNOWN_PRODUCT_TYPE"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 325,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01050",
+      "name": "\"Леопард\" хромир.",
+      "price": 220,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 328,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01058",
+      "name": "Рация \"АЛАН-100\"",
+      "price": 4500,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "driver_electronics",
+      "reason": "Тип товара не распознан по текущим данным. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "UNKNOWN_PRODUCT_TYPE",
+      "groupKey": "do_not_publish|driver_electronics|driver-electronics",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:UNKNOWN_PRODUCT_TYPE"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 344,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01099",
+      "name": "Рация \"Мега-Джет\" 300,100",
+      "price": 5350,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "driver_electronics",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|driver_electronics|driver-electronics",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 361,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01159",
+      "name": "Рация \"Алан-48 плюс\"",
+      "price": 4200,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "driver_electronics",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|driver_electronics|driver-electronics",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 378,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01206",
+      "name": "Отбойник УАЗ-Патриот СА-пласт.",
+      "price": 1300,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 379,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01211",
+      "name": "Накладка на воздухозаборник 2110 (краш.)",
+      "price": 785,
+      "status": "BLOCKED_CONFLICT",
+      "categorySlug": "kuzov-i-optika",
+      "subcategorySlug": "kuzovnye-detali",
+      "confidence": 0.84,
+      "source": "blocked_conflict",
+      "familyId": "body_air_intakes",
+      "familyLabel": "Кузовные воздухозаборники",
+      "detectedFamily": "other",
+      "reason": "Несколько категорий получили близкие оценки, требуется ручная проверка.",
+      "reviewReasonCode": "close_candidates",
+      "groupKey": "body_air_intakes|other|воздухозаборник|kuzov-i-optika|kuzovnye-detali",
+      "evidence": [
+        "family:body_air_intakes",
+        "token:воздухозаборник",
+        "phrase:воздухозаборник",
+        "validation:normalizer:4:useful_tokens"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": 0.028,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 404,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01280",
+      "name": "Перчатки зимние п/шерсть черные с ПВХ",
+      "price": 45,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "personal_accessories",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|personal_accessories|personal-accessories",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 408,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01287",
+      "name": "Бумажник водителя BLACK натур. кожа",
+      "price": 300,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "personal_accessories",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|personal_accessories|personal-accessories",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 410,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01292",
+      "name": "Нож дорожный",
+      "price": 100,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 425,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01332",
+      "name": "\"Банка\" радио+флешка (воспроизв.)",
+      "price": 490,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "electrical_consumer",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|electrical_consumer|electrical-consumer",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 427,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01338",
+      "name": "Часы большие (на батарейке)",
+      "price": 260,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 438,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01370",
+      "name": "А-01370",
+      "price": 100,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 442,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01378",
+      "name": "Сумка-холодильник (термо)",
+      "price": 390,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 449,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01393",
+      "name": "А-01393",
+      "price": 7300,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 451,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01399",
+      "name": "А-01399",
+      "price": 190,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 456,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01429",
+      "name": "А-01429",
+      "price": 6850,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 459,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01437",
+      "name": "Рация OPTIM 270",
+      "price": 3900,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "driver_electronics",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|driver_electronics|driver-electronics",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 468,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01460",
+      "name": "Тепловентилятор автомобильный AVS Comfort ТЕ-310 12В (2 реж.) 150W",
+      "price": 1290,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "electrical_consumer",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|electrical_consumer|electrical-consumer",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 472,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01471",
+      "name": "Хомяк \"говорящий\"",
+      "price": 490,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 474,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01477",
+      "name": "Сумка кожа",
+      "price": 250,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 480,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01490",
+      "name": "Подогрев-сидушка \"HR\"",
+      "price": 660,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 494,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01522",
+      "name": "KOTO EFB-211 Тепловентилятор",
+      "price": 1250,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "electrical_consumer",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|electrical_consumer|electrical-consumer",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 497,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01528",
+      "name": "Четки с иконкой",
+      "price": 100,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 503,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01556",
+      "name": "А-01556",
+      "price": 1900,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 504,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01560",
+      "name": "Плитка газовая (маленькая)",
+      "price": 600,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 511,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01583",
+      "name": "Браслеты для пешеходов светоотражающие",
+      "price": 180,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 514,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01591",
+      "name": "Тент SEEP большой",
+      "price": 3800,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 521,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01613",
+      "name": "Тарелочка магнитная для мелочей",
+      "price": 350,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 523,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01616",
+      "name": "Накидка - искусственный мех \"ALPACA\", 2 шт",
+      "price": 3100,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 527,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01623",
+      "name": "Мешки для колес 4 шт",
+      "price": 520,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 531,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01630",
+      "name": "Разветвитель EPUTUS",
+      "price": 660,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 532,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01634",
+      "name": "Собака \"пушистик\"",
+      "price": 200,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 535,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01650",
+      "name": "Флешка 8 Гб",
+      "price": 440,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "electrical_consumer",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|electrical_consumer|electrical-consumer",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 540,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01665",
+      "name": "Трос 42 т, 5 м",
+      "price": 3150,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 542,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01668",
+      "name": "Термокружка с подогревом",
+      "price": 700,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 547,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01682",
+      "name": "Тестер MS 5300",
+      "price": 1900,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 548,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01686",
+      "name": "А-01686",
+      "price": 890,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 553,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01704",
+      "name": "Накидка \"TRANSIT VAN\"",
+      "price": 2950,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 560,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01717",
+      "name": "А-01717",
+      "price": 145,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 569,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01746",
+      "name": "Тоннель 2110",
+      "price": 650,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Тип товара не распознан по текущим данным. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "UNKNOWN_PRODUCT_TYPE",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:UNKNOWN_PRODUCT_TYPE"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 578,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01765",
+      "name": "Сумка для ноутбука",
+      "price": 990,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 588,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01791",
+      "name": "Отпугиватель грызунов 2206",
+      "price": 1200,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 596,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01810",
+      "name": "STAR LINE GSM блок (с 2-мя сим-картами)",
+      "price": 4450,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 615,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01864",
+      "name": "Блок стробоскопа с пультом",
+      "price": 680,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 617,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01867",
+      "name": "\"Люблю Россию\" (на присоске)",
+      "price": 35,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 619,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01885",
+      "name": "Сигнал \"VOLVO\"",
+      "price": 980,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 623,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01896",
+      "name": "Проставки 6х9 с накладкой",
+      "price": 980,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 627,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01910",
+      "name": "Кресло бескаркасное",
+      "price": 990,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "child_seats",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|child_seats|child-seats",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 644,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01971",
+      "name": "А-01971",
+      "price": 2000,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 645,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01974",
+      "name": "Вымпел большой",
+      "price": 270,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 647,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01983",
+      "name": "Подстаканник на воздуховод",
+      "price": 320,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 653,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01995",
+      "name": "FM модулятор 07 EPLUTUS",
+      "price": 780,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 654,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-01997",
+      "name": "А-01997",
+      "price": 150,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 656,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02004",
+      "name": "Цифровой манометр VST 811",
+      "price": 310,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 669,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02040",
+      "name": "Тент \"SEDAN CLASSIC С\", SEDAN Серебрис",
+      "price": 1800,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 673,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02050",
+      "name": "Мультитестер 266",
+      "price": 450,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Тип товара не распознан по текущим данным. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "UNKNOWN_PRODUCT_TYPE",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:UNKNOWN_PRODUCT_TYPE"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 678,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02071",
+      "name": "Колпачок для дисков VESTA, 1 шт",
+      "price": 150,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 682,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02083",
+      "name": "Колпачки дисков VESTA 17 крашеные, 4 шт",
+      "price": 370,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 689,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02106",
+      "name": "DW8677 Тонкая ткань для полировки кузова",
+      "price": 155,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 690,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02108",
+      "name": "Брелок \"Россия\"",
+      "price": 150,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "personal_accessories",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|personal_accessories|personal-accessories",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 693,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02117",
+      "name": "Рука на присоске \"Россия\"",
+      "price": 100,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 700,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02144",
+      "name": "Аудиоколонка MIVO 09",
+      "price": 2000,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 713,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02175",
+      "name": "Накладки сидений PSV KROCUS (все сидения)",
+      "price": 5140,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "seat_parts",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|seat_parts|seat-parts",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 721,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02200",
+      "name": "FELIX Перчатки хлопковые с ПВХ-покрытием 10 класс",
+      "price": 45,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "personal_accessories",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|personal_accessories|personal-accessories",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 722,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02202",
+      "name": "Ручки 2106 перед. н/о, 2 шт",
+      "price": 400,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0.3636,
+      "neighborExamples": [
+        "РДГ-00201 Ручки двери УАЗ-3163, PATRIOT н/о",
+        "А-01441 Ручки дверные 2106-07 н/о",
+        "КР-00059 Ручки дверные наружные 2109 перед.",
+        "КР-00395 Ручки дверные Калина перед., за 1 шт"
+      ]
+    },
+    {
+      "rowNumber": 731,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02230",
+      "name": "Груша для откачки воздуха",
+      "price": 470,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 736,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02247",
+      "name": "Батарейки \"REXANT\" (за 1 шт)",
+      "price": 40,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 741,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02276",
+      "name": "Зарядка для i-phone 323",
+      "price": 600,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 744,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02282",
+      "name": "Сканер KONNWEI KW-310",
+      "price": 1400,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 747,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02289",
+      "name": "Стяжка 8 мм х 60 см (2 шт) AVS TL-05",
+      "price": 180,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 752,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02313",
+      "name": "ПЗУ Х-6 CARLIVE",
+      "price": 7500,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 753,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02314",
+      "name": "ПЗУ ТМ 1813 MULTI",
+      "price": 4400,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 756,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02317",
+      "name": "Упор (башмак) противооткатный AVS SM-01",
+      "price": 65,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 758,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02323",
+      "name": "Литиевая дисковая батарейка GP Lithium CR2025, за 1 шт",
+      "price": 120,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 766,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02368",
+      "name": "Накидки Фронт \"ICEBERG FRONT\"черный/черный/красный 26190",
+      "price": 3300,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 769,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "А-02377",
+      "name": "Струна \"Автодело\" 40686, 2 шт",
+      "price": 490,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 878,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "АК-00131",
+      "name": "АК-00131",
+      "price": 11500,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 911,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "АК-00181",
+      "name": "АК-00181",
+      "price": 6600,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 976,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "АК-00265",
+      "name": "АК-00265",
+      "price": 7200,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 983,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "Б-00004",
+      "name": "Буфер перед. н/о 3 2803010-53205",
+      "price": 7200,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0.5,
+      "neighborExamples": [
+        "КЗ-01096 Буфер перед. двери Г-3302 NEXT верхний",
+        "ЖЛ-00270 Крыло перед. прав. 21230 н/о",
+        "Ж-00239 Крыло ГАЗ-3302 перед. н/о пластик (к-т)",
+        "Ж-00007 Борт ГАЗ-3302 н/о перед. крашен.",
+        "ЖЛ-00331 Крыло перед. лев. н/о 21230 (Тайвань)"
+      ]
+    },
+    {
+      "rowNumber": 995,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "Б-00054",
+      "name": "Б-00054",
+      "price": 430,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 996,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "Б-00055",
+      "name": "Б-00055",
+      "price": 6200,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 1012,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "Г-00109",
+      "name": "Коллектор 511-1008015-10",
+      "price": 25764.1,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Тип товара не распознан по текущим данным. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "UNKNOWN_PRODUCT_TYPE",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:UNKNOWN_PRODUCT_TYPE"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 1045,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "Г-00366",
+      "name": "Заменитель прием. тр. Лада Веста \"ПАУК\" 16-кл 1.8",
+      "price": 3500,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 1049,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "Г-00386",
+      "name": "Г-00386",
+      "price": 600,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 1052,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "Г-00409",
+      "name": "Щиток наливной трубы 2108",
+      "price": 280,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "other",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 1084,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "Г-00595",
+      "name": "Патрубок КАМАЗ-ЕВРО прием. ТКР корот. пр. (завод)",
+      "price": 950,
+      "status": "MANUAL_REVIEW",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "no_match",
+      "familyId": "no_match",
+      "familyLabel": "no_match",
+      "detectedFamily": "hoses",
+      "reason": "Категория и подкатегория не определены правилами.",
+      "reviewReasonCode": "no_candidate",
+      "groupKey": "no_match|hoses|hoses",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target."
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 1093,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "Г-00652",
+      "name": "Г-00652",
+      "price": 320,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Строка похожа только на артикул или код без понятного типа товара. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "CODE_ONLY",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:CODE_ONLY"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 1584,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "ДВ-00106",
+      "name": "Клапан рециркуляции Нива в сборе",
+      "price": 300,
+      "status": "BLOCKED_CONFLICT",
+      "categorySlug": "dvigatel-i-transmissiya",
+      "subcategorySlug": "detali-dvigatelya",
+      "confidence": 0.759,
+      "source": "blocked_conflict",
+      "familyId": "engine_valves",
+      "familyLabel": "Детали двигателя",
+      "detectedFamily": "other",
+      "reason": "Найдены отрицательные признаки для лучшего кандидата.",
+      "reviewReasonCode": "negative_evidence",
+      "groupKey": "engine_valves|other|клапан|dvigatel-i-transmissiya|detali-dvigatelya",
+      "evidence": [
+        "family:engine_valves",
+        "token:клапан",
+        "token:клапан",
+        "token:кл",
+        "validation:normalizer:5:useful_tokens"
+      ],
+      "negativeEvidence": [
+        "negative:рециркуляции"
+      ],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0.25,
+      "neighborExamples": [
+        "ДВ-00241 Опора двигателя в сборе Нива (лев.,прав.)",
+        "ДВ-00123 Поддон двигателя Нива",
+        "ДВ-00068 Распредвал в сборе Нива-Тайга",
+        "ДВ-00540 Распредвал в сборе Нива 21214",
+        "ДВ-00332 Передняя крышка двигателя Нива 21214"
+      ]
+    },
+    {
+      "rowNumber": 1593,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "ДВ-00186",
+      "name": "Диффузор салона 2105",
+      "price": 105,
+      "status": "BLOCKED_CONFLICT",
+      "categorySlug": "dvigatel-i-transmissiya",
+      "subcategorySlug": "ohlazhdenie",
+      "confidence": 0.74,
+      "source": "blocked_conflict",
+      "familyId": "cooling",
+      "familyLabel": "Охлаждение",
+      "detectedFamily": "other",
+      "reason": "Найдены отрицательные признаки для лучшего кандидата.",
+      "reviewReasonCode": "negative_evidence",
+      "groupKey": "cooling|other|диффузор|dvigatel-i-transmissiya|ohlazhdenie",
+      "evidence": [
+        "family:cooling",
+        "token:диффузор",
+        "validation:normalizer:3:useful_tokens"
+      ],
+      "negativeEvidence": [
+        "negative:салона"
+      ],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 1602,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "ДВ-00236",
+      "name": "Влагоотделитель 2108-15",
+      "price": 480,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Тип товара не распознан по текущим данным. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "UNKNOWN_PRODUCT_TYPE",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:UNKNOWN_PRODUCT_TYPE"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 1609,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "ДВ-00380",
+      "name": "Торпеда 2105",
+      "price": 1950,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Тип товара не распознан по текущим данным. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "UNKNOWN_PRODUCT_TYPE",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:UNKNOWN_PRODUCT_TYPE"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    },
+    {
+      "rowNumber": 1610,
+      "scope": "new_or_unconfirmed",
+      "shopCode": "ДВ-00381",
+      "name": "Торпеда 2107",
+      "price": 2200,
+      "status": "DO_NOT_PUBLISH",
+      "categorySlug": "",
+      "subcategorySlug": "",
+      "confidence": 0,
+      "source": "do_not_publish",
+      "familyId": "do_not_publish",
+      "familyLabel": "do_not_publish",
+      "detectedFamily": "other",
+      "reason": "Тип товара не распознан по текущим данным. Товар не публикуется до ручного исправления.",
+      "reviewReasonCode": "UNKNOWN_PRODUCT_TYPE",
+      "groupKey": "do_not_publish|other|other",
+      "evidence": [
+        "validation:no_match",
+        "validation:Нет семейства, правила или безопасного похожего target.",
+        "validation:UNKNOWN_PRODUCT_TYPE"
+      ],
+      "negativeEvidence": [],
+      "candidateGap": null,
+      "neighborTarget": "",
+      "neighborShare": 0,
+      "neighborExamples": []
+    }
+  ]
+}

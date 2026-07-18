@@ -1,9 +1,17 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { catalogTaxonomy, defaultCategorizationRules } from "../src/config/catalog-taxonomy";
-import { isPublicTaxonomyTarget } from "../src/config/public-taxonomy";
+import {
+  ALL_ASSORTMENT_CATEGORY_SLUG,
+  ALL_PRODUCTS_SUBCATEGORY_SLUG,
+  OTHER_PRODUCTS_SUBCATEGORY_SLUG,
+  isHiddenPublicSubcategory,
+  isPublicNavigationTaxonomyTarget,
+  isPublicTaxonomyTarget
+} from "../src/config/public-taxonomy";
 import { buildDefaultCategorizationContext, categorizeProductName } from "../src/features/categorization/engine";
 import { validateRulePattern } from "../src/features/categorization/learning";
+import { normalizeProductName } from "../src/features/categorization/normalization";
 import type { CategorizationResult } from "../src/features/categorization/types";
 import { createAdminRedirectUrlFromParts } from "../src/middleware";
 import {
@@ -28,10 +36,15 @@ import {
   selectImportBatchForAdminPage,
   type ImportStateBatch
 } from "../src/features/import/import-state";
-import { needsProductReview, resolveImportProductName } from "../src/features/import/automation";
+import {
+  needsProductReview,
+  resolveDraftProductStatus,
+  resolveImportProductName
+} from "../src/features/import/automation";
 import { buildImportReport, buildPriceChangeReport } from "../src/features/import/report";
 import { evaluateImportSafety } from "../src/features/import/safety";
 import { SEARCH_INDEX_PREPARE_FAILED_MESSAGE } from "../src/features/search/indexing";
+import { isAllowedPublicSearchFilter } from "../src/features/search/service";
 import {
   prepareSearchIndexDocumentsWithClient,
   replaceSearchIndexDocumentsWithClient,
@@ -40,6 +53,8 @@ import {
   type SearchIndex,
   type SearchIndexClient
 } from "../src/features/search/meilisearch";
+import { buildSearchDocument } from "../src/features/search/documents";
+import { documentMatchesQuery, rankSearchHits } from "../src/features/search/ranking";
 import {
   buildCategorySuggestion,
   getReviewDiagnosticFromRows
@@ -49,7 +64,7 @@ import type {
   ExistingProductSnapshot,
   ImportPreviewReport
 } from "../src/features/import/types";
-import type { SearchProductDocument } from "../src/features/search/types";
+import type { SearchProductDocument, SearchSynonymRecord } from "../src/features/search/types";
 
 const target = {
   categoryId: "cat-1",
@@ -410,11 +425,157 @@ run("public taxonomy excludes fasteners category and rules", () => {
   assert.equal(isPublicTaxonomyTarget("krepezh", "bolty"), false);
 });
 
-run("fastener-like single token is not auto-published as a new public category", () => {
-  const result = categorizeProductName("B-1 болт м8", buildDefaultCategorizationContext());
+run("all assortment exposes only aggregate subcategory publicly", () => {
+  const allAssortment = catalogTaxonomy.find(
+    (category) => category.slug === ALL_ASSORTMENT_CATEGORY_SLUG
+  );
 
-  assert.notEqual(result.target?.categorySlug, "krepezh");
-  assert.equal(needsProductReview(row({ shopCode: "B-1", name: "болт м8" }), result), true);
+  assert.ok(allAssortment);
+  assert.equal(
+    allAssortment.subcategories.some(([slug]) => slug === ALL_PRODUCTS_SUBCATEGORY_SLUG),
+    true
+  );
+  assert.equal(
+    allAssortment.subcategories.some(([slug]) => slug === OTHER_PRODUCTS_SUBCATEGORY_SLUG),
+    true
+  );
+  assert.equal(
+    isPublicTaxonomyTarget(ALL_ASSORTMENT_CATEGORY_SLUG, OTHER_PRODUCTS_SUBCATEGORY_SLUG),
+    true
+  );
+  assert.equal(
+    isHiddenPublicSubcategory(ALL_ASSORTMENT_CATEGORY_SLUG, OTHER_PRODUCTS_SUBCATEGORY_SLUG),
+    true
+  );
+  assert.equal(
+    isPublicNavigationTaxonomyTarget(ALL_ASSORTMENT_CATEGORY_SLUG, OTHER_PRODUCTS_SUBCATEGORY_SLUG),
+    false
+  );
+  assert.equal(
+    isPublicNavigationTaxonomyTarget(ALL_ASSORTMENT_CATEGORY_SLUG, ALL_PRODUCTS_SUBCATEGORY_SLUG),
+    true
+  );
+  assert.equal(
+    isAllowedPublicSearchFilter({
+      categorySlug: ALL_ASSORTMENT_CATEGORY_SLUG,
+      subcategorySlug: OTHER_PRODUCTS_SUBCATEGORY_SLUG
+    }),
+    false
+  );
+  assert.equal(
+    isAllowedPublicSearchFilter({
+      categorySlug: ALL_ASSORTMENT_CATEGORY_SLUG,
+      subcategorySlug: ALL_PRODUCTS_SUBCATEGORY_SLUG
+    }),
+    true
+  );
+});
+
+run("universal fasteners fall back to hidden other-products target", () => {
+  const result = categorizeProductName("B-1 Болт М8x30 DIN 933", buildDefaultCategorizationContext());
+
+  assert.equal(result.target?.categorySlug, ALL_ASSORTMENT_CATEGORY_SLUG);
+  assert.equal(result.target?.subcategorySlug, OTHER_PRODUCTS_SUBCATEGORY_SLUG);
+  assert.equal(result.decisionStatus, "AUTO_READY");
+  assert.equal(needsProductReview(row({ shopCode: "B-1", name: "Болт М8x30 DIN 933" }), result), false);
+});
+
+run("normalizer preserves automotive technical tokens", () => {
+  const result = normalizeProductName("Лампа диодная Т10 W5W H7 12В DOT4 5W-30");
+
+  for (const token of ["t10", "w5w", "h7", "12v", "dot4", "5w-30"]) {
+    assert.ok(result.technicalTokens.includes(token), token);
+  }
+});
+
+run("compressor does not match suspension spring by substring", () => {
+  const result = categorizeProductName("A-2 Компрессор малый", buildDefaultCategorizationContext());
+
+  assert.notEqual(result.target?.subcategorySlug, "ressory");
+});
+
+run("t10 bulb becomes auto-ready while broad sensor stays grouped for review", () => {
+  const context = buildDefaultCategorizationContext();
+  const bulb = categorizeProductName("A-3 Лампа диодная Т10 12В", context);
+  const sensor = categorizeProductName("A-4 Датчик кислорода", context);
+
+  assert.equal(bulb.target?.categorySlug, "elektrika");
+  assert.equal(bulb.target?.subcategorySlug, "lampy");
+  assert.equal(bulb.decisionStatus, "AUTO_READY");
+  assert.equal(needsProductReview(row({ shopCode: "A-3", name: "Лампа диодная Т10 12В" }), bulb), false);
+  assert.equal(sensor.target?.subcategorySlug, "datchiki");
+  assert.equal(sensor.decisionStatus, "GROUP_REVIEW");
+  assert.equal(needsProductReview(row({ shopCode: "A-4", name: "Датчик кислорода" }), sensor), true);
+});
+
+run("residual context families group without reopening generic fasteners", () => {
+  const context = buildDefaultCategorizationContext();
+  const seatBelt = categorizeProductName("A-5 Ремни безопасности 2101-07", context);
+  const copperTube = categorizeProductName("A-6 Трубки медные д.5 для иномарок 50 см", context);
+  const pneumaticFitting = categorizeProductName("A-7 Фурнитура наружная резьба D=6 М 20*1.5", context);
+  const valveBushing = categorizeProductName("A-8 Втулки клапанов 2101-08", context);
+  const heaterValve = categorizeProductName("A-9 Кран печки 2108", context);
+  const genericDin = categorizeProductName("A-10 DIN912 M10*25 с внутренним шестигранником", context);
+
+  assert.equal(seatBelt.decisionStatus, "GROUP_REVIEW");
+  assert.equal(seatBelt.target?.subcategorySlug, "bezopasnost");
+  assert.equal(copperTube.decisionStatus, "GROUP_REVIEW");
+  assert.equal(copperTube.target?.subcategorySlug, "tormoznye-trubki");
+  assert.equal(pneumaticFitting.decisionStatus, "GROUP_REVIEW");
+  assert.equal(pneumaticFitting.target?.subcategorySlug, "prochaya-tormoznaya-sistema");
+  assert.equal(valveBushing.decisionStatus, "GROUP_REVIEW");
+  assert.equal(valveBushing.target?.subcategorySlug, "detali-dvigatelya");
+  assert.equal(heaterValve.decisionStatus, "GROUP_REVIEW");
+  assert.equal(heaterValve.target?.subcategorySlug, "ohlazhdenie");
+  assert.equal(genericDin.decisionStatus, "MANUAL_REVIEW");
+  assert.equal(genericDin.target, null);
+});
+
+run("other-products fallback never overrides exact automotive context", () => {
+  const context = buildDefaultCategorizationContext();
+  const wheelBolt = categorizeProductName("A-12 Болт колеса М12x1,5", context);
+  const brakeFitting = categorizeProductName("A-13 Фитинг тормозной трубки М10", context);
+  const exhaustClamp = categorizeProductName("A-14 Хомут глушителя 50 мм", context);
+  const straightFitting = categorizeProductName("A-15 Фитинг прямой 8 мм", context);
+  const genericClamp = categorizeProductName("A-16 Хомут 20-32 мм", context);
+
+  assert.notEqual(wheelBolt.target?.subcategorySlug, OTHER_PRODUCTS_SUBCATEGORY_SLUG);
+  assert.equal(wheelBolt.target?.categorySlug, "aksessuary");
+  assert.notEqual(brakeFitting.target?.subcategorySlug, OTHER_PRODUCTS_SUBCATEGORY_SLUG);
+  assert.equal(brakeFitting.target?.categorySlug, "tormoznaya-sistema");
+  assert.notEqual(exhaustClamp.target?.subcategorySlug, OTHER_PRODUCTS_SUBCATEGORY_SLUG);
+  assert.equal(exhaustClamp.target?.subcategorySlug, "vyhlopnaya-sistema");
+  assert.equal(straightFitting.target?.categorySlug, ALL_ASSORTMENT_CATEGORY_SLUG);
+  assert.equal(straightFitting.target?.subcategorySlug, OTHER_PRODUCTS_SUBCATEGORY_SLUG);
+  assert.equal(genericClamp.target?.categorySlug, ALL_ASSORTMENT_CATEGORY_SLUG);
+  assert.equal(genericClamp.target?.subcategorySlug, OTHER_PRODUCTS_SUBCATEGORY_SLUG);
+});
+
+run("code-only and size-only rows become do-not-publish draft products", () => {
+  const context = buildDefaultCategorizationContext();
+  const codeOnly = categorizeProductName("123456789", context);
+  const duplicatedCode = categorizeProductName("К-00535 К-00535", context);
+  const sizeOnly = categorizeProductName("M8 20мм", context);
+
+  assert.equal(codeOnly.decisionStatus, "DO_NOT_PUBLISH");
+  assert.equal(codeOnly.reviewReasonCode, "CODE_ONLY");
+  assert.equal(codeOnly.target, null);
+  assert.equal(duplicatedCode.decisionStatus, "DO_NOT_PUBLISH");
+  assert.equal(duplicatedCode.reviewReasonCode, "CODE_ONLY");
+  assert.equal(resolveDraftProductStatus(row({ name: "123456789" }), codeOnly), "invalid");
+  assert.equal(sizeOnly.decisionStatus, "DO_NOT_PUBLISH");
+  assert.equal(sizeOnly.reviewReasonCode, "SIZE_ONLY");
+  assert.equal(resolveDraftProductStatus(row({ name: "M8 20мм" }), sizeOnly), "invalid");
+});
+
+run("slash wiper abbreviation normalizes to a safe glass-cleaner signal", () => {
+  const normalized = normalizeProductName("Щетки с/о 60+55");
+  const result = categorizeProductName("A-11 Щетки с/о 60+55", buildDefaultCategorizationContext());
+
+  assert.ok(normalized.tokens.includes("стеклоочистителя"));
+  assert.equal(result.target?.categorySlug, "aksessuary");
+  assert.equal(result.target?.subcategorySlug, "prochie-aksessuary");
+  assert.notEqual(result.target?.subcategorySlug, "ressory");
 });
 
 run("broad review rule words are rejected across casing punctuation and forms", () => {
@@ -606,6 +767,90 @@ run("search documents query filters active products and public taxonomy", () => 
 
   assert.match(source, /eq\(products\.status,\s*"active"\)/);
   assert.match(source, /publicTaxonomyTargetCondition/);
+});
+
+run("search t10 uses exact technical token and lamp subject", () => {
+  const synonyms: SearchSynonymRecord[] = [];
+  const documents = [
+    searchDocument({
+      id: "lamp-t10",
+      shopCode: "L-1",
+      shopCodeCompact: "L1",
+      name: "Лампа диодная T10 12V",
+      categorySlug: "elektrika",
+      categoryName: "Электрика",
+      subcategorySlug: "lampy",
+      subcategoryName: "Лампы",
+      searchText: "лампа диодная t10 12v"
+    }),
+    searchDocument({
+      id: "lamp-w5w",
+      shopCode: "L-2",
+      shopCodeCompact: "L2",
+      name: "Лампа W5W",
+      categorySlug: "elektrika",
+      categoryName: "Электрика",
+      subcategorySlug: "lampy",
+      subcategoryName: "Лампы",
+      searchText: "лампа w5w"
+    }),
+    searchDocument({
+      id: "tire-t1001",
+      shopCode: "T1001",
+      shopCodeCompact: "T1001",
+      name: "Шина T1001",
+      categorySlug: "aksessuary",
+      categoryName: "Аксессуары",
+      subcategorySlug: "shiny-i-diski",
+      subcategoryName: "Шины и диски",
+      searchText: "шина t1001"
+    }),
+    searchDocument({
+      id: "tool-t10",
+      shopCode: "I-1",
+      shopCodeCompact: "I1",
+      name: "Ключ TORX T10",
+      categorySlug: "aksessuary",
+      categoryName: "Аксессуары",
+      subcategorySlug: "instrumenty",
+      subcategoryName: "Инструменты",
+      searchText: "ключ torx t10"
+    })
+  ];
+
+  const lampCandidates = documents.filter((document) => documentMatchesQuery(document, "лампа t10", synonyms));
+  const t10Candidates = documents.filter((document) => documentMatchesQuery(document, "t10", synonyms));
+  const t10Hits = rankSearchHits(t10Candidates, "t10", synonyms);
+
+  assert.deepEqual(lampCandidates.map((document) => document.id).sort(), ["lamp-t10", "lamp-w5w"]);
+  assert.equal(t10Candidates.some((document) => document.id === "tire-t1001"), false);
+  assert.equal(t10Hits[0]?.id, "lamp-t10");
+});
+
+run("other-products search document uses aggregate public URL", () => {
+  const document = buildSearchDocument(
+    {
+      id: "other-1",
+      catalogVersionId: "active",
+      shopCode: "B-100",
+      rawName: "Болт М8x30 DIN 933",
+      name: "Болт М8x30 DIN 933",
+      slug: "b-100-bolt-m8x30-din-933",
+      price: 25,
+      categorySlug: ALL_ASSORTMENT_CATEGORY_SLUG,
+      categoryName: "Весь ассортимент",
+      subcategorySlug: OTHER_PRODUCTS_SUBCATEGORY_SLUG,
+      subcategoryName: "Прочие товары"
+    },
+    []
+  );
+
+  assert.equal(
+    document.url,
+    `/catalog/${ALL_ASSORTMENT_CATEGORY_SLUG}/${ALL_PRODUCTS_SUBCATEGORY_SLUG}/b-100-bolt-m8x30-din-933`
+  );
+  assert.match(document.searchText, /Болт М8x30 DIN 933/);
+  assert.match(document.searchText, /Прочие товары/);
 });
 
 run("publish prepares search index before active DB transaction", () => {

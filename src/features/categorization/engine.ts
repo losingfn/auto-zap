@@ -1,6 +1,8 @@
-import { defaultCategorizationRules } from "@/config/catalog-taxonomy";
+import { catalogTaxonomy, defaultCategorizationRules } from "@/config/catalog-taxonomy";
 import { isPublicTaxonomyTarget } from "@/config/public-taxonomy";
 import { normalizeText } from "@/features/import/normalize";
+import { containsPhrase, normalizeProductText, tokenizeNormalizedProductText } from "./normalization";
+import { classifyWithDomainPipeline } from "./pipeline";
 import {
   AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD,
   MEDIUM_CATEGORIZATION_CONFIDENCE_THRESHOLD,
@@ -128,12 +130,7 @@ const safeHighConfidenceSingleRules = new Set([
 ]);
 
 export function normalizeForCategorization(value: string) {
-  return normalizeText(value)
-    .toLowerCase()
-    .replace(/ё/g, "е")
-    .replace(/[.,;:()[\]{}"']/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return normalizeProductText(normalizeText(value));
 }
 
 export function categorizeProductName(
@@ -156,7 +153,8 @@ export function categorizeProductName(
         }
       ],
       needsReview: false,
-      reviewReason: null
+      reviewReason: null,
+      decisionStatus: "AUTO_READY"
     };
   }
 
@@ -182,33 +180,44 @@ export function categorizeProductName(
     .find((rule) => ruleMatches(rule, text));
 
   if (!matchedRule) {
-    return buildUnresolvedResult({
-      source: "no_match",
-      reason: "Категория и подкатегория не определены правилами.",
-      signal: "no_match"
-    });
+    return classifyWithDomainPipeline(
+      productName,
+      context,
+      buildUnresolvedResult({
+        source: "no_match",
+        reason: "Категория и подкатегория не определены правилами.",
+        signal: "no_match"
+      })
+    );
   }
 
   const score = scoreMatchedRule(matchedRule, text);
   const target = targetFromRule(matchedRule);
   if (!isPublicTaxonomyTarget(target.categorySlug, target.subcategorySlug)) {
-    return buildUnresolvedResult({
-      source: "invalid_taxonomy_target",
-      reason: "Правило указывает на категорию, которой нет в согласованной публичной таксономии.",
-      signal: `${target.categorySlug}/${target.subcategorySlug}`
-    });
+    return classifyWithDomainPipeline(
+      productName,
+      context,
+      buildUnresolvedResult({
+        source: "invalid_taxonomy_target",
+        reason: "Правило указывает на категорию, которой нет в согласованной публичной таксономии.",
+        signal: `${target.categorySlug}/${target.subcategorySlug}`
+      })
+    );
   }
 
-  return {
+  return classifyWithDomainPipeline(productName, context, {
     target,
     matchedRule,
     confidence: score.confidence,
     source: score.source,
     reason: score.reason,
     matchedSignals: score.matchedSignals,
-    needsReview: false,
-    reviewReason: null
-  };
+    needsReview: score.confidence < AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD,
+    reviewReason:
+      score.confidence < AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD
+        ? "Требуется подтверждение из-за недостаточной уверенности."
+        : null
+  });
 }
 
 export function getCategorizationConfidenceBucket(
@@ -233,12 +242,28 @@ export function buildDefaultCategorizationContext(): CategorizationContext {
     subcategorySlug: rule.subcategorySlug,
     priority: rule.priority
   }));
+  const targetBySlug = new Map<string, CategorizationTarget>();
+  for (const category of catalogTaxonomy) {
+    for (const [subcategorySlug, subcategoryName] of category.subcategories) {
+      if (!isPublicTaxonomyTarget(category.slug, subcategorySlug)) {
+        continue;
+      }
+
+      targetBySlug.set(`${category.slug}/${subcategorySlug}`, {
+        categorySlug: category.slug,
+        categoryName: category.name,
+        subcategorySlug,
+        subcategoryName
+      });
+    }
+  }
 
   return {
     rules: rules.filter((rule) =>
       isPublicTaxonomyTarget(rule.categorySlug, rule.subcategorySlug)
     ),
-    fallbackByCategorySlug: new Map<string, CategorizationTarget>()
+    fallbackByCategorySlug: new Map<string, CategorizationTarget>(),
+    targetBySlug
   };
 }
 
@@ -432,6 +457,28 @@ function ruleMatches(rule: CategorizationRuleRecord, normalizedText: string) {
       }
     case "contains":
     default:
-      return normalizedText.includes(pattern);
+      return patternMatchesNormalizedText(pattern, normalizedText);
   }
+}
+
+function patternMatchesNormalizedText(pattern: string, normalizedText: string) {
+  if (pattern.includes(" ")) {
+    const patternTokens = tokenizeNormalizedProductText(pattern);
+    const textTokens = tokenizeNormalizedProductText(normalizedText);
+    let cursor = 0;
+    for (const patternToken of patternTokens) {
+      const nextIndex = textTokens.findIndex(
+        (token, index) => index >= cursor && token.startsWith(patternToken)
+      );
+      if (nextIndex === -1) {
+        return containsPhrase({ normalized: normalizedText }, pattern);
+      }
+      cursor = nextIndex + 1;
+    }
+    return true;
+  }
+
+  return tokenizeNormalizedProductText(normalizedText).some(
+    (token) => token === pattern || token.startsWith(pattern)
+  );
 }

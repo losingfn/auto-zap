@@ -174,10 +174,11 @@ function topEntries(bucket: Map<string, { count: number; examples: string[] }>, 
 
 function shouldAutoPublishInShadow(
   row: { status: string },
-  result: { target: unknown; confidence: number }
+  result: { target: unknown; confidence: number; needsReview?: boolean }
 ) {
   return Boolean(
     row.status === "valid" &&
+      !result.needsReview &&
       result.target &&
       result.confidence >= AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD
   );

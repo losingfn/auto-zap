@@ -1,4 +1,5 @@
 import path from "node:path";
+import { writeFile } from "node:fs/promises";
 import { buildDefaultCategorizationContext, categorizeProductName } from "../src/features/categorization/engine";
 import { analyzeImportFile } from "../src/features/import/analyze";
 import { buildSearchDocument, getStaticSubcategoryName } from "../src/features/search/documents";
@@ -13,77 +14,95 @@ if (!inputPath) {
   process.exit(1);
 }
 
-const queries = queryArgs.length > 0 ? queryArgs : ["масло", "акб", "дворники", "А-00002", "maslo", "акумулятор"];
-const analysis = analyzeImportFile(path.resolve(inputPath));
-const categorizationContext = buildDefaultCategorizationContext();
-const synonyms = getDefaultSearchSynonyms();
-const documents: SearchProductDocument[] = [];
-
-for (const row of analysis.rows) {
-  if (!row.shopCode || row.price === null || row.status === "error" || row.status === "skipped") {
-    continue;
-  }
-
-  const categorization = categorizeProductName(
-    `${row.shopCode} ${row.name || row.rawName}`,
-    categorizationContext
-  );
-
-  if (!categorization.target) {
-    continue;
-  }
-
-  const names = getStaticSubcategoryName(
-    categorization.target.categorySlug,
-    categorization.target.subcategorySlug
-  );
-
-  documents.push(
-    buildSearchDocument(
-      {
-        id: `${row.rowNumber}-${row.shopCode}`,
-        catalogVersionId: "fixture",
-        shopCode: row.shopCode,
-        rawName: row.rawName,
-        name: row.name || row.shopCode,
-        slug: row.shopCode.toLowerCase(),
-        price: row.price,
-        categorySlug: categorization.target.categorySlug,
-        categoryName: names.categoryName ?? categorization.target.categorySlug,
-        subcategorySlug: categorization.target.subcategorySlug,
-        subcategoryName: names.subcategoryName ?? categorization.target.subcategorySlug
-      },
-      synonyms
-    )
-  );
-}
-
-const report = queries.map((query) => {
-  const candidates = documents.filter((document) => documentMatchesQuery(document, query, synonyms));
-  return {
-    query,
-    totalCandidates: candidates.length,
-    hits: rankSearchHits(candidates, query, synonyms)
-      .slice(0, 5)
-      .map((hit) => ({
-        shopCode: hit.shopCode,
-        name: hit.name,
-        category: hit.categoryName,
-        subcategory: hit.subcategoryName,
-        score: Math.round(hit.relevanceScore)
-      }))
-  };
+const outArg = queryArgs.find((arg) => arg.startsWith("--out="));
+const queryList = queryArgs.filter((arg) => !arg.startsWith("--out="));
+const queries = queryList.length > 0 ? queryList : ["масло", "акб", "дворники", "А-00002", "maslo", "акумулятор"];
+void main().catch((error) => {
+  console.error(error);
+  process.exit(1);
 });
 
-console.log(
-  JSON.stringify(
-    {
-      fileName: analysis.report.fileName,
-      selectedSheetName: analysis.report.selectedSheetName,
-      indexedFixtureDocuments: documents.length,
-      report
-    },
-    null,
-    2
-  )
-);
+async function main() {
+  const analysis = analyzeImportFile(path.resolve(inputPath!));
+  const categorizationContext = buildDefaultCategorizationContext();
+  const synonyms = getDefaultSearchSynonyms();
+  const documents: SearchProductDocument[] = [];
+  let excludedReviewDocuments = 0;
+
+  for (const row of analysis.rows) {
+    if (!row.shopCode || row.price === null || row.status === "error" || row.status === "skipped") {
+      continue;
+    }
+
+    const categorization = categorizeProductName(
+      `${row.shopCode} ${row.name || row.rawName}`,
+      categorizationContext
+    );
+
+    if (
+      !categorization.target ||
+      categorization.needsReview ||
+      categorization.decisionStatus !== "AUTO_READY"
+    ) {
+      excludedReviewDocuments += 1;
+      continue;
+    }
+
+    const names = getStaticSubcategoryName(
+      categorization.target.categorySlug,
+      categorization.target.subcategorySlug
+    );
+
+    documents.push(
+      buildSearchDocument(
+        {
+          id: `${row.rowNumber}-${row.shopCode}`,
+          catalogVersionId: "fixture",
+          shopCode: row.shopCode,
+          rawName: row.rawName,
+          name: row.name || row.shopCode,
+          slug: row.shopCode.toLowerCase(),
+          price: row.price,
+          categorySlug: categorization.target.categorySlug,
+          categoryName: names.categoryName ?? categorization.target.categorySlug,
+          subcategorySlug: categorization.target.subcategorySlug,
+          subcategoryName: names.subcategoryName ?? categorization.target.subcategorySlug
+        },
+        synonyms
+      )
+    );
+  }
+
+  const report = queries.map((query) => {
+    const candidates = documents.filter((document) => documentMatchesQuery(document, query, synonyms));
+    return {
+      query,
+      totalCandidates: candidates.length,
+      hits: rankSearchHits(candidates, query, synonyms)
+        .slice(0, 5)
+        .map((hit) => ({
+          shopCode: hit.shopCode,
+          name: hit.name,
+          category: hit.categoryName,
+          subcategory: hit.subcategoryName,
+          score: Math.round(hit.relevanceScore)
+        }))
+    };
+  });
+
+  const output = {
+    fileName: analysis.report.fileName,
+    selectedSheetName: analysis.report.selectedSheetName,
+    indexedFixtureDocuments: documents.length,
+    excludedReviewDocuments,
+    reviewProductsIndexed: 0,
+    report
+  };
+  const json = JSON.stringify(output, null, 2);
+
+  if (outArg) {
+    await writeFile(path.resolve(outArg.slice("--out=".length)), `${json}\n`, "utf8");
+  }
+
+  console.log(json);
+}

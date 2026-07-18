@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SearchPageForm } from "@/components/search/search-page-form";
 import { PublicFooter } from "@/components/site/public-footer";
+import { formatPublicTargetLabel } from "@/config/public-taxonomy";
 import { searchProducts } from "@/features/search/service";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +60,7 @@ export default async function SearchPage({
                     <div>
                       <h2 className="text-base font-semibold leading-6">{product.name}</h2>
                       <p className="mt-1 text-sm text-[#CBD5E1]">
-                        {product.categoryName} → {product.subcategoryName}
+                        {formatPublicTargetLabel(product)}
                       </p>
                     </div>
                     <div className="text-lg font-semibold text-white">

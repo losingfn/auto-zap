@@ -16,6 +16,8 @@
     "review:diagnose": "scripts/with-env.sh node --import tsx scripts/diagnose-review.ts",
     "categorization:check": "node --import tsx scripts/check-categorization.ts",
     "categorization:gaps": "node --import tsx scripts/analyze-categorization-gaps.ts",
+    "categorization:offline": "node --import tsx scripts/offline-categorization-report.ts",
+    "categorization:replay": "node --import tsx scripts/replay-import-categorization.ts",
     "taxonomy:sync": "scripts/with-env.sh node --import tsx scripts/sync-taxonomy.ts",
     "taxonomy:sync:test": "scripts/with-env.sh node --import tsx scripts/test-taxonomy-sync.ts",
     "taxonomy:sync-seed": "node --import tsx scripts/sync-taxonomy-seed.ts",

@@ -1,6 +1,7 @@
 import postgres from "postgres";
 import { catalogTaxonomy, defaultCategorizationRules, deprecatedCategorizationRules } from "../src/config/catalog-taxonomy";
 import { catalogCategories } from "../src/config/categories";
+import { isHiddenPublicSubcategory } from "../src/config/public-taxonomy";
 
 type Queryable = postgres.Sql | postgres.TransactionSql;
 
@@ -20,6 +21,7 @@ interface SubcategorySeed {
   slug: string;
   name: string;
   sortOrder: number;
+  isHidden: boolean;
 }
 
 interface RuleSeed {
@@ -54,6 +56,7 @@ interface SubcategoryRow {
   slug: string;
   name: string;
   sort_order: number;
+  is_hidden: boolean;
 }
 
 interface RuleRow {
@@ -85,7 +88,7 @@ interface SubcategoryUpdate {
   categorySlug: string;
   slug: string;
   id: string;
-  changes: Record<string, { from: string | number | null; to: string | number | null }>;
+  changes: Record<string, { from: string | number | boolean | null; to: string | number | boolean | null }>;
 }
 
 interface RuleUpdate {
@@ -129,7 +132,7 @@ export interface TaxonomySyncSummary {
     unchanged: number;
   };
   subcategories: {
-    add: Array<Pick<SubcategorySeed, "categorySlug" | "slug" | "name" | "sortOrder">>;
+    add: Array<Pick<SubcategorySeed, "categorySlug" | "slug" | "name" | "sortOrder" | "isHidden">>;
     update: SubcategoryUpdate[];
     unchanged: number;
   };
@@ -464,8 +467,8 @@ export async function applyTaxonomySyncPlan(tx: postgres.TransactionSql, plan: T
 
   for (const seed of plan.subcategoriesToAdd) {
     const inserted = await tx<{ id: string }[]>`
-      INSERT INTO subcategories (category_id, slug, name, sort_order)
-      SELECT categories.id, ${seed.slug}, ${seed.name}, ${seed.sortOrder}
+      INSERT INTO subcategories (category_id, slug, name, sort_order, is_hidden)
+      SELECT categories.id, ${seed.slug}, ${seed.name}, ${seed.sortOrder}, ${seed.isHidden}
       FROM categories
       WHERE categories.slug = ${seed.categorySlug}
       RETURNING id
@@ -487,6 +490,7 @@ export async function applyTaxonomySyncPlan(tx: postgres.TransactionSql, plan: T
       SET
         name = ${seed.name},
         sort_order = ${seed.sortOrder},
+        is_hidden = ${seed.isHidden},
         updated_at = now()
       WHERE id = ${update.id}
       RETURNING id
@@ -561,11 +565,12 @@ export function summarizePlan(plan: TaxonomySyncPlan, dryRun: boolean): Taxonomy
       unchanged: plan.categoriesUnchanged
     },
     subcategories: {
-      add: plan.subcategoriesToAdd.map(({ categorySlug, slug, name, sortOrder }) => ({
+      add: plan.subcategoriesToAdd.map(({ categorySlug, slug, name, sortOrder, isHidden }) => ({
         categorySlug,
         slug,
         name,
-        sortOrder
+        sortOrder,
+        isHidden
       })),
       update: plan.subcategoriesToUpdate,
       unchanged: plan.subcategoriesUnchanged
@@ -619,7 +624,8 @@ function buildDesiredTaxonomy() {
       categorySlug: category.slug,
       slug,
       name,
-      sortOrder: (index + 1) * 10
+      sortOrder: (index + 1) * 10,
+      isHidden: isHiddenPublicSubcategory(category.slug, slug)
     }))
   );
 
@@ -715,7 +721,8 @@ async function loadSubcategories(sql: Queryable) {
       categories.slug AS category_slug,
       subcategories.slug,
       subcategories.name,
-      subcategories.sort_order
+      subcategories.sort_order,
+      subcategories.is_hidden
     FROM subcategories
     INNER JOIN categories ON categories.id = subcategories.category_id
   `;
@@ -777,7 +784,8 @@ function diffCategory(row: CategoryRow, seed: CategorySeed): CategoryUpdate["cha
 function diffSubcategory(row: SubcategoryRow, seed: SubcategorySeed): SubcategoryUpdate["changes"] {
   return compactChanges({
     name: change(row.name, seed.name),
-    sortOrder: change(row.sort_order, seed.sortOrder)
+    sortOrder: change(row.sort_order, seed.sortOrder),
+    isHidden: change(row.is_hidden, seed.isHidden)
   });
 }
 

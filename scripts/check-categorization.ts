@@ -171,6 +171,7 @@ function topEntries(bucket: Map<string, { count: number; examples: string[] }>, 
 function shouldAutoPublishInShadow(row: AnalyzedImportRow, result: CategorizationResult) {
   return Boolean(
     row.status === "valid" &&
+      !result.needsReview &&
       result.target &&
       result.confidence >= AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD
   );

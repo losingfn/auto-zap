@@ -1,0 +1,13 @@
+Family,Residual,Contextual,No context,Active analogs,Top target,Purity,Confidence gap,Conflict share,No analog share,Safe auto,Safe group,Irreducible,Limit reason
+Unique low-frequency items,606,92,514,0,,0,0,0,1,0,0,606,Редкие единичные товары без активных аналогов и без повторяемого паттерна.
+Generic fasteners without destination,432,22,410,806,aksessuary/shiny-i-diski,0.1303,0.0025,0.8697,0,0,0,432,"Есть только тип крепежа/размер, без узла автомобиля и без единого безопасного target."
+Short/code-only names,336,1,335,0,,0,0,0,1,0,0,336,"Название состоит из кода или слишком короткой фразы, классификационных признаков недостаточно."
+Ambiguous fittings and connectors,137,17,120,271,tormoznaya-sistema/prochaya-tormoznaya-sistema,0.3911,0.2731,0.6089,0,0,0,137,Похожие соединители в активном каталоге распределены по нескольким системам; без назначения нельзя выбрать подкатегорию.
+DIN/socket-head fasteners without public target,77,0,77,39,aksessuary/instrumenty,0.8718,0.8205,0.1282,0,0,0,77,"Крепёж как самостоятельная категория запрещён, а назначения узла в названии нет."
+Small body/interior parts with weak context,60,5,55,761,kuzov-i-optika/kuzovnye-detali,0.2326,0.1551,0.7674,0,0,0,60,"Малые кузовные/салонные элементы имеют похожие названия, но разные targets и часто недостаточный контекст."
+Rings and seals without destination,39,0,39,508,dvigatel-i-transmissiya/detali-dvigatelya,0.5827,0.4862,0.4173,0,0,0,39,"Кольца и уплотнения встречаются в двигателе, КПП, ступицах, тормозах и выхлопе."
+Engine small parts with partial context,36,13,23,570,dvigatel-i-transmissiya/detali-dvigatelya,0.2807,0.1825,0.7193,0,0,0,36,"Часть моторного контекста есть, но оставшиеся позиции требуют дополнительного правила или проверки шума активного каталога."
+Hoses and tubes without system,33,33,0,1247,dvigatel-i-transmissiya/detali-dvigatelya,0.3368,0.1371,0.6632,0,0,0,33,"Шланги/трубки без тормозного, топливного, охлаждающего, ГУР или выхлопного контекста нельзя безопасно развести."
+"Caps, covers and plugs without destination",31,10,21,403,dvigatel-i-transmissiya/detali-dvigatelya,0.2184,0.1266,0.7816,0,0,0,31,"Крышки и заглушки требуют контекст узла: радиатор, поддон, фара, бардачок, КПП и т.п."
+Personal/non-catalog accessories,18,0,18,14,aksessuary/instrumenty,0.2857,0.1429,0.7143,0,0,0,18,Позиции не имеют точного публичного target в текущей автомобильной таксономии.
+Electrical/consumer devices without auto context,8,0,8,27,elektrika/prochaya-elektrika,0.3333,0.1111,0.6667,0,0,0,8,"Электрический товар есть, но автомобильное назначение не подтверждено достаточными признаками."

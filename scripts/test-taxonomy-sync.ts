@@ -42,6 +42,7 @@ async function main() {
       "apply should insert system rules"
     );
     await assertValidRuleTargets();
+    await assertOtherProductsVisibility();
 
     const categoryIdsBeforeRepeat = await loadCategoryIds();
     const repeat = await syncTaxonomy(sql, { dryRun: false });
@@ -52,6 +53,7 @@ async function main() {
     assert(repeat.rules.update.length === 0, "repeat apply should not update rules");
     assert(repeat.rules.deactivateSystemDeprecated.length === 0, "repeat apply should not deactivate rules");
     assertCategoryIdsUnchanged(categoryIdsBeforeRepeat, await loadCategoryIds());
+    await assertOtherProductsVisibility();
 
     await insertLearningRule();
     const afterLearning = await syncTaxonomy(sql, { dryRun: false });
@@ -121,6 +123,21 @@ async function assertValidRuleTargets() {
        OR subcategories.id IS NULL
   `;
   assert(Number(row.count) === 0, `expected all rules to have valid targets, got ${row.count}`);
+}
+
+async function assertOtherProductsVisibility() {
+  const rows = await sql<{ slug: string; is_hidden: boolean }[]>`
+    SELECT subcategories.slug, subcategories.is_hidden
+    FROM subcategories
+    INNER JOIN categories ON categories.id = subcategories.category_id
+    WHERE categories.slug = 'ves-assortiment'
+      AND subcategories.slug IN ('vse-tovary', 'other-products')
+    ORDER BY subcategories.slug
+  `;
+  const visibility = new Map(rows.map((row) => [row.slug, row.is_hidden]));
+
+  assert(visibility.get("vse-tovary") === false, "vse-tovary should remain visible");
+  assert(visibility.get("other-products") === true, "other-products should be hidden");
 }
 
 async function loadCategoryIds() {

@@ -175,7 +175,8 @@ export async function getAdminTaxonomyOptions() {
         slug: subcategories.slug,
         name: subcategories.name,
         sortOrder: subcategories.sortOrder,
-        isActive: subcategories.isActive
+        isActive: subcategories.isActive,
+        isHidden: subcategories.isHidden
       })
       .from(subcategories)
       .orderBy(asc(subcategories.sortOrder), asc(subcategories.name))

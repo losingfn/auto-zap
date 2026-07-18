@@ -2,9 +2,12 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { catalogCategories } from "@/config/categories";
 import {
+  ALL_ASSORTMENT_CATEGORY_SLUG,
+  ALL_PRODUCTS_SUBCATEGORY_SLUG,
   getPublicCategorySlugs,
   getPublicTaxonomyTargets,
   isPublicCategorySlug,
+  isPublicNavigationTaxonomyTarget,
   isPublicTaxonomyTarget
 } from "@/config/public-taxonomy";
 import { categories, catalogVersions, products, subcategories } from "@/db/schema";
@@ -17,8 +20,6 @@ import type {
 } from "./types";
 import { searchProducts } from "@/features/search/service";
 
-const ALL_ASSORTMENT_SLUG = "ves-assortiment";
-const ALL_PRODUCTS_SUBCATEGORY_SLUG = "vse-tovary";
 const DEFAULT_PRODUCTS_PAGE_SIZE = 50;
 const PUBLIC_CATALOG_TIMEOUT_MS = 3500;
 
@@ -141,10 +142,10 @@ async function loadSubcategoriesForCategory(categorySlug: string): Promise<{
       icon: categoryIconBySlug(category.slug),
       description: null,
       sortOrder: staticCategory?.sortOrder ?? 0,
-      isAllAssortment: category.slug === ALL_ASSORTMENT_SLUG
+      isAllAssortment: category.slug === ALL_ASSORTMENT_CATEGORY_SLUG
     };
 
-    if (category.slug === ALL_ASSORTMENT_SLUG) {
+    if (category.slug === ALL_ASSORTMENT_CATEGORY_SLUG) {
       return {
         category: publicCategory,
         subcategories: [
@@ -161,7 +162,8 @@ async function loadSubcategoriesForCategory(categorySlug: string): Promise<{
       .select({
         id: subcategories.id,
         slug: subcategories.slug,
-        name: subcategories.name
+        name: subcategories.name,
+        isHidden: subcategories.isHidden
       })
       .from(subcategories)
       .where(and(eq(subcategories.categoryId, category.id), eq(subcategories.isActive, true)))
@@ -170,7 +172,11 @@ async function loadSubcategoriesForCategory(categorySlug: string): Promise<{
     const items = (
       await Promise.all(
         rows
-          .filter((row) => isPublicTaxonomyTarget(category.slug, row.slug))
+          .filter(
+            (row) =>
+              !row.isHidden &&
+              isPublicNavigationTaxonomyTarget(category.slug, row.slug)
+          )
           .map(async (row) => ({
             id: row.id,
             slug: row.slug,
@@ -222,7 +228,7 @@ async function loadPublicCatalogCategories(): Promise<PublicCategory[]> {
     .orderBy(asc(categories.sortOrder), asc(categories.name));
 
   const items: PublicCategory[] = rows
-    .filter((row) => row.productCount > 0 && row.slug !== ALL_ASSORTMENT_SLUG)
+    .filter((row) => row.productCount > 0 && row.slug !== ALL_ASSORTMENT_CATEGORY_SLUG)
     .map((row) => {
       const staticCategory = staticCategoryBySlug(row.slug);
 
@@ -238,7 +244,7 @@ async function loadPublicCatalogCategories(): Promise<PublicCategory[]> {
     });
 
   const totalProducts = await countProducts(activeVersionId);
-  const allAssortment = publicCategoryFromStatic(ALL_ASSORTMENT_SLUG);
+  const allAssortment = publicCategoryFromStatic(ALL_ASSORTMENT_CATEGORY_SLUG);
   if (totalProducts > 0 && allAssortment) {
     items.push(allAssortment);
   }
@@ -315,10 +321,13 @@ async function loadProductsForSubcategory({
       icon: categoryIconBySlug(category.slug),
       description: null,
       sortOrder: staticCategory?.sortOrder ?? 0,
-      isAllAssortment: category.slug === ALL_ASSORTMENT_SLUG
+      isAllAssortment: category.slug === ALL_ASSORTMENT_CATEGORY_SLUG
     };
 
-    if (category.slug === ALL_ASSORTMENT_SLUG && subcategorySlug === ALL_PRODUCTS_SUBCATEGORY_SLUG) {
+    if (
+      category.slug === ALL_ASSORTMENT_CATEGORY_SLUG &&
+      subcategorySlug === ALL_PRODUCTS_SUBCATEGORY_SLUG
+    ) {
       const totalItems = await countProducts(activeVersionId);
       const pagination = buildPagination({ page, pageSize, totalItems });
       if (searchQuery) {
@@ -370,7 +379,7 @@ async function loadProductsForSubcategory({
       )
       .limit(1);
 
-    if (!subcategory || !isPublicTaxonomyTarget(category.slug, subcategory.slug)) {
+    if (!subcategory || !isPublicNavigationTaxonomyTarget(category.slug, subcategory.slug)) {
       return { category: publicCategory, subcategory: null, products: [], pagination: emptyPagination };
     }
 
@@ -471,12 +480,12 @@ export async function getProductDetails(
     return null;
   }
 
-  if (categorySlug !== ALL_ASSORTMENT_SLUG && row.categorySlug !== categorySlug) {
+  if (categorySlug !== ALL_ASSORTMENT_CATEGORY_SLUG && row.categorySlug !== categorySlug) {
     return null;
   }
 
   if (
-    categorySlug !== ALL_ASSORTMENT_SLUG &&
+    categorySlug !== ALL_ASSORTMENT_CATEGORY_SLUG &&
     subcategorySlug !== ALL_PRODUCTS_SUBCATEGORY_SLUG &&
     row.subcategorySlug !== subcategorySlug
   ) {

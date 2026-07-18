@@ -162,6 +162,7 @@ export const subcategories = pgTable(
     description: text("description"),
     sortOrder: integer("sort_order").notNull().default(0),
     isActive: boolean("is_active").notNull().default(true),
+    isHidden: boolean("is_hidden").notNull().default(false),
     seoTitle: text("seo_title"),
     seoDescription: text("seo_description"),
     ...timestamps

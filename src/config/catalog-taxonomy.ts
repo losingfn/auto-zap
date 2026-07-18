@@ -135,7 +135,10 @@ export const catalogTaxonomy = [
   {
     slug: "ves-assortiment",
     name: "Весь ассортимент",
-    subcategories: [["vse-tovary", "Все товары"]]
+    subcategories: [
+      ["vse-tovary", "Все товары"],
+      ["other-products", "Прочие товары"]
+    ]
   }
 ] as const;
 

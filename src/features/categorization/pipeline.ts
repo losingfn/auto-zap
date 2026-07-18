@@ -1,10 +1,11 @@
-import { isPublicTaxonomyTarget } from "@/config/public-taxonomy";
+import { isOtherProductsTarget, isPublicTaxonomyTarget } from "@/config/public-taxonomy";
 import {
   CONFIDENCE_MODEL_VERSION,
   DOMAIN_DICTIONARY_VERSION,
   DOMAIN_RULES_VERSION,
   dangerousBroadTokens,
   familyDefinitions,
+  weakGeneralTokens,
   type ProductFamilyDefinition
 } from "./domain-config";
 import {
@@ -59,8 +60,15 @@ export function classifyWithDomainPipeline(
   if (!features.normalized) {
     return {
       ...legacyResult,
-      decisionStatus: "INVALID_INPUT",
-      reviewReasonCode: "empty_name",
+      target: null,
+      confidence: 0,
+      source: "do_not_publish",
+      reason: "Название пустое, товар не публикуется до исправления исходных данных.",
+      matchedSignals: [{ kind: "validation", value: "EMPTY_NAME" }],
+      needsReview: true,
+      reviewReason: "DO_NOT_PUBLISH: EMPTY_NAME.",
+      decisionStatus: "DO_NOT_PUBLISH",
+      reviewReasonCode: "EMPTY_NAME",
       confidenceModelVersion: CATEGORIZATION_PIPELINE_VERSION
     };
   }
@@ -240,7 +248,11 @@ function evaluateFamilyCandidate(
     score: clamp(score),
     evidence,
     negativeEvidence,
-    source: strongPhrases.length > 0 ? "family_rule" : "domain_dictionary"
+    source: isOtherProductsTarget(family.categorySlug, family.subcategorySlug)
+      ? "other_products_fallback"
+      : strongPhrases.length > 0
+        ? "family_rule"
+        : "domain_dictionary"
   };
 }
 
@@ -302,23 +314,38 @@ function buildManualResult(
   reviewReasonCode: string,
   signals: CategorizationSignal[]
 ): CategorizationResult {
-  const lowQualityName =
-    features.usefulTokenCount === 0 ||
-    features.normalized === features.technicalTokens.join(" ") ||
-    features.digitRatio > 0.75;
+  const doNotPublishReasonCode = getDoNotPublishReasonCode(features, reviewReasonCode);
+
+  if (doNotPublishReasonCode) {
+    return {
+      ...legacyResult,
+      target: null,
+      confidence: Math.min(legacyResult.confidence, 0.2),
+      source: "do_not_publish",
+      reason: buildDoNotPublishReason(doNotPublishReasonCode),
+      needsReview: true,
+      reviewReason: `DO_NOT_PUBLISH: ${doNotPublishReasonCode}.`,
+      decisionStatus: "DO_NOT_PUBLISH",
+      matchedSignals: [
+        ...legacyResult.matchedSignals,
+        ...signals,
+        { kind: "validation", value: doNotPublishReasonCode }
+      ],
+      confidenceModelVersion: CATEGORIZATION_PIPELINE_VERSION,
+      reviewReasonCode: doNotPublishReasonCode
+    };
+  }
 
   return {
     ...legacyResult,
     target: legacyResult.target,
     confidence: Math.min(legacyResult.confidence, 0.78),
     needsReview: true,
-    reviewReason: lowQualityName
-      ? "Название слишком короткое или состоит преимущественно из кода."
-      : legacyResult.reviewReason ?? "Недостаточно данных для автоматической категоризации.",
-    decisionStatus: lowQualityName ? "INVALID_INPUT" : "MANUAL_REVIEW",
+    reviewReason: legacyResult.reviewReason ?? "Недостаточно данных для автоматической категоризации.",
+    decisionStatus: "MANUAL_REVIEW",
     matchedSignals: [...legacyResult.matchedSignals, ...signals],
     confidenceModelVersion: CATEGORIZATION_PIPELINE_VERSION,
-    reviewReasonCode: lowQualityName ? "low_quality_name" : reviewReasonCode
+    reviewReasonCode
   };
 }
 
@@ -345,6 +372,11 @@ function resolveTarget(
     };
   }
 
+  const fromTargetMap = context.targetBySlug?.get(`${categorySlug}/${subcategorySlug}`);
+  if (fromTargetMap) {
+    return fromTargetMap;
+  }
+
   const fallback = context.fallbackByCategorySlug.get(categorySlug);
   if (fallback?.subcategorySlug === subcategorySlug) {
     return fallback;
@@ -354,6 +386,70 @@ function resolveTarget(
     categorySlug,
     subcategorySlug
   };
+}
+
+function getDoNotPublishReasonCode(features: NormalizedProductName, reviewReasonCode: string) {
+  const semanticTokens = features.significantTokens.filter(
+    (token) => !features.codeTokens.includes(token) && !isNonSemanticToken(token)
+  );
+  const weakSemanticTokens = semanticTokens.filter((token) => weakGeneralTokens.has(token));
+  const strongSemanticTokens = semanticTokens.filter((token) => !weakGeneralTokens.has(token));
+
+  if (semanticTokens.length === 0 && features.measurements.length > 0) {
+    return "SIZE_ONLY";
+  }
+
+  if (
+    semanticTokens.length === 0 &&
+    (features.codeTokens.length > 0 || features.technicalTokens.length > 0)
+  ) {
+    return "CODE_ONLY";
+  }
+
+  if (semanticTokens.length > 0 && strongSemanticTokens.length === 0 && weakSemanticTokens.length > 0) {
+    return "GENERIC_NAME_ONLY";
+  }
+
+  if (features.digitRatio > 0.8 && strongSemanticTokens.length === 0) {
+    return "CORRUPTED_NAME";
+  }
+
+  if (features.usefulTokenCount === 0 && semanticTokens.length === 0) {
+    return "INSUFFICIENT_SEMANTIC_DATA";
+  }
+
+  if (
+    reviewReasonCode === "no_candidate" &&
+    strongSemanticTokens.length === 1 &&
+    !dangerousBroadTokens.has(strongSemanticTokens[0]!)
+  ) {
+    return "UNKNOWN_PRODUCT_TYPE";
+  }
+
+  return null;
+}
+
+function isNonSemanticToken(token: string) {
+  const normalized = normalizeProductName(token).normalized;
+  return (
+    /^[a-zа-я]?\d+[a-zа-я]?(?:[.*-]\d+)*(?:мм|см|м)?$/iu.test(normalized) ||
+    /^din\d+$/iu.test(normalized) ||
+    /^\d+$/iu.test(normalized)
+  );
+}
+
+function buildDoNotPublishReason(reasonCode: string) {
+  const labels: Record<string, string> = {
+    EMPTY_NAME: "Название пустое.",
+    CODE_ONLY: "Строка похожа только на артикул или код без понятного типа товара.",
+    GENERIC_NAME_ONLY: "Название содержит только общие слова без типа товара.",
+    SIZE_ONLY: "Название содержит только размер или техническую меру без типа товара.",
+    CORRUPTED_NAME: "Название повреждено или состоит преимущественно из служебных символов/цифр.",
+    UNKNOWN_PRODUCT_TYPE: "Тип товара не распознан по текущим данным.",
+    INSUFFICIENT_SEMANTIC_DATA: "Недостаточно смысловых данных для публикации."
+  };
+
+  return `${labels[reasonCode] ?? labels.INSUFFICIENT_SEMANTIC_DATA} Товар не публикуется до ручного исправления.`;
 }
 
 function toSignals(candidate: FamilyCandidate, features: NormalizedProductName): CategorizationSignal[] {

@@ -1,4 +1,4 @@
-import { defaultCategorizationRules } from "@/config/catalog-taxonomy";
+import { catalogTaxonomy, defaultCategorizationRules } from "@/config/catalog-taxonomy";
 import { isPublicTaxonomyTarget } from "@/config/public-taxonomy";
 import { normalizeText } from "@/features/import/normalize";
 import { containsPhrase, normalizeProductText, tokenizeNormalizedProductText } from "./normalization";
@@ -242,12 +242,28 @@ export function buildDefaultCategorizationContext(): CategorizationContext {
     subcategorySlug: rule.subcategorySlug,
     priority: rule.priority
   }));
+  const targetBySlug = new Map<string, CategorizationTarget>();
+  for (const category of catalogTaxonomy) {
+    for (const [subcategorySlug, subcategoryName] of category.subcategories) {
+      if (!isPublicTaxonomyTarget(category.slug, subcategorySlug)) {
+        continue;
+      }
+
+      targetBySlug.set(`${category.slug}/${subcategorySlug}`, {
+        categorySlug: category.slug,
+        categoryName: category.name,
+        subcategorySlug,
+        subcategoryName
+      });
+    }
+  }
 
   return {
     rules: rules.filter((rule) =>
       isPublicTaxonomyTarget(rule.categorySlug, rule.subcategorySlug)
     ),
-    fallbackByCategorySlug: new Map<string, CategorizationTarget>()
+    fallbackByCategorySlug: new Map<string, CategorizationTarget>(),
+    targetBySlug
   };
 }
 

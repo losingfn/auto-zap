@@ -1,5 +1,10 @@
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import * as XLSX from "xlsx";
+import {
+  getPublicCategorySlugs,
+  isPublicNavigationTaxonomyTarget,
+  isPublicTaxonomyTarget
+} from "@/config/public-taxonomy";
 import { db } from "@/db/client";
 import {
   adminUsers,
@@ -266,8 +271,12 @@ export async function getActiveCatalogSitemapRows() {
 
   return {
     lastModified: activeVersion.updatedAt,
-    categories: categoryRows,
-    subcategories: subcategoryRows,
-    products: productRows
+    categories: categoryRows.filter((category) => getPublicCategorySlugs().includes(category.slug)),
+    subcategories: subcategoryRows.filter((subcategory) =>
+      isPublicNavigationTaxonomyTarget(subcategory.categorySlug, subcategory.slug)
+    ),
+    products: productRows.filter((product) =>
+      isPublicTaxonomyTarget(product.categorySlug, product.subcategorySlug)
+    )
   };
 }

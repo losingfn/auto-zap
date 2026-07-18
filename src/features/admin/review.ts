@@ -38,6 +38,7 @@ import { getSearchSynonyms } from "@/features/search/synonyms";
 import { getAdminSessionSecret } from "@/features/admin/session-cookie";
 
 export const REVIEW_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
+const REVIEWABLE_PRODUCT_STATUSES = ["needs_review", "invalid"] as const;
 
 export type AdminReviewVersionScope = "workspace" | "active" | "all";
 export type AdminReviewIssueFilter =
@@ -246,6 +247,7 @@ type ReviewRow = {
   name: string;
   rawName: string;
   price: string;
+  productStatus: string;
   currentCategoryId: string | null;
   currentSubcategoryId: string | null;
   catalogVersionStatus: string;
@@ -282,6 +284,10 @@ const LARGE_ACTION_CONFIRMATION_THRESHOLD = 100;
 const READY_CONFIDENCE_THRESHOLD = 0.92;
 const QUICK_CONFIDENCE_THRESHOLD = 0.85;
 const MAX_GROUPING_ROWS = 5000;
+
+function isReviewableProductStatus(status: string) {
+  return REVIEWABLE_PRODUCT_STATUSES.includes(status as "needs_review" | "invalid");
+}
 
 const ISSUE_LABELS: Record<AdminReviewIssueFilter, string> = {
   all: "Все",
@@ -781,7 +787,7 @@ export async function publishReviewWorkspace(input: { adminUserId: string }) {
   const newVersionId = randomUUID();
   const remainingReviewCount = sourceProducts.filter((product) => {
     const pending = pendingByProductId.get(product.id);
-    return !pending && product.status === "needs_review";
+    return !pending && isReviewableProductStatus(product.status);
   }).length;
 
   await db.transaction(async (tx) => {
@@ -867,7 +873,7 @@ export async function publishReviewWorkspace(input: { adminUserId: string }) {
         and(
           eq(reviewQueue.catalogVersionId, versionContext.activeVersion!.id),
           eq(reviewQueue.status, "open"),
-          eq(products.status, "needs_review")
+          inArray(products.status, REVIEWABLE_PRODUCT_STATUSES)
         )
       );
 
@@ -1246,7 +1252,7 @@ async function applyReviewRuleToWorkspace(input: {
             subcategoryId: input.subcategoryId,
             originalCategoryId: row.currentCategoryId,
             originalSubcategoryId: row.currentSubcategoryId,
-            originalStatus: "needs_review",
+            originalStatus: row.productStatus,
             metadata: {
               source: input.actionType,
               group: input.filters.group || null
@@ -1278,7 +1284,7 @@ async function applyReviewRuleToWorkspace(input: {
               status: "excluded" as const,
               originalCategoryId: row.currentCategoryId,
               originalSubcategoryId: row.currentSubcategoryId,
-              originalStatus: "needs_review",
+              originalStatus: row.productStatus,
               metadata: { source: "excluded_from_group" }
             }))
           )
@@ -1394,6 +1400,7 @@ async function getWorkspaceReviewRows(versionContext: VersionContext, workspaceI
       name: products.name,
       rawName: products.rawName,
       price: products.price,
+      productStatus: products.status,
       currentCategoryId: products.categoryId,
       currentSubcategoryId: products.subcategoryId,
       catalogVersionStatus: catalogVersions.status,
@@ -1417,7 +1424,7 @@ async function getWorkspaceReviewRows(versionContext: VersionContext, workspaceI
       and(
         eq(reviewQueue.status, "open"),
         eq(reviewQueue.catalogVersionId, versionContext.activeVersion.id),
-        eq(products.status, "needs_review")
+        inArray(products.status, REVIEWABLE_PRODUCT_STATUSES)
       )
     )
     .orderBy(asc(reviewQueue.createdAt))
@@ -1479,6 +1486,7 @@ async function getRowsByReviewIds(reviewQueueIds: string[], workspaceId: string 
       name: products.name,
       rawName: products.rawName,
       price: products.price,
+      productStatus: products.status,
       currentCategoryId: products.categoryId,
       currentSubcategoryId: products.subcategoryId,
       catalogVersionStatus: catalogVersions.status,
@@ -1501,7 +1509,7 @@ async function getRowsByReviewIds(reviewQueueIds: string[], workspaceId: string 
     .where(
       and(
         eq(reviewQueue.status, "open"),
-        eq(products.status, "needs_review"),
+        inArray(products.status, REVIEWABLE_PRODUCT_STATUSES),
         inArray(reviewQueue.id, reviewQueueIds)
       )
     ) as Promise<ReviewRow[]>;

@@ -1,4 +1,8 @@
-import { getPublicCategorySlugs, isPublicCategorySlug } from "@/config/public-taxonomy";
+import {
+  getPublicCategorySlugs,
+  isPublicCategorySlug,
+  isPublicNavigationTaxonomyTarget
+} from "@/config/public-taxonomy";
 import { getSearchIndex } from "./meilisearch";
 import { buildExpandedQuery, normalizeSearchText } from "./normalization";
 import { searchProductsWithPostgres } from "./postgres";
@@ -27,7 +31,7 @@ export async function searchProducts(input: SearchProductsInput): Promise<Search
   const normalizedQuery = normalizeSearchText(query);
   const expandedQuery = buildExpandedQuery(query, synonyms);
 
-  if (!input.admin && filters.categorySlug && !isPublicCategorySlug(filters.categorySlug)) {
+  if (!input.admin && !isAllowedPublicSearchFilter(filters)) {
     return {
       query,
       normalizedQuery,
@@ -95,6 +99,24 @@ export async function searchProducts(input: SearchProductsInput): Promise<Search
       fallbackReason: error instanceof Error ? error.message : "Meilisearch unavailable"
     };
   }
+}
+
+export function isAllowedPublicSearchFilter(filters: {
+  categorySlug?: string;
+  subcategorySlug?: string;
+}) {
+  if (filters.categorySlug && !isPublicCategorySlug(filters.categorySlug)) {
+    return false;
+  }
+
+  if (!filters.subcategorySlug) {
+    return true;
+  }
+
+  return Boolean(
+    filters.categorySlug &&
+      isPublicNavigationTaxonomyTarget(filters.categorySlug, filters.subcategorySlug)
+  );
 }
 
 async function searchProductsWithMeili(

@@ -29,7 +29,7 @@ import { getSearchSynonyms } from "@/features/search/synonyms";
 import type { SearchSynonymRecord } from "@/features/search/types";
 import { slugify } from "@/lib/slug";
 import { analyzeImportFile } from "./analyze";
-import { needsProductReview, resolveImportProductName } from "./automation";
+import { needsProductReview, resolveDraftProductStatus, resolveImportProductName } from "./automation";
 import { evaluateImportSafety } from "./safety";
 import type {
   AnalyzedImportRow,
@@ -249,15 +249,15 @@ async function insertDraftProducts(
       .insert(products)
       .values(
         categorizedChunk.map(({ row, categorization }) => {
-          const status = needsProductReview(row, categorization)
-            ? ("needs_review" as const)
-            : ("active" as const);
+          const status = resolveDraftProductStatus(row, categorization);
           const productName = resolveImportProductName(
             row,
             existingByCode.get(row.shopCode!)
           );
           const reviewReason =
-            status === "needs_review" ? buildReviewReason(row, categorization) : null;
+            status === "needs_review" || status === "invalid"
+              ? buildReviewReason(row, categorization)
+              : null;
 
           return {
             catalogVersionId,
@@ -676,6 +676,8 @@ function toDecisionPreview(
     rawName: row.rawName,
     confidence: categorization.confidence,
     source: categorization.source,
+    decisionStatus: categorization.decisionStatus,
+    reviewReasonCode: categorization.reviewReasonCode,
     reason: categorization.reason,
     needsReview: needsProductReview(row, categorization),
     wouldAutoPublish: shouldAutoPublishInShadow(row, categorization),
@@ -816,6 +818,12 @@ function buildReviewReason(row: AnalyzedImportRow, categorization: Categorizatio
 function buildCategorizationReviewReason(categorization: CategorizationResult) {
   if (categorization.source === "existing_product_category") {
     return null;
+  }
+
+  if (categorization.decisionStatus === "DO_NOT_PUBLISH") {
+    return `DO_NOT_PUBLISH${
+      categorization.reviewReasonCode ? `/${categorization.reviewReasonCode}` : ""
+    }: ${categorization.reason}`;
   }
 
   if (!categorization.target) {

@@ -124,6 +124,7 @@ export async function getCategorizationContext(): Promise<CategorizationContext>
 
   return {
     rules,
-    fallbackByCategorySlug
+    fallbackByCategorySlug,
+    targetBySlug
   };
 }

@@ -16,6 +16,8 @@ export type CategorizationSource =
   | "aggregated_signals"
   | "blocked_conflict"
   | "weak_group_candidate"
+  | "other_products_fallback"
+  | "do_not_publish"
   | "empty_name"
   | "invalid_name"
   | "invalid_taxonomy_target"
@@ -41,6 +43,7 @@ export type CategorizationDecisionStatus =
   | "GROUP_REVIEW"
   | "MANUAL_REVIEW"
   | "BLOCKED_CONFLICT"
+  | "DO_NOT_PUBLISH"
   | "INVALID_INPUT";
 
 export interface CategorizationCandidate {
@@ -96,4 +99,5 @@ export interface CategorizationResult {
 export interface CategorizationContext {
   rules: CategorizationRuleRecord[];
   fallbackByCategorySlug: Map<string, CategorizationTarget>;
+  targetBySlug?: Map<string, CategorizationTarget>;
 }

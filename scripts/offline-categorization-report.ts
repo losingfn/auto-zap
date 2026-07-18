@@ -43,8 +43,12 @@ async function main() {
   const groups = buildGroups(decisions);
   const reviewReasons = countBy(decisions, (decision) => decision.reviewReasonCode || decision.status);
   const conflicts = decisions.filter((decision) => decision.status === "BLOCKED_CONFLICT");
-  const residual = decisions.filter((decision) =>
-    decision.status === "MANUAL_REVIEW" || decision.status === "INVALID_INPUT" || decision.status === "BLOCKED_CONFLICT"
+  const residual = decisions.filter(
+    (decision) =>
+      decision.status === "MANUAL_REVIEW" ||
+      decision.status === "INVALID_INPUT" ||
+      decision.status === "BLOCKED_CONFLICT" ||
+      decision.status === "DO_NOT_PUBLISH"
   );
   const manualSample = buildManualSample(decisions);
 
@@ -248,8 +252,9 @@ function buildSummary(decisions: DecisionRow[], elapsedMs: number, peakMemoryMb:
   const groupReview = statusCounts.find((item) => item.key === "GROUP_REVIEW")?.count ?? 0;
   const manualReview = statusCounts.find((item) => item.key === "MANUAL_REVIEW")?.count ?? 0;
   const conflicts = statusCounts.find((item) => item.key === "BLOCKED_CONFLICT")?.count ?? 0;
+  const doNotPublish = statusCounts.find((item) => item.key === "DO_NOT_PUBLISH")?.count ?? 0;
   const invalid = statusCounts.find((item) => item.key === "INVALID_INPUT")?.count ?? 0;
-  const fullyManual = manualReview + conflicts + invalid;
+  const fullyManual = manualReview + conflicts + invalid + doNotPublish;
 
   return {
     generatedAt: new Date().toISOString(),
@@ -267,6 +272,7 @@ function buildSummary(decisions: DecisionRow[], elapsedMs: number, peakMemoryMb:
     groupReview,
     manualReview,
     blockedConflict: conflicts,
+    doNotPublish,
     invalidInput: invalid,
     fullyManual,
     groupCount: groups.length,
@@ -375,6 +381,7 @@ async function writeMarkdown(
     `| GROUP_REVIEW groups | ${summary.groupCount} |`,
     `| Fully manual residual | ${summary.fullyManual} |`,
     `| BLOCKED_CONFLICT | ${summary.blockedConflict} |`,
+    `| DO_NOT_PUBLISH | ${summary.doNotPublish} |`,
     `| INVALID_INPUT | ${summary.invalidInput} |`,
     `| Average confidence | ${summary.averageConfidence} |`,
     `| Full run time, ms | ${summary.elapsedMs} |`,
@@ -478,6 +485,7 @@ function statusWeight(status: CategorizationDecisionStatus) {
   if (status === "AUTO_READY") return 3;
   if (status === "GROUP_REVIEW") return 2;
   if (status === "BLOCKED_CONFLICT") return 0;
+  if (status === "DO_NOT_PUBLISH") return 0;
   if (status === "INVALID_INPUT") return 0;
   return 1;
 }

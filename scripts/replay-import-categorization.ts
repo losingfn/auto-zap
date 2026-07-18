@@ -2,7 +2,11 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import postgres from "postgres";
 import { defaultCategorizationRules } from "../src/config/catalog-taxonomy";
-import { isPublicCategorySlug, isPublicTaxonomyTarget } from "../src/config/public-taxonomy";
+import {
+  isOtherProductsTarget,
+  isPublicCategorySlug,
+  isPublicTaxonomyTarget
+} from "../src/config/public-taxonomy";
 import { categorizeProductName, normalizeForCategorization } from "../src/features/categorization/engine";
 import { CATEGORIZATION_PIPELINE_VERSION } from "../src/features/categorization/pipeline";
 import {
@@ -264,7 +268,18 @@ async function main() {
       ])
     ]),
     writeCsv("iteration-comparison.csv", [
-      ["Iteration", "AUTO_READY", "GROUP_REVIEW", "Groups", "MANUAL_REVIEW", "BLOCKED_CONFLICT", "INVALID_INPUT", "Fully manual", "Main change"],
+      [
+        "Iteration",
+        "AUTO_READY",
+        "GROUP_REVIEW",
+        "Groups",
+        "MANUAL_REVIEW",
+        "BLOCKED_CONFLICT",
+        "DO_NOT_PUBLISH",
+        "INVALID_INPUT",
+        "Fully manual",
+        "Main change"
+      ],
       ...iterationComparison.map((item) => [
         item.iteration,
         item.autoReady,
@@ -272,6 +287,7 @@ async function main() {
         item.groups,
         item.manualReview,
         item.blockedConflict,
+        item.doNotPublish,
         item.invalidInput,
         item.fullyManual,
         item.mainChange
@@ -440,6 +456,7 @@ async function main() {
         ""
       ])
     ]),
+    writeOtherProductsFinalArtifacts(newDecisions, groups, summary),
     writeMarkdown(summary, groups, residual, activeAnalogPareto, confidenceCalibration, residualAnalysis, iterationComparison),
     writeManualAudit(summary, residualAnalysis, groups),
     writeDraftPr(summary, residualAnalysis, iterationComparison)
@@ -698,7 +715,7 @@ async function loadCategorizationContext(): Promise<CategorizationContext> {
   }
   rules.sort((a, b) => a.priority - b.priority || b.pattern.length - a.pattern.length);
 
-  return { rules, fallbackByCategorySlug };
+  return { rules, fallbackByCategorySlug, targetBySlug };
 }
 
 async function loadActiveProducts(): Promise<ActiveProduct[]> {
@@ -1245,7 +1262,13 @@ function buildConfidenceCalibration(
     ["0.70-0.80", 0.7, 0.8],
     ["below-0.70", 0, 0.7]
   ] as const;
-  const statuses: CategorizationDecisionStatus[] = ["AUTO_READY", "GROUP_REVIEW", "MANUAL_REVIEW", "BLOCKED_CONFLICT"];
+  const statuses: CategorizationDecisionStatus[] = [
+    "AUTO_READY",
+    "GROUP_REVIEW",
+    "MANUAL_REVIEW",
+    "BLOCKED_CONFLICT",
+    "DO_NOT_PUBLISH"
+  ];
   return statuses.flatMap((status) =>
     bands.map(([label, min, max]) => {
       const bandRows = rows.filter(
@@ -1906,6 +1929,7 @@ async function buildIterationComparison(summary: ReturnType<typeof buildSummary>
       groups: baseline.newProductMetrics.groupCount,
       manualReview: baseline.newProductMetrics.manualReview,
       blockedConflict: baseline.newProductMetrics.blockedConflict,
+      doNotPublish: baseline.newProductMetrics.doNotPublish ?? 0,
       invalidInput: baseline.newProductMetrics.invalidInput,
       fullyManual: baseline.newProductMetrics.fullyManual,
       mainChange: "Baseline before final residual pass."
@@ -1918,6 +1942,7 @@ async function buildIterationComparison(summary: ReturnType<typeof buildSummary>
     groups: summary.newProductMetrics.groupCount,
     manualReview: summary.newProductMetrics.manualReview,
     blockedConflict: summary.newProductMetrics.blockedConflict,
+    doNotPublish: summary.newProductMetrics.doNotPublish,
     invalidInput: summary.newProductMetrics.invalidInput,
     fullyManual: summary.newProductMetrics.fullyManual,
     mainChange: "Contextual residual families, stricter residual decomposition, final reports."
@@ -2041,9 +2066,10 @@ function buildSummary(input: {
   const groupReview = statusCount(statusCounts, "GROUP_REVIEW");
   const manualReview = statusCount(statusCounts, "MANUAL_REVIEW");
   const blockedConflict = statusCount(statusCounts, "BLOCKED_CONFLICT");
+  const doNotPublish = statusCount(statusCounts, "DO_NOT_PUBLISH");
   const invalidInput = statusCount(statusCounts, "INVALID_INPUT");
   const operatorDecisionsAfter =
-    manualReview + blockedConflict + invalidInput + input.groups.length;
+    manualReview + blockedConflict + invalidInput + doNotPublish + input.groups.length;
   const localScenarioMismatch = {
     requestedLatestImportApproximation: {
       totalRows: 25567,
@@ -2109,6 +2135,7 @@ function buildSummary(input: {
       groupReview,
       manualReview,
       blockedConflict,
+      doNotPublish,
       invalidInput,
       fullyManual: input.residual.length,
       groupCount: input.groups.length,
@@ -2180,6 +2207,7 @@ async function writeMarkdown(
     `The 300-900 fully manual target was ${targetReached ? "reached" : "not reached"} in the local count-bounded replay.`,
     `Final fully manual residual: ${summary.newProductMetrics.fullyManual}.`,
     `AUTO_READY products: ${summary.newProductMetrics.autoReady}. GROUP_REVIEW products: ${summary.newProductMetrics.groupReview} across ${summary.newProductMetrics.groupCount} groups.`,
+    `Hidden fallback target: ves-assortiment/other-products (Прочие товары). DO_NOT_PUBLISH rows: ${summary.newProductMetrics.doNotPublish}.`,
     `The remaining lower bound is supported by \`taxonomy-limit.csv\`; it is dominated by missing destination context, no allowed public target, conflicting active analogs, short/code-only names, and low-frequency items without analogs.`,
     "",
     "## 2. Current State",
@@ -2201,22 +2229,26 @@ async function writeMarkdown(
     "",
     "## 3. What Was Implemented Before This Run",
     "",
-    "- Deterministic categorization statuses: AUTO_READY, GROUP_REVIEW, MANUAL_REVIEW, BLOCKED_CONFLICT and INVALID_INPUT.",
+    "- Deterministic categorization statuses: AUTO_READY, GROUP_REVIEW, MANUAL_REVIEW, BLOCKED_CONFLICT, DO_NOT_PUBLISH and INVALID_INPUT.",
     "- GROUP_REVIEW stays `needsReview=true` and is not publicly published automatically.",
     "- Offline replay with production guards, read-only DB mode, existing/new split, count-bounded scenario, Pareto outputs, shadow precision samples and search-token fixes.",
     "- Public search fixture excludes review/unconfirmed products and preserves technical-token behavior for T10/W5W/H7/DOT4/5W-30.",
     "",
     "## 4. What Was Done In This Run",
     "",
+    "- Added hidden technical fallback `ves-assortiment/other-products` (`Прочие товары`) under `Весь ассортимент`, while keeping the visible aggregate `ves-assortiment/vse-tovary` (`Все товары`).",
+    "- Public catalog navigation, sitemap subcategory rows and category cards exclude the hidden target; public product/search presentation displays only `Прочие товары` and routes through the visible aggregate URL.",
+    "- Added `DO_NOT_PUBLISH` for insufficient data rows (empty names, code-only rows, generic-only names, size-only rows, corrupted names and unknown product types); these rows stay out of active catalog, public counts and search documents.",
+    "- Added safe `other_products_fallback` families for universal fasteners, fittings/connectors/adapters and clamps/brackets when no exact automotive category is available.",
     "- Added safe contextual GROUP_REVIEW families for recurring residual clusters, while keeping broad fasteners and ambiguous parts out of AUTO_READY.",
     "- Extended residual analytics with `residual-reasons.csv`, `residual-families.csv`, `taxonomy-limit.csv`, `largest-groups.csv`, `auto-ready-audit.csv`, `group-review-audit.csv`, `manual-audit.md` and `draft-pr.md`.",
     "- Split the previous broad residual into concrete report-only families: fasteners without destination, fittings/connectors, repair kits, engine/transmission partial context, body/interior fragments, wheel accessories, driver electronics, lighting/signal devices, novelty/non-catalog goods, code-only names and truly low-frequency items.",
-    "- Preserved safety boundaries: no new public categories, no broad artificial fastener category, no LLM, no production writes, no push and no PR.",
+    "- Preserved safety boundaries: no new public categories, no recreated `Крепёж`, no LLM, no production writes, no push and no PR.",
     "",
     "## 5. Baseline Iteration 11",
     "",
     baseline
-      ? `Iteration 11 baseline: AUTO_READY=${baseline.autoReady}, GROUP_REVIEW=${baseline.groupReview}, groups=${baseline.groups}, MANUAL_REVIEW=${baseline.manualReview}, BLOCKED_CONFLICT=${baseline.blockedConflict}, fully manual=${baseline.fullyManual}.`
+      ? `Iteration 11 baseline: AUTO_READY=${baseline.autoReady}, GROUP_REVIEW=${baseline.groupReview}, groups=${baseline.groups}, MANUAL_REVIEW=${baseline.manualReview}, BLOCKED_CONFLICT=${baseline.blockedConflict}, DO_NOT_PUBLISH=${baseline.doNotPublish}, fully manual=${baseline.fullyManual}.`
       : "Iteration 11 baseline summary was not found in the local reports directory.",
     "",
     "## 6. Decomposition Other",
@@ -2235,7 +2267,8 @@ async function writeMarkdown(
     "",
     "- Seat belts, portable 12/24V work lights, car clocks, heater electrical/cooling parts, copper brake tubes and pneumatic-line fittings were added as narrow reviewable families.",
     "- Fuel-system, engine-valve, suspension-hardware, tow-hardware, engine-mount, brake-tube, body/interior/decor, exhaust and car-audio/product-normalization signals were expanded only with contextual evidence and negative terms.",
-    "- Generic DIN/socket-head fasteners, nuts, washers, rings, caps, hoses and ambiguous fittings remain manual unless destination context and active analogs are strong enough.",
+    "- Universal fasteners/fittings/clamps can fall back to hidden `Прочие товары`; exact automotive contexts still override that fallback.",
+    "- Generic DIN/socket-head fasteners, nuts, washers, rings, caps, hoses and ambiguous fittings remain review/manual or DO_NOT_PUBLISH when data is insufficient or destination context is unsafe.",
     "",
     "## 8. Taxonomy-Limit Analysis",
     "",
@@ -2248,11 +2281,11 @@ async function writeMarkdown(
     "",
     "## 9. Iteration Comparison",
     "",
-    "| Iteration | AUTO_READY | GROUP_REVIEW | Groups | MANUAL_REVIEW | BLOCKED | INVALID_INPUT | Fully manual | Main change |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+    "| Iteration | AUTO_READY | GROUP_REVIEW | Groups | MANUAL_REVIEW | BLOCKED | DO_NOT_PUBLISH | INVALID_INPUT | Fully manual | Main change |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
     ...iterationComparison.map(
       (item) =>
-        `| ${item.iteration} | ${item.autoReady} | ${item.groupReview} | ${item.groups} | ${item.manualReview} | ${item.blockedConflict} | ${item.invalidInput} | ${item.fullyManual} | ${escapeMarkdown(item.mainChange)} |`
+        `| ${item.iteration} | ${item.autoReady} | ${item.groupReview} | ${item.groups} | ${item.manualReview} | ${item.blockedConflict} | ${item.doNotPublish} | ${item.invalidInput} | ${item.fullyManual} | ${escapeMarkdown(item.mainChange)} |`
     ),
     "",
     "## 10. Final Metrics",
@@ -2263,6 +2296,7 @@ async function writeMarkdown(
     `| GROUP_REVIEW | ${summary.newProductMetrics.groupReview} |`,
     `| MANUAL_REVIEW | ${summary.newProductMetrics.manualReview} |`,
     `| BLOCKED_CONFLICT | ${summary.newProductMetrics.blockedConflict} |`,
+    `| DO_NOT_PUBLISH | ${summary.newProductMetrics.doNotPublish} |`,
     `| INVALID_INPUT | ${summary.newProductMetrics.invalidInput} |`,
     `| Fully manual residual | ${summary.newProductMetrics.fullyManual} |`,
     `| GROUP_REVIEW groups | ${summary.newProductMetrics.groupCount} |`,
@@ -2663,6 +2697,7 @@ function isFullyManual(decision: DecisionRow) {
   return (
     decision.status === "MANUAL_REVIEW" ||
     decision.status === "BLOCKED_CONFLICT" ||
+    decision.status === "DO_NOT_PUBLISH" ||
     decision.status === "INVALID_INPUT"
   );
 }
@@ -2743,10 +2778,170 @@ function round(value: number) {
 
 function statusWeight(status: CategorizationDecisionStatus) {
   if (status === "BLOCKED_CONFLICT") return 0;
+  if (status === "DO_NOT_PUBLISH") return 0;
   if (status === "INVALID_INPUT") return 0;
   if (status === "MANUAL_REVIEW") return 1;
   if (status === "GROUP_REVIEW") return 2;
   return 3;
+}
+
+async function writeOtherProductsFinalArtifacts(
+  decisions: DecisionRow[],
+  groups: GroupRow[],
+  summary: ReturnType<typeof buildSummary>
+) {
+  const otherProducts = decisions.filter((decision) =>
+    isOtherProductsTarget(decision.categorySlug, decision.subcategorySlug)
+  );
+  const doNotPublish = decisions.filter((decision) => decision.status === "DO_NOT_PUBLISH");
+  const remainingManual = decisions.filter(
+    (decision) =>
+      decision.status === "MANUAL_REVIEW" ||
+      decision.status === "BLOCKED_CONFLICT" ||
+      decision.status === "INVALID_INPUT"
+  );
+  const exactOverrides = decisions.filter(
+    (decision) =>
+      !isOtherProductsTarget(decision.categorySlug, decision.subcategorySlug) &&
+      looksLikeOtherProductsFallback(decision)
+  );
+
+  await Promise.all([
+    writeCsv("before-after.csv", [
+      ["metric", "before_iteration11", "after_final", "delta"],
+      ["AUTO_READY", 425, summary.newProductMetrics.autoReady, summary.newProductMetrics.autoReady - 425],
+      ["GROUP_REVIEW", 1504, summary.newProductMetrics.groupReview, summary.newProductMetrics.groupReview - 1504],
+      ["GROUP_REVIEW_groups", 466, summary.newProductMetrics.groupCount, summary.newProductMetrics.groupCount - 466],
+      ["MANUAL_REVIEW", 1798, summary.newProductMetrics.manualReview, summary.newProductMetrics.manualReview - 1798],
+      ["BLOCKED_CONFLICT", 15, summary.newProductMetrics.blockedConflict, summary.newProductMetrics.blockedConflict - 15],
+      ["DO_NOT_PUBLISH", 0, summary.newProductMetrics.doNotPublish, summary.newProductMetrics.doNotPublish],
+      ["fully_manual", 1813, summary.newProductMetrics.fullyManual, summary.newProductMetrics.fullyManual - 1813]
+    ]),
+    writeCsv("other-products-auto-ready.csv", [
+      decisionCsvHeader(),
+      ...otherProducts.filter((decision) => decision.status === "AUTO_READY").map(decisionCsvRow)
+    ]),
+    writeCsv("other-products-group-review.csv", [
+      decisionCsvHeader(),
+      ...otherProducts.filter((decision) => decision.status === "GROUP_REVIEW").map(decisionCsvRow)
+    ]),
+    writeCsv("do-not-publish.csv", [
+      decisionCsvHeader(),
+      ...doNotPublish.map(decisionCsvRow)
+    ]),
+    writeCsv("remaining-manual-review.csv", [
+      decisionCsvHeader(),
+      ...remainingManual.map(decisionCsvRow)
+    ]),
+    writeCsv("exact-category-overrides.csv", [
+      decisionCsvHeader(),
+      ...exactOverrides.map(decisionCsvRow)
+    ]),
+    writeCsv("other-products-families.csv", [
+      ["family", "status", "count", "examples"],
+      ...countBy(otherProducts, (decision) => `${decision.familyLabel}|${decision.status}`).map((item) => {
+        const [family, status] = item.key.split("|");
+        return [
+          family ?? "unknown",
+          status ?? "unknown",
+          item.count,
+          examplesFor(otherProducts, (decision) => `${decision.familyLabel}|${decision.status}` === item.key)
+        ];
+      })
+    ]),
+    writeFile(
+      path.join(outputDir, "ui-behavior.md"),
+      [
+        "# UI behavior",
+        "",
+        "- `/catalog/ves-assortiment` keeps one visible card: `Все товары`.",
+        "- `ves-assortiment/other-products` is a hidden technical target and is excluded from public navigation and sitemap subcategory rows.",
+        "- Product/search display for this target uses `Прочие товары` without the parent chain.",
+        "- Public search URLs for this target point through `/catalog/ves-assortiment/vse-tovary/{slug}`."
+      ].join("\n") + "\n",
+      "utf8"
+    ),
+    writeFile(
+      path.join(outputDir, "migration-plan.md"),
+      [
+        "# Migration plan",
+        "",
+        "- Apply `db/migrations/0006_hidden_other_products.sql` after existing migrations.",
+        "- The migration adds `subcategories.is_hidden` with default `false`.",
+        "- It upserts `ves-assortiment/other-products` as active and hidden.",
+        "- It keeps `ves-assortiment/vse-tovary` active and visible.",
+        "- It is idempotent and does not publish, replay or index catalog products."
+      ].join("\n") + "\n",
+      "utf8"
+    ),
+    writeFile(
+      path.join(outputDir, "rollback-plan.md"),
+      [
+        "# Rollback plan",
+        "",
+        "- Revert the application commit before running taxonomy sync again.",
+        "- If DB rollback is required, set `ves-assortiment/other-products` inactive or hidden and leave products non-active until reviewed.",
+        "- Do not delete imported rows; `DO_NOT_PUBLISH` rows are retained for admin correction.",
+        "- Rebuild the search index only after a confirmed active catalog version is selected."
+      ].join("\n") + "\n",
+      "utf8"
+    )
+  ]);
+}
+
+function decisionCsvHeader() {
+  return [
+    "status",
+    "shopCode",
+    "name",
+    "category",
+    "subcategory",
+    "confidence",
+    "source",
+    "family",
+    "reasonCode",
+    "reason",
+    "evidence",
+    "negativeEvidence"
+  ];
+}
+
+function decisionCsvRow(decision: DecisionRow) {
+  return [
+    decision.status,
+    decision.shopCode,
+    decision.name,
+    decision.categorySlug,
+    decision.subcategorySlug,
+    decision.confidence,
+    decision.source,
+    decision.familyLabel,
+    decision.reviewReasonCode,
+    decision.reason,
+    decision.evidence.join(" | "),
+    decision.negativeEvidence.join(" | ")
+  ];
+}
+
+function looksLikeOtherProductsFallback(decision: DecisionRow) {
+  const normalized = normalizeForCategorization(`${decision.shopCode} ${decision.name}`);
+  return [
+    "болт",
+    "гайк",
+    "шайб",
+    "винт",
+    "шпильк",
+    "фитинг",
+    "штуцер",
+    "переходник",
+    "соединитель",
+    "муфт",
+    "тройник",
+    "хомут",
+    "скоб",
+    "кронштейн",
+    "креплен"
+  ].some((token) => normalized.includes(token));
 }
 
 async function writeJson(fileName: string, value: unknown) {

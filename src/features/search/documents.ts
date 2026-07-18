@@ -1,6 +1,10 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { catalogTaxonomy } from "@/config/catalog-taxonomy";
-import { getPublicCategorySlugs, getPublicTaxonomyTargets } from "@/config/public-taxonomy";
+import {
+  getPublicCategorySlugs,
+  getPublicProductPath,
+  getPublicTaxonomyTargets
+} from "@/config/public-taxonomy";
 import { db } from "@/db/client";
 import { catalogVersions, categories, products, subcategories } from "@/db/schema";
 import {
@@ -121,7 +125,7 @@ export function buildSearchDocument(
     status: "active",
     shopCodeNormalized: normalizeSearchShopCode(product.shopCode),
     shopCodeCompact: compactShopCode(product.shopCode),
-    url: `/catalog/${product.categorySlug}/${product.subcategorySlug}/${product.slug}`,
+    url: getPublicProductPath(product),
     searchText,
     normalizedText,
     synonymText,

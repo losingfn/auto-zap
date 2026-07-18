@@ -1,4 +1,5 @@
 import type {
+  CategorizationDecisionStatus,
   CategorizationMatchType,
   CategorizationSignal,
   CategorizationSource
@@ -93,6 +94,8 @@ export interface AutoCategorizationDecisionPreview {
   rawName: string;
   confidence: number;
   source: CategorizationSource;
+  decisionStatus?: CategorizationDecisionStatus;
+  reviewReasonCode?: string | null;
   reason: string;
   needsReview: boolean;
   wouldAutoPublish: boolean;

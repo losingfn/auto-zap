@@ -1,0 +1,364 @@
+{
+  "fileName": "catalog.xls",
+  "selectedSheetName": "TDSheet",
+  "indexedFixtureDocuments": 14980,
+  "excludedReviewDocuments": 15710,
+  "reviewProductsIndexed": 0,
+  "report": [
+    {
+      "query": "лампа",
+      "totalCandidates": 102,
+      "hits": [
+        {
+          "shopCode": "ЭО-00819",
+          "name": "Лампа \"БОШ\" Н1,Н3 55 w",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 2510
+        },
+        {
+          "shopCode": "ЭОГ-00780",
+          "name": "Лампа \"Нарва\" 24В 75/70",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 2510
+        },
+        {
+          "shopCode": "ЭОГ-00781",
+          "name": "Лампа \"Нарва\" Н-4, 24В 100/90",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 2510
+        },
+        {
+          "shopCode": "ЭО-01027",
+          "name": "Лампа \"Парус\" Н15 12V",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 2510
+        },
+        {
+          "shopCode": "ЭО-01314",
+          "name": "Лампа \"Phillips\" Н7 (станд.)",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 2510
+        }
+      ]
+    },
+    {
+      "query": "t10",
+      "totalCandidates": 5,
+      "hits": [
+        {
+          "shopCode": "ЭО-01140",
+          "name": "Лампа диодная Т10",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 1780
+        },
+        {
+          "shopCode": "ЭО-01463",
+          "name": "Лампа Т027 Т10/белый/(W2,1х9,5d) 5SMD 5050 3 chip, W5W",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 1780
+        },
+        {
+          "shopCode": "И-01926",
+          "name": "Головки со вставками TORX 1/4 Т10 Нх37мм АД",
+          "category": "Аксессуары",
+          "subcategory": "Инструменты",
+          "score": 1560
+        },
+        {
+          "shopCode": "ЭО-01321",
+          "name": "Лампа AVS Vegas 12V W5W XENJN EFFECT (W2, 1х9,5d), 2шт",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 1560
+        },
+        {
+          "shopCode": "ИН-00285",
+          "name": "Лампа W5W 12V 5W W2. 1Х9.5d",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 1560
+        }
+      ]
+    },
+    {
+      "query": "T1001",
+      "totalCandidates": 3,
+      "hits": [
+        {
+          "shopCode": "Ш-00650",
+          "name": "А/шины Bridgestone 195/65R15 91V Turanza T1001 TL",
+          "category": "Аксессуары",
+          "subcategory": "Шины и диски",
+          "score": 1740
+        },
+        {
+          "shopCode": "Ш-00636",
+          "name": "А/шины Bridgestone 185/60R14 82H Turanza Т001 (от 4-х шт)",
+          "category": "Аксессуары",
+          "subcategory": "Шины и диски",
+          "score": 40
+        },
+        {
+          "shopCode": "ТС-00001",
+          "name": "Магистральная трубка 01-07",
+          "category": "Тормозная система",
+          "subcategory": "Прочая тормозная система",
+          "score": 40
+        }
+      ]
+    },
+    {
+      "query": "W5W",
+      "totalCandidates": 5,
+      "hits": [
+        {
+          "shopCode": "ЭО-01463",
+          "name": "Лампа Т027 Т10/белый/(W2,1х9,5d) 5SMD 5050 3 chip, W5W",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 3080
+        },
+        {
+          "shopCode": "ЭО-01321",
+          "name": "Лампа AVS Vegas 12V W5W XENJN EFFECT (W2, 1х9,5d), 2шт",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 3080
+        },
+        {
+          "shopCode": "ИН-00285",
+          "name": "Лампа W5W 12V 5W W2. 1Х9.5d",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 3080
+        },
+        {
+          "shopCode": "ЭО-01140",
+          "name": "Лампа диодная Т10",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 1560
+        },
+        {
+          "shopCode": "И-01926",
+          "name": "Головки со вставками TORX 1/4 Т10 Нх37мм АД",
+          "category": "Аксессуары",
+          "subcategory": "Инструменты",
+          "score": 1340
+        }
+      ]
+    },
+    {
+      "query": "H7",
+      "totalCandidates": 20,
+      "hits": [
+        {
+          "shopCode": "ЭО-00125",
+          "name": "12V Лампа Bosch H7 55W +50%",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 2510
+        },
+        {
+          "shopCode": "ЭОГ-00596",
+          "name": "Светодиодная лампа JT LED H7.12/24V.20W, 2 шт",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 2510
+        },
+        {
+          "shopCode": "ЭО-00925",
+          "name": "Автолампа NARVA H7, НВ3 Range Power White",
+          "category": "Электрика",
+          "subcategory": "Прочая электрика",
+          "score": 2290
+        },
+        {
+          "shopCode": "ЭО-00916",
+          "name": "Автолампа SCT H7 12V 55W",
+          "category": "Электрика",
+          "subcategory": "Прочая электрика",
+          "score": 2290
+        },
+        {
+          "shopCode": "ЭО-00917",
+          "name": "Автолампа SCT H7 24V70",
+          "category": "Электрика",
+          "subcategory": "Прочая электрика",
+          "score": 2290
+        }
+      ]
+    },
+    {
+      "query": "DOT4",
+      "totalCandidates": 7,
+      "hits": [
+        {
+          "shopCode": "ГСМ-00530",
+          "name": "Тормозная жидкость Роса ДОТ-4, 1 л",
+          "category": "Фильтры и масла",
+          "subcategory": "Технические жидкости",
+          "score": 1340
+        },
+        {
+          "shopCode": "ГСМ-00541",
+          "name": "Тормозная жидкость Mobil Brake Fluid universal DOT-4, 0.5 л",
+          "category": "Фильтры и масла",
+          "subcategory": "Технические жидкости",
+          "score": 1340
+        },
+        {
+          "shopCode": "ГСМ-00725",
+          "name": "BP DOT-4 Тормозная жидкость, 0,5 л",
+          "category": "Фильтры и масла",
+          "subcategory": "Технические жидкости",
+          "score": 1340
+        },
+        {
+          "shopCode": "ГСМ-01182",
+          "name": "Castrol Brake Fluid DOT-4, 1 л",
+          "category": "Фильтры и масла",
+          "subcategory": "Технические жидкости",
+          "score": 1340
+        },
+        {
+          "shopCode": "ГСМ-00472",
+          "name": "HG7044R Тормозная жидкость ДОТ-4 +, 473",
+          "category": "Фильтры и масла",
+          "subcategory": "Технические жидкости",
+          "score": 1340
+        }
+      ]
+    },
+    {
+      "query": "5W-30",
+      "totalCandidates": 80,
+      "hits": [
+        {
+          "shopCode": "ГСМ-01068",
+          "name": "А/масло Ликви Моли Оптимал Синт НТ 5w30, 1 л",
+          "category": "Фильтры и масла",
+          "subcategory": "Масла",
+          "score": 1340
+        },
+        {
+          "shopCode": "ГСМ-00856",
+          "name": "А/масло ЛМ Оптимал Синт НТ 5w30, 4 л",
+          "category": "Фильтры и масла",
+          "subcategory": "Масла",
+          "score": 1340
+        },
+        {
+          "shopCode": "ГСМ-00532",
+          "name": "А/масло ЛУКОЙЛ Люкс 5w30 API SL/CF синте",
+          "category": "Фильтры и масла",
+          "subcategory": "Масла",
+          "score": 1340
+        },
+        {
+          "shopCode": "ГСМ-01110",
+          "name": "А/масло ЛУКОЙЛ Люкс 5w30 API SL/CF синте",
+          "category": "Фильтры и масла",
+          "subcategory": "Масла",
+          "score": 1340
+        },
+        {
+          "shopCode": "ГСМ-01383",
+          "name": "А/масло Лукойл GENESIS ARMORTECH DIESEL 5w30 1 л",
+          "category": "Фильтры и масла",
+          "subcategory": "Масла",
+          "score": 1340
+        }
+      ]
+    },
+    {
+      "query": "болт м8",
+      "totalCandidates": 504,
+      "hits": [
+        {
+          "shopCode": "К-00921",
+          "name": "Болт М8*100*1.25 с полной резьбой",
+          "category": "Весь ассортимент",
+          "subcategory": "Прочие товары",
+          "score": 1645
+        },
+        {
+          "shopCode": "КГ-00336",
+          "name": "Болт М8*12*1.25",
+          "category": "Весь ассортимент",
+          "subcategory": "Прочие товары",
+          "score": 1645
+        },
+        {
+          "shopCode": "К-00601",
+          "name": "Болт М8*35*1.25 приварной",
+          "category": "Весь ассортимент",
+          "subcategory": "Прочие товары",
+          "score": 1645
+        },
+        {
+          "shopCode": "К-00633",
+          "name": "Болт М8*40*1.25 с полной резьбой",
+          "category": "Весь ассортимент",
+          "subcategory": "Прочие товары",
+          "score": 1645
+        },
+        {
+          "shopCode": "К-00634",
+          "name": "Болт М8*45*1.25 с полной резьбой",
+          "category": "Весь ассортимент",
+          "subcategory": "Прочие товары",
+          "score": 1645
+        }
+      ]
+    },
+    {
+      "query": "фитинг прямой",
+      "totalCandidates": 116,
+      "hits": [
+        {
+          "shopCode": "КГ-01332",
+          "name": "Фитинг прямой, угловой Ф-14",
+          "category": "Весь ассортимент",
+          "subcategory": "Прочие товары",
+          "score": 4030
+        },
+        {
+          "shopCode": "КГ-00872",
+          "name": "Фитинг 12х6 прямой ЕВРО латунь",
+          "category": "Весь ассортимент",
+          "subcategory": "Прочие товары",
+          "score": 2180
+        },
+        {
+          "shopCode": "КГ-00874",
+          "name": "Фитинг 16х12 прямой ЕВРО латунь",
+          "category": "Весь ассортимент",
+          "subcategory": "Прочие товары",
+          "score": 2180
+        },
+        {
+          "shopCode": "КГ-00873",
+          "name": "Фитинг 16х6 прямой ЕВРО латунь",
+          "category": "Весь ассортимент",
+          "subcategory": "Прочие товары",
+          "score": 2180
+        },
+        {
+          "shopCode": "КГ-00875",
+          "name": "Фитинг 18х12 прямой ЕВРО латунь",
+          "category": "Весь ассортимент",
+          "subcategory": "Прочие товары",
+          "score": 2180
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { getPublicProductPath } from "@/config/public-taxonomy";
 import { siteConfig } from "@/config/site";
 import { getActiveCatalogSitemapRows } from "@/features/admin/backups/service";
 
@@ -33,7 +34,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7
     })),
     ...rows.products.map((product) => ({
-      url: `${baseUrl}/catalog/${product.categorySlug}/${product.subcategorySlug}/${product.slug}`,
+      url: `${baseUrl}${getPublicProductPath(product)}`,
       lastModified: product.updatedAt,
       changeFrequency: "weekly" as const,
       priority: 0.5

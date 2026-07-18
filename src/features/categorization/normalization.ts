@@ -30,16 +30,22 @@ const replacementPairs: Array<[RegExp, string]> = [
   [/\bправ\.\b/giu, "правый"],
   [/\bвнутр\.\b/giu, "внутренний"],
   [/\bнаруж\.\b/giu, "наружный"],
+  [/(^|\s)двиг\.(?=\s|$)/giu, "$1двигатель"],
   [/\bк-т\b/giu, "комплект"],
   [/\bкт\b/giu, "комплект"],
   [/\bдв\.\b/giu, "двигатель"],
   [/\bдвс\b/giu, "двигатель"],
+  [/(^|\s)с\s*\/\s*о(?=\s|$)/giu, "$1стеклоочистителя"],
+  [/(^|\s)ст\.?\s*очист/giu, "$1стеклоочист"],
   [/б\s*\/\s*датчика/giu, "без датчика"],
   [/\bв\/в\b/giu, "высоковольтный"],
   [/\bгура\b/giu, "гур"],
+  [/(^|\s)супорт(?=\s|$)/giu, "$1суппорт"],
+  [/(^|\s)супорта(?=\s|$)/giu, "$1суппорт"],
   [/\bсуппорта\b/giu, "суппорт"],
   [/\bсуппортов\b/giu, "суппорт"],
   [/\bступицы\b/giu, "ступица"],
+  [/(^|\s)бензин\.(?=\s|$)/giu, "$1бензиновый"],
   [/\bфильтр салона\b/giu, "салонный фильтр"],
   [/\bфильтр воздуш\b/giu, "воздушный фильтр"],
   [/\bфильтр масл\b/giu, "масляный фильтр"],
@@ -179,13 +185,14 @@ export function normalizeTechnicalToken(value: string) {
     .map((char) => cyrillicTechChars[char] ?? char)
     .join("")
     .replace(/[^a-z0-9.-]/g, "");
+  const compactTechnical = normalized.replace(/[.-]/g, "");
 
   if (/^t\d{1,3}$/.test(normalized)) return normalized;
   if (/^h\d{1,2}$/.test(normalized)) return normalized;
   if (/^w\d+w$/.test(normalized)) return normalized;
   if (/^\d{1,2}v$/.test(normalized)) return normalized;
-  if (/^dot\d$/.test(normalized)) return normalized;
-  if (/^\d{1,2}w[- ]?\d{2}$/.test(normalized)) return normalized.replace(/\s/g, "");
+  if (/^dot\d$/.test(compactTechnical)) return compactTechnical;
+  if (/^\d{1,2}w[-.]?\d{2}$/.test(normalized)) return normalized.replace(/\./g, "-");
   if (/^\d{1,2}w\d{2}$/.test(normalized)) return normalized;
   if (normalized === "atf" || normalized === "sae" || normalized === "led") return normalized;
   return "";

@@ -1,0 +1,21 @@
+status,band,evaluated,correct,precision,note
+AUTO_READY,0.95-1.00,8833,8436,0.9551,Active-label shadow; not a human audit.
+AUTO_READY,0.90-0.95,4880,4340,0.8893,Active-label shadow; not a human audit.
+AUTO_READY,0.80-0.90,0,0,,Active-label shadow; not a human audit.
+AUTO_READY,0.70-0.80,0,0,,Active-label shadow; not a human audit.
+AUTO_READY,below-0.70,0,0,,Active-label shadow; not a human audit.
+GROUP_REVIEW,0.95-1.00,9,9,1,Active-label shadow; not a human audit.
+GROUP_REVIEW,0.90-0.95,2085,1647,0.7899,Active-label shadow; not a human audit.
+GROUP_REVIEW,0.80-0.90,9344,8231,0.8809,Active-label shadow; not a human audit.
+GROUP_REVIEW,0.70-0.80,0,0,,Active-label shadow; not a human audit.
+GROUP_REVIEW,below-0.70,0,0,,Active-label shadow; not a human audit.
+MANUAL_REVIEW,0.95-1.00,0,0,,Active-label shadow; not a human audit.
+MANUAL_REVIEW,0.90-0.95,0,0,,Active-label shadow; not a human audit.
+MANUAL_REVIEW,0.80-0.90,0,0,,Active-label shadow; not a human audit.
+MANUAL_REVIEW,0.70-0.80,332,327,0.9849,Active-label shadow; not a human audit.
+MANUAL_REVIEW,below-0.70,0,0,,Active-label shadow; not a human audit.
+BLOCKED_CONFLICT,0.95-1.00,0,0,,Active-label shadow; not a human audit.
+BLOCKED_CONFLICT,0.90-0.95,0,0,,Active-label shadow; not a human audit.
+BLOCKED_CONFLICT,0.80-0.90,199,138,0.6935,Active-label shadow; not a human audit.
+BLOCKED_CONFLICT,0.70-0.80,17,14,0.8235,Active-label shadow; not a human audit.
+BLOCKED_CONFLICT,below-0.70,0,0,,Active-label shadow; not a human audit.

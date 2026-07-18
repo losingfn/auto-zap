@@ -1,0 +1,859 @@
+{
+  "note": "Active-label shadow evaluation only. Existing catalog labels are treated as local reference data; this is not a human precision audit.",
+  "totalActiveProducts": 26027,
+  "evaluatedWithTarget": 25699,
+  "autoReady": {
+    "evaluated": 13713,
+    "correct": 12776,
+    "precision": 0.9317
+  },
+  "groupReview": {
+    "evaluated": 11438,
+    "correct": 9887,
+    "precision": 0.8644
+  },
+  "bySource": [
+    {
+      "key": "weak_group_candidate|GROUP_REVIEW",
+      "count": 11438
+    },
+    {
+      "key": "exact_prefix_rule|AUTO_READY",
+      "count": 6167
+    },
+    {
+      "key": "domain_dictionary|AUTO_READY",
+      "count": 4117
+    },
+    {
+      "key": "family_rule|AUTO_READY",
+      "count": 2211
+    },
+    {
+      "key": "strong_multi_token|AUTO_READY",
+      "count": 1170
+    },
+    {
+      "key": "ambiguous_token|MANUAL_REVIEW",
+      "count": 332
+    },
+    {
+      "key": "no_match|MANUAL_REVIEW",
+      "count": 328
+    },
+    {
+      "key": "blocked_conflict|BLOCKED_CONFLICT",
+      "count": 216
+    },
+    {
+      "key": "single_strong_token|AUTO_READY",
+      "count": 42
+    },
+    {
+      "key": "exact_article_rule|AUTO_READY",
+      "count": 6
+    }
+  ],
+  "topErrors": [
+    {
+      "shopCode": "И-00692",
+      "name": "Ключ свечной карданный с пружиной *16 500м",
+      "status": "BLOCKED_CONFLICT",
+      "confidence": 0.84,
+      "predictedTarget": "aksessuary/instrumenty",
+      "actualTarget": "podveska/pruzhiny",
+      "source": "blocked_conflict",
+      "family": "Инструменты"
+    },
+    {
+      "shopCode": "А-00815",
+      "name": "Компрессор \"Торнадо\"",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-00665",
+      "name": "Компрессор (Дания)",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-00630",
+      "name": "Компрессор АС581 (в кейсе)",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-00138",
+      "name": "Компрессор малый (Дания)",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-01518",
+      "name": "Компрессор Катунь 370",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-01249",
+      "name": "Компрессор АС 602",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-01008",
+      "name": "Компрессор \"Хёндай 40\"",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-02330",
+      "name": "Компрессор автомобильный AVS КА580",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-02170",
+      "name": "АГРЕССОР AGR-50 Компрессор 50 л/мин (max 10атм)/6/на клеммы/1/6",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-02037",
+      "name": "\"АГРЕССОР\" AGR-75 Компрессор 75л/мин (max 10атм)",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-01588",
+      "name": "Компрессор \"Хёндай\" №20",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-02383",
+      "name": "Компрессор GOODYEAR GY-45L 45 л/мин",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "И-00138",
+      "name": "Шлиф.машинка от компрессора",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ПСГ-00613",
+      "name": "Рем. к-т компрессора 18-3509015 (10 наим.) МД",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ТСГ-00584",
+      "name": "Р/к-т компрессора 2-х цилиндр.",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ТСГ-00580",
+      "name": "Трубка компрессора Валдай 3,8 К",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ТСГ-00517",
+      "name": "Трубка охладителя компрессора КАМАЗ ЕВРО",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ТСГ-00391",
+      "name": "Рем. к-т компрессора Бычок",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ТСГ-00388",
+      "name": "Головка компрессора ЗИЛ-Бычок",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ТСГ-00383",
+      "name": "Трубка компрессора КАМАЗ",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ТСГ-00302",
+      "name": "Трубка охладителя 1-цил.компрессора КАМА",
+      "status": "AUTO_READY",
+      "confidence": 0.98,
+      "predictedTarget": "tormoznaya-sistema/prochaya-tormoznaya-sistema",
+      "actualTarget": "podveska/ressory",
+      "source": "exact_prefix_rule",
+      "family": "Прочая тормозная система"
+    },
+    {
+      "shopCode": "ТСГ-00263",
+      "name": "Трубка компрессора ПАЗ медная",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ТСГ-00232",
+      "name": "Ремкомплект компрессора КАМАЗ-Зил-Бычок",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ХСГ-00563",
+      "name": "Сайлент-блок рессор. Зил-Бычок нов. обр.",
+      "status": "AUTO_READY",
+      "confidence": 0.92,
+      "predictedTarget": "podveska/saylentbloki",
+      "actualTarget": "podveska/ressory",
+      "source": "domain_dictionary",
+      "family": "Сайлентблоки"
+    },
+    {
+      "shopCode": "ЭО-01254",
+      "name": "ПЗУ+компрессор ТМ-18",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ЭО-01251",
+      "name": "Пуско-зарядное устройство ТН-25+компрессор",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-00165",
+      "name": "Компрессор 2-х цилиндровый",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-00362",
+      "name": "Компрессор \"Беркут-14\"",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-01064",
+      "name": "Компрессор \"Торнадо\" (большой)",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-01048",
+      "name": "Компрессор \"Качок-90\" с витым шлангом и дефлятором",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-01472",
+      "name": "Автомобильный компрессор с пылесосом 2 в 1 12В, 80Вт, 10 атм, 10 л/мин",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-01195",
+      "name": "Компрессор АС 605",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-01660",
+      "name": "Компрессор \"Качок-К-90х2С\" (2-х цилиндр.) 57 л/мин",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-02181",
+      "name": "Компрессор автомобильный AVS KE350EL",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "А-02057",
+      "name": "Компрессор автомобильный JT AC580",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ДВГ-00451",
+      "name": "Кольцо компрессора Зил-Бычок",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ДВГ-00417",
+      "name": "Кольца компрессорные Зил",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ДВГ-00491",
+      "name": "Вкладыши компрессора ЗИЛ",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ДВГ-00490",
+      "name": "Коленвал компрессора ЗИЛ",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ДВГ-00487",
+      "name": "Поршень компрессора ЗИЛ-130",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ДВГ-00829",
+      "name": "Кронштейн компрессора ЗИЛ",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ДВГ-01035",
+      "name": "Головка компрессора в сборе Зил-130",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ДВГ-01184",
+      "name": "Кольцо компрессора 1-цил. Goetze",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ДВГ-01343",
+      "name": "Турбокомпрессор МАЗ (Чехия)",
+      "status": "AUTO_READY",
+      "confidence": 0.98,
+      "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+      "actualTarget": "podveska/ressory",
+      "source": "exact_prefix_rule",
+      "family": "Детали двигателя"
+    },
+    {
+      "shopCode": "ДВГ-01288",
+      "name": "Трубка охлаждения компрессора МАЗ №1, 2",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ДВГ-01397",
+      "name": "Ролик натяжной компрессора 245 дв.",
+      "status": "AUTO_READY",
+      "confidence": 0.95,
+      "predictedTarget": "dvigatel-i-transmissiya/remni",
+      "actualTarget": "podveska/ressory",
+      "source": "family_rule",
+      "family": "ГРМ и ролики"
+    },
+    {
+      "shopCode": "ДВГ-01657",
+      "name": "Турбокомпрессор 7406.1118013 (ТКР-7С-6)",
+      "status": "AUTO_READY",
+      "confidence": 0.98,
+      "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+      "actualTarget": "podveska/ressory",
+      "source": "exact_prefix_rule",
+      "family": "Детали двигателя"
+    },
+    {
+      "shopCode": "ДВГ-01656",
+      "name": "Турбокомпрессор 7406.1118012 (ТКР-7С-6) правый",
+      "status": "AUTO_READY",
+      "confidence": 0.98,
+      "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+      "actualTarget": "podveska/ressory",
+      "source": "exact_prefix_rule",
+      "family": "Детали двигателя"
+    },
+    {
+      "shopCode": "ДВГ-01565",
+      "name": "Трубка подводящая турбокомпрессора 245 д",
+      "status": "AUTO_READY",
+      "confidence": 0.98,
+      "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+      "actualTarget": "podveska/ressory",
+      "source": "exact_prefix_rule",
+      "family": "Детали двигателя"
+    },
+    {
+      "shopCode": "ДВГ-01718",
+      "name": "Трубка сливная масла с турбокомпрессором",
+      "status": "AUTO_READY",
+      "confidence": 0.98,
+      "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+      "actualTarget": "podveska/ressory",
+      "source": "exact_prefix_rule",
+      "family": "Детали двигателя"
+    },
+    {
+      "shopCode": "ДВГ-02106",
+      "name": "Кольца компрессора Бычок 1-цилиндр.",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ДВГ-02193",
+      "name": "Шланг турбокомпрессора УАЗ (дв. ЗМЗ-514) d58*75*90",
+      "status": "AUTO_READY",
+      "confidence": 0.98,
+      "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+      "actualTarget": "podveska/ressory",
+      "source": "exact_prefix_rule",
+      "family": "Детали двигателя"
+    },
+    {
+      "shopCode": "ДВГ-02149",
+      "name": "Шланг турбокомпрессора УАЗ (дв.ЗМЗ-514) угловой силикон",
+      "status": "AUTO_READY",
+      "confidence": 0.98,
+      "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+      "actualTarget": "podveska/ressory",
+      "source": "exact_prefix_rule",
+      "family": "Детали двигателя"
+    },
+    {
+      "shopCode": "ДВГ-02133",
+      "name": "Трубка подвода масла к компрессору Г-зон NEXT (дв. ЯМЗ-5344)",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ДВГ-02135",
+      "name": "Трубка подвода охл. жидкости к компрессору Г-зон NEXT (дв. ЯМЗ-5340)",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ДВГ-02327",
+      "name": "Турбокомпрессор ТКР44.27-115-02.00 МД",
+      "status": "AUTO_READY",
+      "confidence": 0.98,
+      "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+      "actualTarget": "podveska/ressory",
+      "source": "exact_prefix_rule",
+      "family": "Детали двигателя"
+    },
+    {
+      "shopCode": "ДВГ-02326",
+      "name": "Турбокомпрессор (ТКР.44.96.002-003.96.00) МД",
+      "status": "AUTO_READY",
+      "confidence": 0.98,
+      "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+      "actualTarget": "podveska/ressory",
+      "source": "exact_prefix_rule",
+      "family": "Детали двигателя"
+    },
+    {
+      "shopCode": "ДВГ-02325",
+      "name": "Турбокомпрессор (ТКР 44.13-296-01.00) МД",
+      "status": "AUTO_READY",
+      "confidence": 0.98,
+      "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+      "actualTarget": "podveska/ressory",
+      "source": "exact_prefix_rule",
+      "family": "Детали двигателя"
+    },
+    {
+      "shopCode": "ДВГ-02313",
+      "name": "Турбокомпрессор ТКР.44.99.001-20.01 МД",
+      "status": "AUTO_READY",
+      "confidence": 0.98,
+      "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+      "actualTarget": "podveska/ressory",
+      "source": "exact_prefix_rule",
+      "family": "Детали двигателя"
+    },
+    {
+      "shopCode": "ДВГ-02301",
+      "name": "Турбокомпрессор (ТКР 44.14-180-01.00) МД",
+      "status": "AUTO_READY",
+      "confidence": 0.98,
+      "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+      "actualTarget": "podveska/ressory",
+      "source": "exact_prefix_rule",
+      "family": "Детали двигателя"
+    },
+    {
+      "shopCode": "ДВГ-02303",
+      "name": "Турбокомпрессор (ТКР 44.27-145-02.00) МД",
+      "status": "AUTO_READY",
+      "confidence": 0.98,
+      "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+      "actualTarget": "podveska/ressory",
+      "source": "exact_prefix_rule",
+      "family": "Детали двигателя"
+    },
+    {
+      "shopCode": "И-00081",
+      "name": "Переходник шланга компрессора",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "И-00064",
+      "name": "Быстроразъем компрессора",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "И-00661",
+      "name": "Шланг компрессора",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "И-00854",
+      "name": "Влагоотделитель на компрессор (мал.)",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "И-00842",
+      "name": "Пневмошприц от компрессора",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "И-00761",
+      "name": "Съёмник сайлентблока рессор Газель",
+      "status": "AUTO_READY",
+      "confidence": 0.92,
+      "predictedTarget": "podveska/saylentbloki",
+      "actualTarget": "podveska/ressory",
+      "source": "domain_dictionary",
+      "family": "Сайлентблоки"
+    },
+    {
+      "shopCode": "И-01582",
+      "name": "Съёмник муфты компрессора кондиционера Шевроле Лачетти 565053",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "И-01970",
+      "name": "Универсальный шланг-удлинитель с манометром для автомоб. компрессоров",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ИН-00949",
+      "name": "АСВ35х55х20 Подшипник компрессора кондици",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "podveska/podshipniki",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Подшипники"
+    },
+    {
+      "shopCode": "ИН-00819",
+      "name": "АСВ30Х52Х22 Подшипник компрессора кондици",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "podveska/podshipniki",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Подшипники"
+    },
+    {
+      "shopCode": "ИН-01159",
+      "name": "АСВ35х52х20 Подшипник компрессора кондици",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "podveska/podshipniki",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Подшипники"
+    },
+    {
+      "shopCode": "ПСГ-00185",
+      "name": "Сальник гура, компрессора ЗИЛ-130 42х58",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ПСГ-00321",
+      "name": "Сальник компрессора ЗИЛ №92*/120",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "РГ-00031",
+      "name": "Рем.к-т компрессора 1-цил. РТИ 3509015-53",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ПСГ-00617",
+      "name": "Рем. к-т компрессора 18-3509015 (5 наим.) МД",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ПСГ-00616",
+      "name": "Рем. к-т 2-х цилиндрового компрессора АМ (7 наим.) МД",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ПСГ-00615",
+      "name": "Рем. к-т 1-цилиндрового компрессора АМ (9 наим.) МД",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    },
+    {
+      "shopCode": "ПСГ-00614",
+      "name": "Рем. к-т компрессора 53205-3509015 с IV кв. 2018 г. (5 наим.) МД",
+      "status": "GROUP_REVIEW",
+      "confidence": 0.88,
+      "predictedTarget": "aksessuary/kompressory",
+      "actualTarget": "podveska/ressory",
+      "source": "weak_group_candidate",
+      "family": "Компрессоры"
+    }
+  ]
+}

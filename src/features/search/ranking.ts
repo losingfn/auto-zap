@@ -11,7 +11,11 @@ import type { SearchProductDocument, SearchProductHit, SearchSynonymRecord } fro
 
 const technicalTokenAliases: Record<string, string[]> = {
   t10: ["t10", "w5w"],
-  w5w: ["w5w", "t10"]
+  w5w: ["w5w", "t10"],
+  "5w30": ["5w30", "5w-30"],
+  "5w-30": ["5w-30", "5w30"],
+  "10w40": ["10w40", "10w-40"],
+  "10w-40": ["10w-40", "10w40"]
 };
 
 const lampSubjectTokens = new Set(["лампа", "лампы", "лампочка", "лампочки", "led"]);

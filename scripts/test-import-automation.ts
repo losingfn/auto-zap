@@ -447,6 +447,39 @@ run("t10 bulb becomes auto-ready while broad sensor stays grouped for review", (
   assert.equal(needsProductReview(row({ shopCode: "A-4", name: "Датчик кислорода" }), sensor), true);
 });
 
+run("residual context families group without reopening generic fasteners", () => {
+  const context = buildDefaultCategorizationContext();
+  const seatBelt = categorizeProductName("A-5 Ремни безопасности 2101-07", context);
+  const copperTube = categorizeProductName("A-6 Трубки медные д.5 для иномарок 50 см", context);
+  const pneumaticFitting = categorizeProductName("A-7 Фурнитура наружная резьба D=6 М 20*1.5", context);
+  const valveBushing = categorizeProductName("A-8 Втулки клапанов 2101-08", context);
+  const heaterValve = categorizeProductName("A-9 Кран печки 2108", context);
+  const genericDin = categorizeProductName("A-10 DIN912 M10*25 с внутренним шестигранником", context);
+
+  assert.equal(seatBelt.decisionStatus, "GROUP_REVIEW");
+  assert.equal(seatBelt.target?.subcategorySlug, "bezopasnost");
+  assert.equal(copperTube.decisionStatus, "GROUP_REVIEW");
+  assert.equal(copperTube.target?.subcategorySlug, "tormoznye-trubki");
+  assert.equal(pneumaticFitting.decisionStatus, "GROUP_REVIEW");
+  assert.equal(pneumaticFitting.target?.subcategorySlug, "prochaya-tormoznaya-sistema");
+  assert.equal(valveBushing.decisionStatus, "GROUP_REVIEW");
+  assert.equal(valveBushing.target?.subcategorySlug, "detali-dvigatelya");
+  assert.equal(heaterValve.decisionStatus, "GROUP_REVIEW");
+  assert.equal(heaterValve.target?.subcategorySlug, "ohlazhdenie");
+  assert.equal(genericDin.decisionStatus, "MANUAL_REVIEW");
+  assert.equal(genericDin.target, null);
+});
+
+run("slash wiper abbreviation normalizes to a safe glass-cleaner signal", () => {
+  const normalized = normalizeProductName("Щетки с/о 60+55");
+  const result = categorizeProductName("A-11 Щетки с/о 60+55", buildDefaultCategorizationContext());
+
+  assert.ok(normalized.tokens.includes("стеклоочистителя"));
+  assert.equal(result.target?.categorySlug, "aksessuary");
+  assert.equal(result.target?.subcategorySlug, "prochie-aksessuary");
+  assert.notEqual(result.target?.subcategorySlug, "ressory");
+});
+
 run("broad review rule words are rejected across casing punctuation and forms", () => {
   for (const pattern of [
     "БОЛТ",

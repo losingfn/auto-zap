@@ -1,0 +1,1842 @@
+{
+  "generatedAt": "2026-07-18T21:55:23.064Z",
+  "readOnly": true,
+  "productionUsed": false,
+  "inputFile": "1782302118029-de725b0722e1-catalog.xlsx",
+  "selectedSheetName": "TDSheet",
+  "pipelineVersion": "product-normalizer-v2+domain-dictionary-v2+domain-rules-v2+confidence-model-v2",
+  "activeVersion": {
+    "id": "c55e517a-e505-47dc-848b-89e6d923915e",
+    "sourceFileName": "catalog.xlsx",
+    "totalRows": 30703,
+    "parsedRows": 30690,
+    "addedCount": 0,
+    "updatedCount": 0,
+    "reviewCount": 4663,
+    "errorCount": 5,
+    "publishedAt": "2026-06-24T12:01:34.645Z"
+  },
+  "recentLocalImportBatches": [
+    {
+      "id": "05031fd8-dcb6-45c9-a5aa-c60aa89e546c",
+      "source_file_name": "catalog.xlsx",
+      "status": "published",
+      "created_at": "2026-06-24T11:55:38.360Z",
+      "analyzed_at": "2026-06-24T11:55:38.366Z",
+      "published_at": "2026-06-24T12:01:34.645Z",
+      "total_rows": 30703,
+      "parsed_rows": 30690,
+      "review_rows": 4663,
+      "added_count": 0,
+      "updated_count": 0
+    },
+    {
+      "id": "4aaa027e-7489-4fe4-a131-581bc384dfad",
+      "source_file_name": "catalog.xlsx",
+      "status": "analyzed",
+      "created_at": "2026-06-24T11:55:21.379Z",
+      "analyzed_at": "2026-06-24T11:55:21.386Z",
+      "published_at": null,
+      "total_rows": 30703,
+      "parsed_rows": 30690,
+      "review_rows": 4663,
+      "added_count": 0,
+      "updated_count": 0
+    },
+    {
+      "id": "4a69470b-99fe-4f19-a108-2f936464fb7a",
+      "source_file_name": "catalog.xls",
+      "status": "published",
+      "created_at": "2026-06-24T11:43:48.387Z",
+      "analyzed_at": "2026-06-24T11:43:48.391Z",
+      "published_at": "2026-06-24T11:44:00.562Z",
+      "total_rows": 30703,
+      "parsed_rows": 30690,
+      "review_rows": 4663,
+      "added_count": 0,
+      "updated_count": 0
+    },
+    {
+      "id": "e5373119-92be-40d4-9a29-01919c8800f2",
+      "source_file_name": "catalog.xls",
+      "status": "published",
+      "created_at": "2026-06-24T11:35:19.448Z",
+      "analyzed_at": "2026-06-24T11:35:19.453Z",
+      "published_at": "2026-06-24T11:35:47.975Z",
+      "total_rows": 30703,
+      "parsed_rows": 30690,
+      "review_rows": 4663,
+      "added_count": 30413,
+      "updated_count": 0
+    }
+  ],
+  "scenario": {
+    "mode": "target-count-bounded-local-replay",
+    "importLimit": 25567,
+    "targetExisting": 21811,
+    "targetNew": 3742,
+    "selectedRows": 25004,
+    "existingActiveRows": 21262,
+    "newOrUnconfirmedRows": 3742,
+    "localScenarioMismatch": {
+      "requestedLatestImportApproximation": {
+        "totalRows": 25567,
+        "existingProducts": 21811,
+        "newProducts": 3742,
+        "initialReview": 3297
+      },
+      "localSnapshotObserved": {
+        "totalRows": 30703,
+        "parsedRows": 30690,
+        "activeExistingProducts": 26027,
+        "newOrUnconfirmedProducts": 3742,
+        "activeVersionReviewCount": 4663
+      },
+      "limitation": "Локальный snapshot не содержит заявленный 25 567-row импорт; replay использует доступный локальный active catalog и локальный import file. Target-count flags can create a count-bounded approximation, but it is reported separately."
+    }
+  },
+  "importReportWithActiveProducts": {
+    "totalRows": 30703,
+    "parsedRows": 30690,
+    "validRows": 30413,
+    "reviewRows": 277,
+    "errorRows": 5,
+    "skippedRows": 8,
+    "addedCount": 4386,
+    "updatedCount": 0,
+    "archivedCount": 0,
+    "unchangedCount": 26027
+  },
+  "newProductMetrics": {
+    "total": 3742,
+    "autoReady": 425,
+    "groupReview": 1504,
+    "manualReview": 1798,
+    "blockedConflict": 15,
+    "invalidInput": 0,
+    "fullyManual": 1813,
+    "groupCount": 466,
+    "medianGroupSize": 2,
+    "maxGroupSize": 38,
+    "groupsOver100": 0,
+    "groupsOver300": 0,
+    "averageConfidence": 0.468,
+    "handledShare": 0.5155,
+    "fullyManualShare": 0.4845,
+    "statusCounts": [
+      {
+        "key": "MANUAL_REVIEW",
+        "count": 1798
+      },
+      {
+        "key": "GROUP_REVIEW",
+        "count": 1504
+      },
+      {
+        "key": "AUTO_READY",
+        "count": 425
+      },
+      {
+        "key": "BLOCKED_CONFLICT",
+        "count": 15
+      }
+    ],
+    "reviewReasons": [
+      {
+        "key": "no_candidate",
+        "count": 1798
+      },
+      {
+        "key": "negative_evidence",
+        "count": 9
+      },
+      {
+        "key": "close_candidates",
+        "count": 6
+      }
+    ],
+    "familyDistribution": [
+      {
+        "key": "other|MANUAL_REVIEW",
+        "count": 871
+      },
+      {
+        "key": "other|GROUP_REVIEW",
+        "count": 762
+      },
+      {
+        "key": "other|AUTO_READY",
+        "count": 385
+      },
+      {
+        "key": "bolts|MANUAL_REVIEW",
+        "count": 256
+      },
+      {
+        "key": "fittings|MANUAL_REVIEW",
+        "count": 151
+      },
+      {
+        "key": "fittings|GROUP_REVIEW",
+        "count": 116
+      },
+      {
+        "key": "bolts|GROUP_REVIEW",
+        "count": 90
+      },
+      {
+        "key": "nuts|MANUAL_REVIEW",
+        "count": 87
+      },
+      {
+        "key": "washers|MANUAL_REVIEW",
+        "count": 66
+      },
+      {
+        "key": "socket_head_fasteners|MANUAL_REVIEW",
+        "count": 64
+      },
+      {
+        "key": "pneumatic_fittings|GROUP_REVIEW",
+        "count": 58
+      },
+      {
+        "key": "nuts|GROUP_REVIEW",
+        "count": 50
+      },
+      {
+        "key": "rings|MANUAL_REVIEW",
+        "count": 41
+      },
+      {
+        "key": "caps_plugs|GROUP_REVIEW",
+        "count": 40
+      },
+      {
+        "key": "seat_parts|GROUP_REVIEW",
+        "count": 40
+      },
+      {
+        "key": "studs|MANUAL_REVIEW",
+        "count": 40
+      },
+      {
+        "key": "clamps|GROUP_REVIEW",
+        "count": 35
+      },
+      {
+        "key": "clamps|MANUAL_REVIEW",
+        "count": 34
+      },
+      {
+        "key": "screws|MANUAL_REVIEW",
+        "count": 34
+      },
+      {
+        "key": "studs|GROUP_REVIEW",
+        "count": 34
+      },
+      {
+        "key": "caps_plugs|MANUAL_REVIEW",
+        "count": 30
+      },
+      {
+        "key": "heater_parts|GROUP_REVIEW",
+        "count": 29
+      },
+      {
+        "key": "hoses|GROUP_REVIEW",
+        "count": 27
+      },
+      {
+        "key": "hoses|MANUAL_REVIEW",
+        "count": 23
+      },
+      {
+        "key": "rings|GROUP_REVIEW",
+        "count": 23
+      },
+      {
+        "key": "washers|GROUP_REVIEW",
+        "count": 23
+      },
+      {
+        "key": "fragrances|GROUP_REVIEW",
+        "count": 19
+      },
+      {
+        "key": "steering_wheels|GROUP_REVIEW",
+        "count": 19
+      },
+      {
+        "key": "adhesive_tapes|GROUP_REVIEW",
+        "count": 16
+      },
+      {
+        "key": "driver_electronics|GROUP_REVIEW",
+        "count": 15
+      }
+    ]
+  },
+  "operatorWorkflow": {
+    "decisionsBefore": 3742,
+    "decisionsAfter": 2279,
+    "reduction": 1463,
+    "reductionShare": 0.391
+  },
+  "groupQuality": {
+    "largestGroups": [
+      {
+        "id": "pneumatic_line_fittings|pneumatic_fittings|соединитель-шлангов|tormoznaya-sistema|prochaya-tormoznaya-sistema",
+        "label": "Пневмофитинги и соединители шлангов",
+        "count": 38,
+        "categorySlug": "tormoznaya-sistema",
+        "subcategorySlug": "prochaya-tormoznaya-sistema",
+        "confidence": 0.92,
+        "homogeneity": 1,
+        "reviewSampleSize": 12,
+        "riskFlags": [
+          "near_threshold_or_close_candidate"
+        ],
+        "examples": [
+          "КГ-01086 Соединитель шлангов Г-образный метал. д.1",
+          "КГ-00675 Соединитель шлангов метал 14х14",
+          "КГ-01075 Соединитель шлангов прямой метал. д.14",
+          "КГ-01076 Соединитель шлангов прямой метал. д.16",
+          "КГ-01077 Соединитель шлангов прямой метал. д.18",
+          "КГ-01078 Соединитель шлангов прямой метал. д.20",
+          "КГ-01079 Соединитель шлангов тройник метал. д.14",
+          "КГ-01080 Соединитель шлангов тройник метал. д.16"
+        ],
+        "outliers": [
+          "КГ-01330 Соединитель шлангов угол 16х16 ключ 19"
+        ]
+      },
+      {
+        "id": "engine_valves|other|клапан|dvigatel-i-transmissiya|detali-dvigatelya",
+        "label": "Детали двигателя",
+        "count": 36,
+        "categorySlug": "dvigatel-i-transmissiya",
+        "subcategorySlug": "detali-dvigatelya",
+        "confidence": 0.8867,
+        "homogeneity": 1,
+        "reviewSampleSize": 12,
+        "riskFlags": [],
+        "examples": [
+          "ДВ-00757 К-т клапанов выпускных 2108-1007012-01-Ч ЧАМЗ немагнит.",
+          "ДВ-00009 Втулки клапанные SM 2101-07",
+          "ДВ-00010 Втулки клапанные SM 2108",
+          "ДВ-00042 Регулятор клапанов 2101-07",
+          "ДВ-00047 Втулки клапанные 2101-08 (1 шт)",
+          "ДВ-00314 Клапан 2108 выпуск. (Луганск)",
+          "ДВ-00368 Клапан выпускной АМР 2101-07, за 1 шт",
+          "ДВ-00369 Клапан выпускной АМР 2108-09, за 1 шт"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "wiper|other|стеклооч|aksessuary|prochie-aksessuary",
+        "label": "Стеклоочистители",
+        "count": 28,
+        "categorySlug": "aksessuary",
+        "subcategorySlug": "prochie-aksessuary",
+        "confidence": 0.912,
+        "homogeneity": 1,
+        "reviewSampleSize": 12,
+        "riskFlags": [],
+        "examples": [
+          "ЗЧМ-00138 Мотор стеклоочистителя 2141",
+          "ЗЧМ-00611 Мотор стеклоочистителя 2140-412",
+          "ИН-00214 Трапеция стеклоочистителя Дэу-Нексиа",
+          "А-00350 Лента стеклоочистителя ХОРС 54см",
+          "А-00532 Лента стеклоочистителя ХОРС 36см",
+          "А-00879 Лента стеклоочистителя \"Хорс\" 61 см",
+          "А-01342 Лента стеклоочистителя \"Хорс\" 51, 61 см",
+          "А-01994 Лента щёток стеклоочист. в блистере 71 см, к-т 2 шт, профиль \"БОШ\""
+        ],
+        "outliers": []
+      },
+      {
+        "id": "active_neighbor|clamps|active-neighbor-100|dvigatel-i-transmissiya|vyhlopnaya-sistema",
+        "label": "Похожие активные товары",
+        "count": 26,
+        "categorySlug": "dvigatel-i-transmissiya",
+        "subcategorySlug": "vyhlopnaya-sistema",
+        "confidence": 0.94,
+        "homogeneity": 1,
+        "reviewSampleSize": 12,
+        "riskFlags": [],
+        "examples": [
+          "ИН-00307 107 219 685 Хомут 54,5мм",
+          "ИН-00310 107 222 685 Хомут 59, 5 мм",
+          "ИН-00306 102 754 685 Хомут 54,5 мм",
+          "ИН-00308 107 220 685 Хомут 59,5мм",
+          "ИН-00309 107 221 685 Хомут 49,5 мм",
+          "КГ-00821 Хомут гл. (стремянка) 58 мм \"Bosal\"",
+          "КГ-00854 Хомут силовой 68-73 мм (25 мм) HD-18",
+          "КГ-00897 Хомут силовой 51-55 мм (20мм) (Т) HD-14 T"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "exhaust|other|гофра|dvigatel-i-transmissiya|vyhlopnaya-sistema",
+        "label": "Выхлопная система",
+        "count": 24,
+        "categorySlug": "dvigatel-i-transmissiya",
+        "subcategorySlug": "vyhlopnaya-sistema",
+        "confidence": 0.89,
+        "homogeneity": 1,
+        "reviewSampleSize": 12,
+        "riskFlags": [],
+        "examples": [
+          "Г-00155 Гофра ф22",
+          "Г-00255 Гофра ремонтная",
+          "Г-00414 Гофра 40х330",
+          "Г-00509 Гофра ф38",
+          "Г-00554 Гофра 60*100 3х-слойн.серии 311.InterLock",
+          "Г-00555 Гофра 60*150 3х-слойн.серии 311.InterLock",
+          "Г-00556 Гофра 60*200 3х-слойн.серии 311.InterLock",
+          "Г-00557 Гофра 60*250 3х-слойн.серии 311.InterLock"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "pneumatic_line_fittings|fittings|соединитель|tormoznaya-sistema|prochaya-tormoznaya-sistema",
+        "label": "Пневмофитинги и соединители шлангов",
+        "count": 21,
+        "categorySlug": "tormoznaya-sistema",
+        "subcategorySlug": "prochaya-tormoznaya-sistema",
+        "confidence": 0.8646,
+        "homogeneity": 1,
+        "reviewSampleSize": 12,
+        "riskFlags": [],
+        "examples": [
+          "ДВ-00723 Соединитель воздушных шлангов 2107 инж.",
+          "ДВ-00724 Соединитель воздушных шлангов 21214 инж.",
+          "ИН-00689 06.301AL Труба соединительная DAEWOO NE",
+          "КГ-00757 Соединитель латунный д.6",
+          "КГ-00758 Соединитель латунный д.8",
+          "КГ-00759 Соединитель латунный д.10",
+          "КГ-00760 Соединитель латунный д.12",
+          "КГ-00761 Соединитель латунный д.14"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "active_neighbor|fittings|active-neighbor-100|tormoznaya-sistema|prochaya-tormoznaya-sistema",
+        "label": "Похожие активные товары",
+        "count": 21,
+        "categorySlug": "tormoznaya-sistema",
+        "subcategorySlug": "prochaya-tormoznaya-sistema",
+        "confidence": 0.94,
+        "homogeneity": 1,
+        "reviewSampleSize": 12,
+        "riskFlags": [],
+        "examples": [
+          "КГ-00647 Быстросъем для пневм. трубок Ф6",
+          "КГ-00412 Соединитель трубок ПВХ М8/м10/м12",
+          "КГ-00563 Фитинг соединитель прям. Ф-15 мм",
+          "КГ-00564 Фитинг соединитель прям. Ф-16 мм",
+          "КГ-00871 Фитинг латунь ЕВРО 12х8 прямой",
+          "КГ-00872 Фитинг 12х6 прямой ЕВРО латунь",
+          "КГ-00873 Фитинг 16х6 прямой ЕВРО латунь",
+          "КГ-00874 Фитинг 16х12 прямой ЕВРО латунь"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "exhaust_hardware|other|приемной-трубы|dvigatel-i-transmissiya|vyhlopnaya-sistema",
+        "label": "Метизы и хомуты выхлопной системы",
+        "count": 18,
+        "categorySlug": "dvigatel-i-transmissiya",
+        "subcategorySlug": "vyhlopnaya-sistema",
+        "confidence": 0.912,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "ОК-00061 Прижим приемной трубы",
+          "РГ-00127 Ремкомплект приемной трубы ГАЗ-53",
+          "РГ-00274 Рем.к-т приемной трубы УАЗ-469",
+          "Г-00158 Флянец приемной трубы Бычок",
+          "ИН-01075 К-т приемной трубы Рено (8 кл.)",
+          "ИН-01076 К-т приемной трубы Рено Дастер (16 кл.)",
+          "К-00192 Стопор гаек приёмной трубы ВАЗ",
+          "К-00486 Рем.к-т приемной трубы 2112 с катализат."
+        ],
+        "outliers": []
+      },
+      {
+        "id": "misc_accessories|other|пленка|aksessuary|prochie-aksessuary",
+        "label": "Прочие аксессуары",
+        "count": 18,
+        "categorySlug": "aksessuary",
+        "subcategorySlug": "prochie-aksessuary",
+        "confidence": 0.85,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "А-00401 Пленка тонирующая с переходом",
+          "А-01574 MTF Пленка PREMIUM 0,5м",
+          "А-01575 MTF Пленка PREMIUM 0,75м",
+          "А-02109 Плёнка тонирров. MTF 1мх3м",
+          "А-02137 TOR Маскировочная пленка 1100ммх33мм с клеящей лентой (стат. эффект)",
+          "А-00010 Плёнка с переходом 75 см",
+          "А-00097 Плёнка тонирующая",
+          "А-00277 Пленка тонирующая 5%, 0,5 м MTF (Корея)"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "washer_reservoir|other|бачок-омывателя|kuzov-i-optika|kuzovnye-detali",
+        "label": "Бачки омывателя",
+        "count": 17,
+        "categorySlug": "kuzov-i-optika",
+        "subcategorySlug": "kuzovnye-detali",
+        "confidence": 0.912,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "ДВ-00129 Бачок омывателя 2101-07",
+          "ДВ-00226 Бачок омывателя двойной пустой ВАЗ",
+          "А-00663 Бачок омывателя зад. Нива, 2104, Ока",
+          "ДВ-00059 Бачок омывателя 2101 (пустой)",
+          "ДВ-00220 Бачок омывателя 2108",
+          "ДВ-00252 Бачок омывателя 21214",
+          "ДВ-00279 Бачок омывателя 21213",
+          "ДВ-00333 Бачок омывателя 2110"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "wheel_caps|other|колпаки|aksessuary|shiny-i-diski",
+        "label": "Колпаки колес",
+        "count": 17,
+        "categorySlug": "aksessuary",
+        "subcategorySlug": "shiny-i-diski",
+        "confidence": 0.9049,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "А-01083 Колпаки декоративные малые ВАЗ (1 шт)",
+          "А-00785 Колпаки хромированные д.15",
+          "А-01052 Колпаки Каррера плюс 13/14",
+          "А-01325 Колпаки Рено д.15,14 (1 шт)",
+          "А-00784 Колпаки хромированные д.16 ЛЕМАНС",
+          "А-01410 Колпаки \"Леманс\" 13,14",
+          "А-01973 Колпаки МИГ БЕЛЫЙ (Газель) 16(10), 4 шт",
+          "А-01013 Колпаки Наскар Золотой 13"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "pneumatic_line_fittings|pneumatic_fittings|наружная-резьба|tormoznaya-sistema|prochaya-tormoznaya-sistema",
+        "label": "Пневмофитинги и соединители шлангов",
+        "count": 16,
+        "categorySlug": "tormoznaya-sistema",
+        "subcategorySlug": "prochaya-tormoznaya-sistema",
+        "confidence": 0.902,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "КГ-01176 Фурнитура наружная резьба D=6 М 20*1.5 0759",
+          "КГ-01097 Фурнитура D6 М10Х1 наружная резьба",
+          "КГ-01175 Фурнитура наружная резьба D=6 М 8*1 0796",
+          "КГ-01177 Фурнитура наружная резьба D=8 М8*1",
+          "КГ-01178 Фурнитура наружная резьба D=8 М 12*1,25",
+          "КГ-01179 Фурнитура наружная резьба D=8 М 16*1,5",
+          "КГ-01180 Фурнитура наружная резьба D=8 М 20*1,5 0760",
+          "КГ-01181 Фурнитура наружная резьба D=8 М 22*1,5"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "electrical_misc|other|компьютер|elektrika|prochaya-elektrika",
+        "label": "Прочая электрика",
+        "count": 16,
+        "categorySlug": "elektrika",
+        "subcategorySlug": "prochaya-elektrika",
+        "confidence": 0.85,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "А-00161 Компьютер \"Штат\" 2110 (голосовой)",
+          "А-00585 Компьютер 2115 (говорящий)",
+          "А-00759 Компьютер 2115",
+          "А-01051 Компьютер ШТАТ н/о 2107",
+          "А-00205 Компьютер маршрутный 2110 \"Штат\" мультидис",
+          "А-00283 Компьютер \"Штат\" 5К-21 Нива",
+          "А-00308 Компьютер \"Штат Х1\" 2110,Самара-2, Калина,",
+          "А-00531 Компьютер для 406 дв."
+        ],
+        "outliers": []
+      },
+      {
+        "id": "accessory_electronics|other|автомагнитола|aksessuary|prochie-aksessuary",
+        "label": "Автоэлектроника и устройства",
+        "count": 15,
+        "categorySlug": "aksessuary",
+        "subcategorySlug": "prochie-aksessuary",
+        "confidence": 0.89,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "А-00694 Автомагнитола AM Eplutus СА310, СА313",
+          "А-01270 Автомагнитола \"УРАЛ\" 280 24V",
+          "А-01272 Автомагнитола \"SWAT\" 212",
+          "А-01544 Автомагнитола \"Carlive\"",
+          "А-02312 Автомагнитола мультимедиа Factory F-1-10",
+          "А-00443 Автомагнитола МОК-4041",
+          "А-00647 Автомагнитола \"Eplutus\" СА902",
+          "А-01271 Автомагнитола CarLive А6 (10)"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "accessory_electronics|other|видеорегистратор|aksessuary|prochie-aksessuary",
+        "label": "Автоэлектроника и устройства",
+        "count": 15,
+        "categorySlug": "aksessuary",
+        "subcategorySlug": "prochie-aksessuary",
+        "confidence": 0.89,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "А-01226 Видеорегистратор 2 камеры DVR",
+          "А-01451 Видеорегистратор EPLUTUS 931",
+          "А-01148 Видеорегистратор XPX P40 Pro",
+          "А-01166 Видеорегистратор",
+          "А-01167 Видеорегистратор 930",
+          "А-01219 Видеорегистратор EPLUTUS 030",
+          "А-01294 Видеорегистратор XPX P20 Pro",
+          "А-01450 Видеорегистратор DUR 300 2 камеры"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "interior|other|накладка|kuzov-i-optika|elementy-salona",
+        "label": "Элементы салона",
+        "count": 15,
+        "categorySlug": "kuzov-i-optika",
+        "subcategorySlug": "elementy-salona",
+        "confidence": 0.85,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [
+          "near_threshold_or_close_candidate"
+        ],
+        "examples": [
+          "А-00439 Накладка кулисы 2101-07",
+          "А-00509 Накладка потолка 2105-07",
+          "ЗЧМ-00241 Накладка поводка 2141 Москвич",
+          "ЗЧМ-00358 Накладка с пепельницой 2141",
+          "КР-00439 Накладка центральная Приора",
+          "А-00261 Накладка заднего замка 2109",
+          "А-00431 Накладка тоннеля 2121",
+          "А-00584 Накладка люка б/бака"
+        ],
+        "outliers": [
+          "А-00439 Накладка кулисы 2101-07"
+        ]
+      },
+      {
+        "id": "active_neighbor|fittings|active-neighbor-82|tormoznaya-sistema|prochaya-tormoznaya-sistema",
+        "label": "Похожие активные товары",
+        "count": 14,
+        "categorySlug": "tormoznaya-sistema",
+        "subcategorySlug": "prochaya-tormoznaya-sistema",
+        "confidence": 0.9391,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "КГ-00927 Фитинг 22х12 с наружной резьбой",
+          "КГ-00926 Фитинг 22х10 с наружной резьбой",
+          "КГ-00928 Фитинг 22х8 с наружной резьбой",
+          "КГ-00929 Фитинг 12х12 с наружной резьбой",
+          "КГ-00930 Фитинг 16х6 с наружной резьбой",
+          "КГ-00931 Фитинг 16х12 с наружной резьбой",
+          "КГ-00932 Фитинг 12х10 с наружной резьбой",
+          "КГ-00933 Фитинг 10х12 с наружной резьбой"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "wheel_fasteners|nuts|гайка-колес|aksessuary|shiny-i-diski",
+        "label": "Колёсные болты, гайки и шпильки",
+        "count": 13,
+        "categorySlug": "aksessuary",
+        "subcategorySlug": "shiny-i-diski",
+        "confidence": 0.912,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [
+          "near_threshold_or_close_candidate"
+        ],
+        "examples": [
+          "ЗЧМ-00041 Гайка колес Москвич 2140",
+          "К-00108 Гайка колёс Нива",
+          "К-00408 Гайка колес Нива (удлиненная)",
+          "К-00657 Гайка колес М12Х1.5 высокая (никель)",
+          "КГ-00028 Гайка колес Газель-Бычок",
+          "КГ-00144 Гайка колёс Таврия",
+          "КГ-00464 Гайка колес КАМАЗ",
+          "КГ-00650 Гайка колес УАЗ 14х1.5 ключ 19"
+        ],
+        "outliers": [
+          "КГ-00650 Гайка колес УАЗ 14х1.5 ключ 19"
+        ]
+      },
+      {
+        "id": "adhesive_tapes|adhesive_tapes|скотч|aksessuary|prochie-aksessuary",
+        "label": "Скотч и клейкие ленты",
+        "count": 13,
+        "categorySlug": "aksessuary",
+        "subcategorySlug": "prochie-aksessuary",
+        "confidence": 0.8424,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "А-00214 Скотч \"Боди\" 25 мм",
+          "А-00219 Скотч \"Боди\" 38 мм",
+          "А-00886 Скотч 2-х сторонний \"ЗМ\" (9 мм)",
+          "А-01103 \"ЗМ\" Скотч 2-х сторон. 15 мм",
+          "А-02104 TOP CAR Скотч 38 мм/40м",
+          "А-00461 Скотч 50 мм",
+          "А-00973 Скотч \"3М\" (9 мм, 33 м)",
+          "А-02245 Скотч 150 мм"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "car_fragrances|fragrances|дезодорант|aksessuary|prochie-aksessuary",
+        "label": "Ароматизаторы и дезодоранты",
+        "count": 12,
+        "categorySlug": "aksessuary",
+        "subcategorySlug": "prochie-aksessuary",
+        "confidence": 0.8567,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [
+          "near_threshold_or_close_candidate"
+        ],
+        "examples": [
+          "А-00266 Дезодорант \"Кубики\"",
+          "А-00773 Дезодорант гелевый (вентилятор)",
+          "А-00917 Дезодорант гелевый (животные)",
+          "А-00977 Дезодорант \"Елочка\" (большая)",
+          "А-01107 Дезодорант в баночке Органика",
+          "А-01424 Дезодорант автомобильный",
+          "А-01434 Дезодорант под сиденье",
+          "А-01655 Дезодорант \"DIFFEREN\""
+        ],
+        "outliers": [
+          "А-01434 Дезодорант под сиденье"
+        ]
+      },
+      {
+        "id": "body_air_intakes|other|воздухозаборник|kuzov-i-optika|kuzovnye-detali",
+        "label": "Кузовные воздухозаборники",
+        "count": 12,
+        "categorySlug": "kuzov-i-optika",
+        "subcategorySlug": "kuzovnye-detali",
+        "confidence": 0.8767,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "А-00623 Воздухозаборник Нива",
+          "А-01290 Воздухозаборник Нива н/о хром",
+          "А-00483 Воздухозаборник ОКА",
+          "А-00793 Воздухозаборник Нива, 2106",
+          "А-01493 Воздухозаборник Нива черный, белый",
+          "А-01919 Воздухозаборник 2110 (тюнинг) наклад.",
+          "А-02341 Воздухозаборник Нива-Легенда 21214",
+          "КГ-00239 Воздухозаборник УАЗ"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "steering_wheel_covers|steering_wheel_covers|оплетка|aksessuary|prochie-aksessuary",
+        "label": "Оплетки руля",
+        "count": 11,
+        "categorySlug": "aksessuary",
+        "subcategorySlug": "prochie-aksessuary",
+        "confidence": 0.9073,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "А-02324 Оплётка для перетяжки руля \"АвтоПрофи\"",
+          "А-01612 Оплетка (натуральный мех)",
+          "А-01823 Оплётка 48 см",
+          "А-02099 Оплётка Гранта",
+          "А-02100 Оплётка Солярис, Рио",
+          "А-01481 Оплётка \"HR\" Израиль",
+          "А-01615 Оплетка \"DAKAR\" HR",
+          "А-01649 Оплётка PSV"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "body_small_exterior|other|жабо|kuzov-i-optika|kuzovnye-detali",
+        "label": "Малые кузовные элементы",
+        "count": 10,
+        "categorySlug": "kuzov-i-optika",
+        "subcategorySlug": "kuzovnye-detali",
+        "confidence": 0.8912,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "КР-00348 Жабо ВАЗ 2108 (за 2 шт)",
+          "ИН-01127 Жабо Рено Дастер",
+          "А-01112 Жабо 2115",
+          "А-02228 Жабо 2170 Приора",
+          "ИН-01128 Жабо Рено Логан",
+          "К-00947 Набор жабо 1118",
+          "К-00948 Набор жабо 2110",
+          "К-00949 Набор жабо 2170"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "exhaust_hardware|studs|коллектор|dvigatel-i-transmissiya|vyhlopnaya-sistema",
+        "label": "Метизы и хомуты выхлопной системы",
+        "count": 10,
+        "categorySlug": "dvigatel-i-transmissiya",
+        "subcategorySlug": "vyhlopnaya-sistema",
+        "confidence": 0.872,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "КГ-00598 Шпилька коллектора ЗИЛ-130 короткая",
+          "КГ-00599 Шпилька коллектора ЗИЛ-130 длин.",
+          "ЗЧМ-00373 Шпилька коллектора Москвич 8 шаг 1.0",
+          "К-00489 Шпилька коллектора М6*30 2108",
+          "К-00559 Шпилька М10*25 вып. коллектора 21103",
+          "К-00712 Шпилька М10*25 вып. коллектора 21103",
+          "КГ-00032 Шпилька коллектора ГАЗ",
+          "КГ-00034 Шпилька коллектора ГАЗ"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "electrical_misc|other|переключатель|elektrika|prochaya-elektrika",
+        "label": "Прочая электрика",
+        "count": 10,
+        "categorySlug": "elektrika",
+        "subcategorySlug": "prochaya-elektrika",
+        "confidence": 0.85,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "ИН-00881 Переключатель",
+          "ЗЧМ-00296 Центральный переключатель света Москвич",
+          "ИН-00185 Переключатель света центр. Ланос",
+          "ИН-00197 Переключатель света Дэу-Нексиа",
+          "ИН-00734 Переключатель поворотов Ланос",
+          "ИН-00787 Переключатель поворотов Рено Логан",
+          "ИН-01022 Переключатель поворотов Рено-Логан н. об",
+          "ИН-01518 Переключатель подрул. свет. сигнал Renault Logan (-14) без ПТФ"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "steering_wheels|steering_wheels|руль|kuzov-i-optika|kuzovnye-detali",
+        "label": "Рули и рулевые колеса",
+        "count": 10,
+        "categorySlug": "kuzov-i-optika",
+        "subcategorySlug": "kuzovnye-detali",
+        "confidence": 0.82,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "А-00390 Руль кожа-дерево",
+          "А-00123 Руль (кожа)",
+          "А-00227 Руль Лада",
+          "А-00405 Руль (цветной)",
+          "А-00490 Руль Нива-Тайга 2107",
+          "А-00491 Руль \"Вираж\"",
+          "А-00648 Руль \"Вираж\" (нов. обр.)",
+          "А-01054 Накладки на руль"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "headlight|other|фары|kuzov-i-optika|fary",
+        "label": "Фары",
+        "count": 10,
+        "categorySlug": "kuzov-i-optika",
+        "subcategorySlug": "fary",
+        "confidence": 0.9,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [
+          "near_threshold_or_close_candidate"
+        ],
+        "examples": [
+          "А-00472 Накладка под фары 2110 (2 шт)",
+          "А-02291 Фары 2115 (тюнинг), 2 шт",
+          "ИН-00702 Фары пр.21511В7RLEMN2,лев.21511В7LLEMN2",
+          "ИН-00735 Кожух крышки фары Chevrolet",
+          "О-00645 Фары тракторные (рефленые)",
+          "О-00672 Фары тракторные средние",
+          "О-00673 Фары тракторные большие",
+          "К-00677 Набор крепления фары ВАЗ 2104, 2105, 2107"
+        ],
+        "outliers": [
+          "А-00472 Накладка под фары 2110 (2 шт)",
+          "ИН-00735 Кожух крышки фары Chevrolet",
+          "О-00038 Ободок фары УАЗ"
+        ]
+      },
+      {
+        "id": "exhaust|other|пламегаситель|dvigatel-i-transmissiya|vyhlopnaya-sistema",
+        "label": "Выхлопная система",
+        "count": 9,
+        "categorySlug": "dvigatel-i-transmissiya",
+        "subcategorySlug": "vyhlopnaya-sistema",
+        "confidence": 0.89,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "Г-00599 Пламегаситель стронгер 45*400 с перфор.-диффузором \"CBD\" STAL113",
+          "Г-00633 Пламегаситель коллекторный диссипативный D=57х110мм L=100мм CBD510.010",
+          "Г-00600 Пламегаситель стронгер 45*550 с перфор.-диффузором \"CBD\" STAL114",
+          "Г-00601 Пламегаситель стронгер 50*300 с перфор.-диффузором \"CBD\" STAL115",
+          "Г-00602 Пламегаситель стронгер 50*400 с перфор.-диффузором \"CBD\" STAL116",
+          "Г-00603 Пламегаситель стронгер 50*550 с перфор.-диффузором \"CBD\" STAL117",
+          "Г-00604 Стронгер пламегаситель жаброобразный 76х50мм L=400мм STAL101",
+          "Г-00621 Пламегаситель коллекторный диссилативный UNIVERSAL D=57х100 мм L=100мм CBD510.003"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "engine_valves|caps_plugs|клапан|dvigatel-i-transmissiya|detali-dvigatelya",
+        "label": "Детали двигателя",
+        "count": 9,
+        "categorySlug": "dvigatel-i-transmissiya",
+        "subcategorySlug": "detali-dvigatelya",
+        "confidence": 0.916,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "ЗЧМ-00601 Крышка клапанная Таврия",
+          "ДВ-00124 Крышка клапанная 2101",
+          "ДВ-00259 Крышка клапанов 2105",
+          "ДВ-00261 Крышка клапанная 2108",
+          "ДВ-00439 Крышка клапанов Нива 21214",
+          "ДВ-00447 Крышка клапанов 2108 инжектор",
+          "ДВ-00498 Крышка клапанная 16 кл. дв. ВАЗ",
+          "ДВ-00551 Крышка клапанов 2107инжектор, Нива 21214"
+        ],
+        "outliers": []
+      },
+      {
+        "id": "copper_brake_tubes|brake_tubes|трубки-медные|tormoznaya-sistema|tormoznye-trubki",
+        "label": "Медные тормозные трубки",
+        "count": 9,
+        "categorySlug": "tormoznaya-sistema",
+        "subcategorySlug": "tormoznye-trubki",
+        "confidence": 0.9233,
+        "homogeneity": 1,
+        "reviewSampleSize": 8,
+        "riskFlags": [],
+        "examples": [
+          "ИН-00517 Трубки медные д.5 для иномарок 50 см",
+          "ИН-00518 Трубки медные д.5 для иномарок 75 см",
+          "ИН-00519 Трубки медные д.5 для иномарок 100 см",
+          "ИН-00520 Трубки медные д.5 для иномарок 125 см",
+          "ИН-00521 Трубки медные д.5 для иномарок 150 см",
+          "ИН-00522 Трубки медные д.5 для иномарок 175 см",
+          "ИН-00523 Трубки медные д.5 для иномарок 200 см",
+          "ИН-00999 Трубки медные для иномарок д. 3,5м"
+        ],
+        "outliers": []
+      }
+    ],
+    "riskyGroupCount": 23,
+    "veryLargeGroups": 0
+  },
+  "precision": {
+    "activeLabelShadow": {
+      "note": "Active-label shadow evaluation only. Existing catalog labels are treated as local reference data; this is not a human precision audit.",
+      "totalActiveProducts": 26027,
+      "evaluatedWithTarget": 25730,
+      "autoReady": {
+        "evaluated": 13606,
+        "correct": 12700,
+        "precision": 0.9334
+      },
+      "groupReview": {
+        "evaluated": 11499,
+        "correct": 9820,
+        "precision": 0.854
+      },
+      "bySource": [
+        {
+          "key": "weak_group_candidate|GROUP_REVIEW",
+          "count": 11499
+        },
+        {
+          "key": "exact_prefix_rule|AUTO_READY",
+          "count": 6160
+        },
+        {
+          "key": "domain_dictionary|AUTO_READY",
+          "count": 4078
+        },
+        {
+          "key": "family_rule|AUTO_READY",
+          "count": 2201
+        },
+        {
+          "key": "strong_multi_token|AUTO_READY",
+          "count": 1120
+        },
+        {
+          "key": "ambiguous_token|MANUAL_REVIEW",
+          "count": 328
+        },
+        {
+          "key": "blocked_conflict|BLOCKED_CONFLICT",
+          "count": 297
+        },
+        {
+          "key": "no_match|MANUAL_REVIEW",
+          "count": 297
+        },
+        {
+          "key": "single_strong_token|AUTO_READY",
+          "count": 41
+        },
+        {
+          "key": "exact_article_rule|AUTO_READY",
+          "count": 6
+        }
+      ],
+      "topErrors": [
+        {
+          "shopCode": "И-00692",
+          "name": "Ключ свечной карданный с пружиной *16 500м",
+          "status": "BLOCKED_CONFLICT",
+          "confidence": 0.84,
+          "predictedTarget": "aksessuary/instrumenty",
+          "actualTarget": "podveska/pruzhiny",
+          "source": "blocked_conflict",
+          "family": "Инструменты"
+        },
+        {
+          "shopCode": "А-00815",
+          "name": "Компрессор \"Торнадо\"",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-00665",
+          "name": "Компрессор (Дания)",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-00630",
+          "name": "Компрессор АС581 (в кейсе)",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-00138",
+          "name": "Компрессор малый (Дания)",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-01518",
+          "name": "Компрессор Катунь 370",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-01249",
+          "name": "Компрессор АС 602",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-01008",
+          "name": "Компрессор \"Хёндай 40\"",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-02330",
+          "name": "Компрессор автомобильный AVS КА580",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-02170",
+          "name": "АГРЕССОР AGR-50 Компрессор 50 л/мин (max 10атм)/6/на клеммы/1/6",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-02037",
+          "name": "\"АГРЕССОР\" AGR-75 Компрессор 75л/мин (max 10атм)",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-01588",
+          "name": "Компрессор \"Хёндай\" №20",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-02383",
+          "name": "Компрессор GOODYEAR GY-45L 45 л/мин",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "И-00138",
+          "name": "Шлиф.машинка от компрессора",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ПСГ-00613",
+          "name": "Рем. к-т компрессора 18-3509015 (10 наим.) МД",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ТСГ-00584",
+          "name": "Р/к-т компрессора 2-х цилиндр.",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ТСГ-00580",
+          "name": "Трубка компрессора Валдай 3,8 К",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ТСГ-00517",
+          "name": "Трубка охладителя компрессора КАМАЗ ЕВРО",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ТСГ-00391",
+          "name": "Рем. к-т компрессора Бычок",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ТСГ-00388",
+          "name": "Головка компрессора ЗИЛ-Бычок",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ТСГ-00383",
+          "name": "Трубка компрессора КАМАЗ",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ТСГ-00302",
+          "name": "Трубка охладителя 1-цил.компрессора КАМА",
+          "status": "AUTO_READY",
+          "confidence": 0.98,
+          "predictedTarget": "tormoznaya-sistema/prochaya-tormoznaya-sistema",
+          "actualTarget": "podveska/ressory",
+          "source": "exact_prefix_rule",
+          "family": "Прочая тормозная система"
+        },
+        {
+          "shopCode": "ТСГ-00263",
+          "name": "Трубка компрессора ПАЗ медная",
+          "status": "BLOCKED_CONFLICT",
+          "confidence": 0.84,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "blocked_conflict",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ТСГ-00232",
+          "name": "Ремкомплект компрессора КАМАЗ-Зил-Бычок",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ХСГ-00563",
+          "name": "Сайлент-блок рессор. Зил-Бычок нов. обр.",
+          "status": "AUTO_READY",
+          "confidence": 0.92,
+          "predictedTarget": "podveska/saylentbloki",
+          "actualTarget": "podveska/ressory",
+          "source": "domain_dictionary",
+          "family": "Сайлентблоки"
+        },
+        {
+          "shopCode": "ЭО-01254",
+          "name": "ПЗУ+компрессор ТМ-18",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ЭО-01251",
+          "name": "Пуско-зарядное устройство ТН-25+компрессор",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-00165",
+          "name": "Компрессор 2-х цилиндровый",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-00362",
+          "name": "Компрессор \"Беркут-14\"",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-01064",
+          "name": "Компрессор \"Торнадо\" (большой)",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-01048",
+          "name": "Компрессор \"Качок-90\" с витым шлангом и дефлятором",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-01472",
+          "name": "Автомобильный компрессор с пылесосом 2 в 1 12В, 80Вт, 10 атм, 10 л/мин",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-01195",
+          "name": "Компрессор АС 605",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-01660",
+          "name": "Компрессор \"Качок-К-90х2С\" (2-х цилиндр.) 57 л/мин",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-02181",
+          "name": "Компрессор автомобильный AVS KE350EL",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "А-02057",
+          "name": "Компрессор автомобильный JT AC580",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ДВГ-00451",
+          "name": "Кольцо компрессора Зил-Бычок",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ДВГ-00417",
+          "name": "Кольца компрессорные Зил",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ДВГ-00491",
+          "name": "Вкладыши компрессора ЗИЛ",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ДВГ-00490",
+          "name": "Коленвал компрессора ЗИЛ",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ДВГ-00487",
+          "name": "Поршень компрессора ЗИЛ-130",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ДВГ-00829",
+          "name": "Кронштейн компрессора ЗИЛ",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ДВГ-01035",
+          "name": "Головка компрессора в сборе Зил-130",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ДВГ-01184",
+          "name": "Кольцо компрессора 1-цил. Goetze",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ДВГ-01343",
+          "name": "Турбокомпрессор МАЗ (Чехия)",
+          "status": "AUTO_READY",
+          "confidence": 0.98,
+          "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "actualTarget": "podveska/ressory",
+          "source": "exact_prefix_rule",
+          "family": "Детали двигателя"
+        },
+        {
+          "shopCode": "ДВГ-01288",
+          "name": "Трубка охлаждения компрессора МАЗ №1, 2",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ДВГ-01397",
+          "name": "Ролик натяжной компрессора 245 дв.",
+          "status": "AUTO_READY",
+          "confidence": 0.95,
+          "predictedTarget": "dvigatel-i-transmissiya/remni",
+          "actualTarget": "podveska/ressory",
+          "source": "family_rule",
+          "family": "ГРМ и ролики"
+        },
+        {
+          "shopCode": "ДВГ-01657",
+          "name": "Турбокомпрессор 7406.1118013 (ТКР-7С-6)",
+          "status": "AUTO_READY",
+          "confidence": 0.98,
+          "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "actualTarget": "podveska/ressory",
+          "source": "exact_prefix_rule",
+          "family": "Детали двигателя"
+        },
+        {
+          "shopCode": "ДВГ-01656",
+          "name": "Турбокомпрессор 7406.1118012 (ТКР-7С-6) правый",
+          "status": "AUTO_READY",
+          "confidence": 0.98,
+          "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "actualTarget": "podveska/ressory",
+          "source": "exact_prefix_rule",
+          "family": "Детали двигателя"
+        },
+        {
+          "shopCode": "ДВГ-01565",
+          "name": "Трубка подводящая турбокомпрессора 245 д",
+          "status": "AUTO_READY",
+          "confidence": 0.98,
+          "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "actualTarget": "podveska/ressory",
+          "source": "exact_prefix_rule",
+          "family": "Детали двигателя"
+        },
+        {
+          "shopCode": "ДВГ-01718",
+          "name": "Трубка сливная масла с турбокомпрессором",
+          "status": "AUTO_READY",
+          "confidence": 0.98,
+          "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "actualTarget": "podveska/ressory",
+          "source": "exact_prefix_rule",
+          "family": "Детали двигателя"
+        },
+        {
+          "shopCode": "ДВГ-02106",
+          "name": "Кольца компрессора Бычок 1-цилиндр.",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ДВГ-02193",
+          "name": "Шланг турбокомпрессора УАЗ (дв. ЗМЗ-514) d58*75*90",
+          "status": "AUTO_READY",
+          "confidence": 0.98,
+          "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "actualTarget": "podveska/ressory",
+          "source": "exact_prefix_rule",
+          "family": "Детали двигателя"
+        },
+        {
+          "shopCode": "ДВГ-02149",
+          "name": "Шланг турбокомпрессора УАЗ (дв.ЗМЗ-514) угловой силикон",
+          "status": "AUTO_READY",
+          "confidence": 0.98,
+          "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "actualTarget": "podveska/ressory",
+          "source": "exact_prefix_rule",
+          "family": "Детали двигателя"
+        },
+        {
+          "shopCode": "ДВГ-02133",
+          "name": "Трубка подвода масла к компрессору Г-зон NEXT (дв. ЯМЗ-5344)",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ДВГ-02135",
+          "name": "Трубка подвода охл. жидкости к компрессору Г-зон NEXT (дв. ЯМЗ-5340)",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ДВГ-02327",
+          "name": "Турбокомпрессор ТКР44.27-115-02.00 МД",
+          "status": "AUTO_READY",
+          "confidence": 0.98,
+          "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "actualTarget": "podveska/ressory",
+          "source": "exact_prefix_rule",
+          "family": "Детали двигателя"
+        },
+        {
+          "shopCode": "ДВГ-02326",
+          "name": "Турбокомпрессор (ТКР.44.96.002-003.96.00) МД",
+          "status": "AUTO_READY",
+          "confidence": 0.98,
+          "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "actualTarget": "podveska/ressory",
+          "source": "exact_prefix_rule",
+          "family": "Детали двигателя"
+        },
+        {
+          "shopCode": "ДВГ-02325",
+          "name": "Турбокомпрессор (ТКР 44.13-296-01.00) МД",
+          "status": "AUTO_READY",
+          "confidence": 0.98,
+          "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "actualTarget": "podveska/ressory",
+          "source": "exact_prefix_rule",
+          "family": "Детали двигателя"
+        },
+        {
+          "shopCode": "ДВГ-02313",
+          "name": "Турбокомпрессор ТКР.44.99.001-20.01 МД",
+          "status": "AUTO_READY",
+          "confidence": 0.98,
+          "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "actualTarget": "podveska/ressory",
+          "source": "exact_prefix_rule",
+          "family": "Детали двигателя"
+        },
+        {
+          "shopCode": "ДВГ-02301",
+          "name": "Турбокомпрессор (ТКР 44.14-180-01.00) МД",
+          "status": "AUTO_READY",
+          "confidence": 0.98,
+          "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "actualTarget": "podveska/ressory",
+          "source": "exact_prefix_rule",
+          "family": "Детали двигателя"
+        },
+        {
+          "shopCode": "ДВГ-02303",
+          "name": "Турбокомпрессор (ТКР 44.27-145-02.00) МД",
+          "status": "AUTO_READY",
+          "confidence": 0.98,
+          "predictedTarget": "dvigatel-i-transmissiya/detali-dvigatelya",
+          "actualTarget": "podveska/ressory",
+          "source": "exact_prefix_rule",
+          "family": "Детали двигателя"
+        },
+        {
+          "shopCode": "И-00081",
+          "name": "Переходник шланга компрессора",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "И-00064",
+          "name": "Быстроразъем компрессора",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "И-00661",
+          "name": "Шланг компрессора",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "И-00854",
+          "name": "Влагоотделитель на компрессор (мал.)",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "И-00842",
+          "name": "Пневмошприц от компрессора",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "И-00761",
+          "name": "Съёмник сайлентблока рессор Газель",
+          "status": "AUTO_READY",
+          "confidence": 0.92,
+          "predictedTarget": "podveska/saylentbloki",
+          "actualTarget": "podveska/ressory",
+          "source": "domain_dictionary",
+          "family": "Сайлентблоки"
+        },
+        {
+          "shopCode": "И-01582",
+          "name": "Съёмник муфты компрессора кондиционера Шевроле Лачетти 565053",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "И-01970",
+          "name": "Универсальный шланг-удлинитель с манометром для автомоб. компрессоров",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ИН-00949",
+          "name": "АСВ35х55х20 Подшипник компрессора кондици",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "podveska/podshipniki",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Подшипники"
+        },
+        {
+          "shopCode": "ИН-00819",
+          "name": "АСВ30Х52Х22 Подшипник компрессора кондици",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "podveska/podshipniki",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Подшипники"
+        },
+        {
+          "shopCode": "ИН-01159",
+          "name": "АСВ35х52х20 Подшипник компрессора кондици",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "podveska/podshipniki",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Подшипники"
+        },
+        {
+          "shopCode": "ПСГ-00185",
+          "name": "Сальник гура, компрессора ЗИЛ-130 42х58",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ПСГ-00321",
+          "name": "Сальник компрессора ЗИЛ №92*/120",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "РГ-00031",
+          "name": "Рем.к-т компрессора 1-цил. РТИ 3509015-53",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ПСГ-00617",
+          "name": "Рем. к-т компрессора 18-3509015 (5 наим.) МД",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ПСГ-00616",
+          "name": "Рем. к-т 2-х цилиндрового компрессора АМ (7 наим.) МД",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ПСГ-00615",
+          "name": "Рем. к-т 1-цилиндрового компрессора АМ (9 наим.) МД",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        },
+        {
+          "shopCode": "ПСГ-00614",
+          "name": "Рем. к-т компрессора 53205-3509015 с IV кв. 2018 г. (5 наим.) МД",
+          "status": "GROUP_REVIEW",
+          "confidence": 0.88,
+          "predictedTarget": "aksessuary/kompressory",
+          "actualTarget": "podveska/ressory",
+          "source": "weak_group_candidate",
+          "family": "Компрессоры"
+        }
+      ]
+    },
+    "humanAudit": {
+      "performed": false,
+      "note": "CSV samples were generated for human review. No manual precision is claimed by this command."
+    }
+  },
+  "elapsedMs": 169792,
+  "peakMemoryMb": 574
+}

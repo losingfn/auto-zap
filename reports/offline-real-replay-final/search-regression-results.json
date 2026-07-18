@@ -1,0 +1,473 @@
+{
+  "fileName": "1782302118029-de725b0722e1-catalog.xlsx",
+  "selectedSheetName": "TDSheet",
+  "indexedFixtureDocuments": 14042,
+  "excludedReviewDocuments": 16648,
+  "reviewProductsIndexed": 0,
+  "report": [
+    {
+      "query": "лампа t10",
+      "totalCandidates": 4,
+      "hits": [
+        {
+          "shopCode": "ЭО-01140",
+          "name": "Лампа диодная Т10",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 3630
+        },
+        {
+          "shopCode": "ЭО-01463",
+          "name": "Лампа Т027 Т10/белый/(W2,1х9,5d) 5SMD 5050 3 chip, W5W",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 3630
+        },
+        {
+          "shopCode": "ЭО-01321",
+          "name": "Лампа AVS Vegas 12V W5W XENJN EFFECT (W2, 1х9,5d), 2шт",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 3410
+        },
+        {
+          "shopCode": "ИН-00285",
+          "name": "Лампа W5W 12V 5W W2. 1Х9.5d",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 3410
+        }
+      ]
+    },
+    {
+      "query": "t10",
+      "totalCandidates": 5,
+      "hits": [
+        {
+          "shopCode": "ЭО-01140",
+          "name": "Лампа диодная Т10",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 1780
+        },
+        {
+          "shopCode": "ЭО-01463",
+          "name": "Лампа Т027 Т10/белый/(W2,1х9,5d) 5SMD 5050 3 chip, W5W",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 1780
+        },
+        {
+          "shopCode": "И-01926",
+          "name": "Головки со вставками TORX 1/4 Т10 Нх37мм АД",
+          "category": "Аксессуары",
+          "subcategory": "Инструменты",
+          "score": 1560
+        },
+        {
+          "shopCode": "ЭО-01321",
+          "name": "Лампа AVS Vegas 12V W5W XENJN EFFECT (W2, 1х9,5d), 2шт",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 1560
+        },
+        {
+          "shopCode": "ИН-00285",
+          "name": "Лампа W5W 12V 5W W2. 1Х9.5d",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 1560
+        }
+      ]
+    },
+    {
+      "query": "лампа w5w",
+      "totalCandidates": 4,
+      "hits": [
+        {
+          "shopCode": "ИН-00285",
+          "name": "Лампа W5W 12V 5W W2. 1Х9.5d",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 5480
+        },
+        {
+          "shopCode": "ЭО-01463",
+          "name": "Лампа Т027 Т10/белый/(W2,1х9,5d) 5SMD 5050 3 chip, W5W",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 3630
+        },
+        {
+          "shopCode": "ЭО-01321",
+          "name": "Лампа AVS Vegas 12V W5W XENJN EFFECT (W2, 1х9,5d), 2шт",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 3630
+        },
+        {
+          "shopCode": "ЭО-01140",
+          "name": "Лампа диодная Т10",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 3410
+        }
+      ]
+    },
+    {
+      "query": "лампа h7",
+      "totalCandidates": 12,
+      "hits": [
+        {
+          "shopCode": "ЭО-01314",
+          "name": "Лампа \"Phillips\" Н7 (станд.)",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 3410
+        },
+        {
+          "shopCode": "ЭО-00818",
+          "name": "Лампа Н7 \"БОШ\"",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 3410
+        },
+        {
+          "shopCode": "ЭОГ-01044",
+          "name": "Лампа Нарва Н7 24V",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 3410
+        },
+        {
+          "shopCode": "ЭО-01184",
+          "name": "Лампа MTF Н7 Long Life, 1 шт",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 3410
+        },
+        {
+          "shopCode": "ЭОГ-00840",
+          "name": "Лампа MTF Light Н7 24V 70W LONG LIFE Корея",
+          "category": "Электрика",
+          "subcategory": "Лампы",
+          "score": 3410
+        }
+      ]
+    },
+    {
+      "query": "фильтр масляный",
+      "totalCandidates": 1960,
+      "hits": [
+        {
+          "shopCode": "ИН-00896",
+          "name": "Фильтр масляный",
+          "category": "Фильтры и масла",
+          "subcategory": "Масляные фильтры",
+          "score": 8430
+        },
+        {
+          "shopCode": "ДВГ-01267",
+          "name": "Фильтр масляный \"Каменс\" КАМАЗ",
+          "category": "Фильтры и масла",
+          "subcategory": "Масляные фильтры",
+          "score": 6230
+        },
+        {
+          "shopCode": "ГСМ-00480",
+          "name": "Фильтр масляный \"Финвал\" 2101-07",
+          "category": "Фильтры и масла",
+          "subcategory": "Масляные фильтры",
+          "score": 6230
+        },
+        {
+          "shopCode": "ГСМ-00162",
+          "name": "Фильтр масляный \"Финвал\" 2105, 08",
+          "category": "Фильтры и масла",
+          "subcategory": "Масляные фильтры",
+          "score": 6230
+        },
+        {
+          "shopCode": "ГСМ-00724",
+          "name": "Фильтр масляный \"Фрам\" (406 дв.)",
+          "category": "Фильтры и масла",
+          "subcategory": "Масляные фильтры",
+          "score": 6230
+        }
+      ]
+    },
+    {
+      "query": "масл фильтр",
+      "totalCandidates": 2021,
+      "hits": [
+        {
+          "shopCode": "ГСМ-01114",
+          "name": "Фильтр \"Невский\" масляный NF-1020",
+          "category": "Фильтры и масла",
+          "subcategory": "Масляные фильтры",
+          "score": 3845
+        },
+        {
+          "shopCode": "ГСМ-01112",
+          "name": "Фильтр \"Невский\" масляный NF-1106",
+          "category": "Фильтры и масла",
+          "subcategory": "Масляные фильтры",
+          "score": 3845
+        },
+        {
+          "shopCode": "ИН-00896",
+          "name": "Фильтр масляный",
+          "category": "Фильтры и масла",
+          "subcategory": "Масляные фильтры",
+          "score": 3845
+        },
+        {
+          "shopCode": "ДВГ-01267",
+          "name": "Фильтр масляный \"Каменс\" КАМАЗ",
+          "category": "Фильтры и масла",
+          "subcategory": "Масляные фильтры",
+          "score": 3845
+        },
+        {
+          "shopCode": "ГСМ-00480",
+          "name": "Фильтр масляный \"Финвал\" 2101-07",
+          "category": "Фильтры и масла",
+          "subcategory": "Масляные фильтры",
+          "score": 3845
+        }
+      ]
+    },
+    {
+      "query": "диск тормозной",
+      "totalCandidates": 1213,
+      "hits": [
+        {
+          "shopCode": "ИН-00813",
+          "name": "Диск тормозной",
+          "category": "Тормозная система",
+          "subcategory": "Тормозные диски",
+          "score": 6230
+        },
+        {
+          "shopCode": "ИН-00854",
+          "name": "Диск тормозной (к-т) Mitsubishi",
+          "category": "Тормозная система",
+          "subcategory": "Тормозные диски",
+          "score": 4030
+        },
+        {
+          "shopCode": "ТС-00141",
+          "name": "Диск тормозной 2101-07 (Фенокс)",
+          "category": "Тормозная система",
+          "subcategory": "Тормозные диски",
+          "score": 4030
+        },
+        {
+          "shopCode": "ТС-00020",
+          "name": "Диск тормозной 2108",
+          "category": "Тормозная система",
+          "subcategory": "Тормозные диски",
+          "score": 4030
+        },
+        {
+          "shopCode": "ХС-00105",
+          "name": "Диск тормозной 2110",
+          "category": "Тормозная система",
+          "subcategory": "Тормозные диски",
+          "score": 4030
+        }
+      ]
+    },
+    {
+      "query": "акб",
+      "totalCandidates": 384,
+      "hits": [
+        {
+          "shopCode": "ЭО-01280",
+          "name": "АКБ START JUMPER 70",
+          "category": "Электрика",
+          "subcategory": "Аккумуляторы",
+          "score": 10090
+        },
+        {
+          "shopCode": "КЗ-00413",
+          "name": "Зажим крышки АКБ Зил-Бычок",
+          "category": "Электрика",
+          "subcategory": "Аккумуляторы",
+          "score": 9540
+        },
+        {
+          "shopCode": "ЭОГ-00055",
+          "name": "Клеммы АКБ (+/-) латунь",
+          "category": "Электрика",
+          "subcategory": "Аккумуляторы",
+          "score": 9540
+        },
+        {
+          "shopCode": "ЭО-00849",
+          "name": "Клеммы АКБ +/- , латунь (завод)",
+          "category": "Электрика",
+          "subcategory": "Аккумуляторы",
+          "score": 9540
+        },
+        {
+          "shopCode": "ЭО-01370",
+          "name": "Клеммы АКБ +/- Веста, Ларгус к-т 2 шт",
+          "category": "Электрика",
+          "subcategory": "Аккумуляторы",
+          "score": 9540
+        }
+      ]
+    },
+    {
+      "query": "масло 5w30",
+      "totalCandidates": 80,
+      "hits": [
+        {
+          "shopCode": "ГСМ-01798",
+          "name": "Масло моторное 5w30 1 л Premium DPF Diesel",
+          "category": "Фильтры и масла",
+          "subcategory": "Масла",
+          "score": 10590
+        },
+        {
+          "shopCode": "ГСМ-01799",
+          "name": "Масло моторное 5w30 6 л Premium DPF Diesel",
+          "category": "Фильтры и масла",
+          "subcategory": "Масла",
+          "score": 10590
+        },
+        {
+          "shopCode": "ГСМ-00653",
+          "name": "Масло ТНК-Мотор Ойл 5W30, 1 л п/синт.",
+          "category": "Фильтры и масла",
+          "subcategory": "Масла",
+          "score": 10590
+        },
+        {
+          "shopCode": "ГСМ-01729",
+          "name": "Масло для легковых автомобилей RZIC X9 FE 5W30, 4 л",
+          "category": "Фильтры и масла",
+          "subcategory": "Масла",
+          "score": 10140
+        },
+        {
+          "shopCode": "ГСМ-01739",
+          "name": "Масло Лукойл Genesis Armortech Diesel 5W30, 4 л",
+          "category": "Фильтры и масла",
+          "subcategory": "Масла",
+          "score": 10140
+        }
+      ]
+    },
+    {
+      "query": "dot4",
+      "totalCandidates": 7,
+      "hits": [
+        {
+          "shopCode": "ГСМ-00530",
+          "name": "Тормозная жидкость Роса ДОТ-4, 1 л",
+          "category": "Фильтры и масла",
+          "subcategory": "Технические жидкости",
+          "score": 1340
+        },
+        {
+          "shopCode": "ГСМ-00541",
+          "name": "Тормозная жидкость Mobil Brake Fluid universal DOT-4, 0.5 л",
+          "category": "Фильтры и масла",
+          "subcategory": "Технические жидкости",
+          "score": 1340
+        },
+        {
+          "shopCode": "ГСМ-00725",
+          "name": "BP DOT-4 Тормозная жидкость, 0,5 л",
+          "category": "Фильтры и масла",
+          "subcategory": "Технические жидкости",
+          "score": 1340
+        },
+        {
+          "shopCode": "ГСМ-01182",
+          "name": "Castrol Brake Fluid DOT-4, 1 л",
+          "category": "Фильтры и масла",
+          "subcategory": "Технические жидкости",
+          "score": 1340
+        },
+        {
+          "shopCode": "ГСМ-00472",
+          "name": "HG7044R Тормозная жидкость ДОТ-4 +, 473",
+          "category": "Фильтры и масла",
+          "subcategory": "Технические жидкости",
+          "score": 1340
+        }
+      ]
+    },
+    {
+      "query": "А-00002",
+      "totalCandidates": 194,
+      "hits": [
+        {
+          "shopCode": "А-00929",
+          "name": "\"Bremax\" WB-6040 PBN Щетки с/о 60+40 VW Po",
+          "category": "Аксессуары",
+          "subcategory": "Прочие аксессуары",
+          "score": 40
+        },
+        {
+          "shopCode": "А-00842",
+          "name": "\"Bremax\" WB-6055 РТ Щетки с/о 60+55 Volvo",
+          "category": "Аксессуары",
+          "subcategory": "Прочие аксессуары",
+          "score": 40
+        },
+        {
+          "shopCode": "АК-00022",
+          "name": "Аккумулятор \"FIRE BALL\" 60 Аз индикатор",
+          "category": "Электрика",
+          "subcategory": "Аккумуляторы",
+          "score": 40
+        },
+        {
+          "shopCode": "АК-00202",
+          "name": "Аккумулятор 90 А.ч. п.п. AutoPart Plu",
+          "category": "Электрика",
+          "subcategory": "Аккумуляторы",
+          "score": 40
+        },
+        {
+          "shopCode": "АК-00024",
+          "name": "Аккумулятор Медведь SILVER 6СТ-110.1 VLA Asia",
+          "category": "Электрика",
+          "subcategory": "Аккумуляторы",
+          "score": 40
+        }
+      ]
+    },
+    {
+      "query": "T1001",
+      "totalCandidates": 3,
+      "hits": [
+        {
+          "shopCode": "Ш-00650",
+          "name": "А/шины Bridgestone 195/65R15 91V Turanza T1001 TL",
+          "category": "Аксессуары",
+          "subcategory": "Шины и диски",
+          "score": 1740
+        },
+        {
+          "shopCode": "Ш-00636",
+          "name": "А/шины Bridgestone 185/60R14 82H Turanza Т001 (от 4-х шт)",
+          "category": "Аксессуары",
+          "subcategory": "Шины и диски",
+          "score": 40
+        },
+        {
+          "shopCode": "ТС-00001",
+          "name": "Магистральная трубка 01-07",
+          "category": "Тормозная система",
+          "subcategory": "Прочая тормозная система",
+          "score": 40
+        }
+      ]
+    }
+  ]
+}

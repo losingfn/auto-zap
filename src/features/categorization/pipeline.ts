@@ -184,6 +184,8 @@ function evaluateFamilyCandidate(
   const requiredAllMatched = family.requiredAll?.filter((token) => hasAnyToken(features, [token])) ?? [];
   const requiredAllOk =
     !family.requiredAll || requiredAllMatched.length === family.requiredAll.length;
+  const contextMatched = family.contextAny?.filter((token) => hasAnyToken(features, [token])) ?? [];
+  const contextOk = !family.contextAny || contextMatched.length > 0;
   const technicalMatched =
     family.technicalAny?.filter((token) =>
       features.technicalTokens.includes(normalizeTechnicalToken(token))
@@ -192,7 +194,7 @@ function evaluateFamilyCandidate(
   const hasRequiredAny = requiredAnyMatched.length > 0;
   const phraseCanOpen = strongPhrases.length > 0;
 
-  if ((!hasRequiredAny || !requiredAllOk) && !phraseCanOpen) {
+  if ((!hasRequiredAny || !requiredAllOk || !contextOk) && !phraseCanOpen) {
     return null;
   }
 
@@ -208,6 +210,7 @@ function evaluateFamilyCandidate(
   const evidence = [
     ...requiredAnyMatched.map((token) => `term:${token}`),
     ...requiredAllMatched.map((token) => `context:${token}`),
+    ...contextMatched.map((token) => `context:${token}`),
     ...strongPhrases.map((phrase) => `phrase:${phrase}`),
     ...technicalMatched.map((token) => `technical:${token}`),
     ...optionalMatched.map((token) => `optional:${token}`),
@@ -216,12 +219,14 @@ function evaluateFamilyCandidate(
   const strongEvidenceCount =
     requiredAnyMatched.length +
     requiredAllMatched.length +
+    contextMatched.length +
     strongPhrases.length * 2 +
     technicalMatched.length +
     (legacyAgrees ? 1 : 0);
   let score = family.baseConfidence;
   score += strongPhrases.length * 0.025;
   score += technicalMatched.length * 0.015;
+  score += contextMatched.length * 0.012;
   score += optionalMatched.length * 0.008;
   score += legacyAgrees ? 0.025 : 0;
   score += strongEvidenceCount >= 3 ? 0.015 : 0;

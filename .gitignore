@@ -14,3 +14,22 @@ __pycache__
 public/uploads
 data/imports/uploads
 tmp
+
+# Local intermediate offline replay reports.
+reports/offline-categorization-iteration-fasteners/
+reports/offline-real-replay-after-taxonomy-sync/
+reports/offline-real-replay-iteration2/
+reports/offline-real-replay-iteration3/
+reports/offline-real-replay-iteration4/
+reports/offline-real-replay-iteration5/
+reports/offline-real-replay-iteration6/
+reports/offline-real-replay-iteration7/
+reports/offline-real-replay-iteration8/
+reports/offline-real-replay-iteration9/
+reports/offline-real-replay-iteration10/
+reports/offline-real-replay-local/
+reports/offline-real-replay-target-count-iteration6/
+reports/offline-real-replay-target-count-iteration7/
+reports/offline-real-replay-target-count-iteration8/
+reports/offline-real-replay-target-count-iteration9/
+reports/offline-real-replay-target-count-iteration10/

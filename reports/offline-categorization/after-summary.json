@@ -1,0 +1,468 @@
+{
+  "generatedAt": "2026-07-18T11:25:27.689Z",
+  "readOnly": true,
+  "productionUsed": false,
+  "inputFile": "catalog.xls",
+  "selectedSheetName": "TDSheet",
+  "pipelineVersion": "product-normalizer-v2+domain-dictionary-v2+domain-rules-v2+confidence-model-v2",
+  "totalRows": 30703,
+  "validRows": 30413,
+  "errorRows": 5,
+  "skippedRows": 8,
+  "productCandidates": 30690,
+  "autoReady": 13464,
+  "groupReview": 13163,
+  "manualReview": 4010,
+  "blockedConflict": 53,
+  "invalidInput": 0,
+  "fullyManual": 4063,
+  "groupCount": 260,
+  "medianGroupSize": 18,
+  "maxGroupSize": 459,
+  "groupsOver100": 39,
+  "averageConfidence": 0.799,
+  "manualReductionShare": 0.8676,
+  "groupReviewProducts": 13163,
+  "elapsedMs": 56754,
+  "peakMemoryMb": 414,
+  "statusCounts": [
+    {
+      "key": "AUTO_READY",
+      "count": 13464
+    },
+    {
+      "key": "GROUP_REVIEW",
+      "count": 13163
+    },
+    {
+      "key": "MANUAL_REVIEW",
+      "count": 4010
+    },
+    {
+      "key": "BLOCKED_CONFLICT",
+      "count": 53
+    }
+  ],
+  "topGroups": [
+    {
+      "id": "legacy_dvigatel-i-transmissiya_sceplenie|сцеплен|dvigatel-i-transmissiya|sceplenie",
+      "label": "sceplenie",
+      "status": "GROUP_REVIEW",
+      "count": 459,
+      "categorySlug": "dvigatel-i-transmissiya",
+      "subcategorySlug": "sceplenie",
+      "confidence": 0.82,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "ЗЧМ-00019 Трос сцепления 2141",
+        "ЗЧМ-00286 Набор втулок сцепления 2141 (3 шт)",
+        "ЗЧМ-00380 Набор сцепления 2141",
+        "ЗЧМ-00483 Сцепление \"LUK\"",
+        "ЗЧМ-00526 Вилка сцепления 2141",
+        "ЗЧМ-00592 Ремкомплект вилки сцепления 2141",
+        "ИН-00612 30647 Трос сцепления DAEWOO MATIZ/SPARK",
+        "ИН-01095 N10104501 Болт крепления корзины сцеплени"
+      ]
+    },
+    {
+      "id": "bearing|подшипник|podveska|podshipniki",
+      "label": "Подшипники",
+      "status": "GROUP_REVIEW",
+      "count": 449,
+      "categorySlug": "podveska",
+      "subcategorySlug": "podshipniki",
+      "confidence": 0.904,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "ЗКГ-00230 Набор игольчатых подшипников КПП Таврия",
+        "ЗКГ-00400 Крышка подшипника вторичного вала МАЗ",
+        "ИН-00017 Подшипник задней ступицы Рено 1 шт",
+        "ИН-00104 подшипник 40210-4М400",
+        "ИН-00286 Подшипник ступ. OPEL ASTRA/CORSA/KADET/VE",
+        "ИН-00368 Подшипник передний GH040030",
+        "ИН-00938 Подшипник",
+        "ИН-01008 Подшипник перед. ступицы Рено с АБС (Оригинал)"
+      ]
+    },
+    {
+      "id": "sensor|датчик|elektrika|datchiki",
+      "label": "Датчики",
+      "status": "GROUP_REVIEW",
+      "count": 372,
+      "categorySlug": "elektrika",
+      "subcategorySlug": "datchiki",
+      "confidence": 0.894,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "А-00957 Парктроник (4 датчика+коннекторы, голосовое,цветной светодиод. дисплей с цифр. табло)",
+        "А-01605 Парктроник PS-126U 6 датчиков+коннекторы",
+        "ДВГ-00146 Датчик массового расхода воздуха нов. обр.",
+        "ДВГ-00822 Датчик распред. вала 406 дв. \"Бош\"",
+        "ДВГ-01235 Датчик ДМРВ Г/У (дв.405,409) пленочн. Ев",
+        "ДВГ-01280 Датчик давления масла ЕВРО МАЗ",
+        "ДВГ-01974 Датчик+шланг мех. давления (масла МТЗ)",
+        "ЗЧМ-00450 Датчик температурный 2141 №ТМ-100А"
+      ]
+    },
+    {
+      "id": "legacy_tormoznaya-sistema_prochaya-tormoznaya-sistema|тормозн|tormoznaya-sistema|prochaya-tormoznaya-sistema",
+      "label": "prochaya-tormoznaya-sistema",
+      "status": "GROUP_REVIEW",
+      "count": 359,
+      "categorySlug": "tormoznaya-sistema",
+      "subcategorySlug": "prochaya-tormoznaya-sistema",
+      "confidence": 0.82,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "ГСМ-00827 VMPAUTO Набор смазок для тормозной системы BREMZ стик-пакет, 100мл",
+        "ГСМ-01198 LM Медный спрей для тормозных колодок 0,",
+        "ЗЧМ-00397 Комплект тормозных трубок Москвич 2141",
+        "ЗЧМ-00482 Комплект тормозных трубок (Москвич 412-2",
+        "ЗЧМ-00543 Барабан тормозной задний ИЖ-2126",
+        "ЗЧМ-00663 Бачок глав. тормозного Москвич 2141",
+        "И-01124 Набор для сведения тормозных цилиндров 12 пр.",
+        "ИН-00137 Тормозной суппорт задний Рено"
+      ]
+    },
+    {
+      "id": "body_exterior|двер|kuzov-i-optika|kuzovnye-detali",
+      "label": "Кузовные детали",
+      "status": "GROUP_REVIEW",
+      "count": 336,
+      "categorySlug": "kuzov-i-optika",
+      "subcategorySlug": "kuzovnye-detali",
+      "confidence": 0.82,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "А-00409 Обивка двери ВАЗ 2108-09",
+        "А-00497 Комплект дверных накладок 2106",
+        "А-00841 Обивка двери 2101-07 (цветная)",
+        "А-00933 Карманы дверные 2110",
+        "А-01241 Обивка задней двери 21213",
+        "А-01286 Обивка двери 2114 к-т",
+        "А-01673 Накладки двери 2113 наруж., к-т",
+        "А-01958 Подиум дверной 2110, Приора"
+      ]
+    },
+    {
+      "id": "wiring|провод|elektrika|provodka",
+      "label": "Проводка",
+      "status": "GROUP_REVIEW",
+      "count": 330,
+      "categorySlug": "elektrika",
+      "subcategorySlug": "provodka",
+      "confidence": 0.899,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "А-01070 Провода прикуривателя 700А 6 м (Россия)",
+        "А-01730 Провод к видеорегистратору, навигатору 2 м",
+        "А-01856 Провод зарядный IPHONES магн.",
+        "А-01944 Провода \"PROGRESS\" 400 А",
+        "А-02113 Провод микро-USB в коробке",
+        "А-02180 Провод прикуривания 500А",
+        "А-02281 Провода аккустич. Carlive MD-10GA",
+        "А-02315 АЛЛИГАТОР Провода прикуривания 100% ССА, морозостойкие, 600 А, 3 м"
+      ]
+    },
+    {
+      "id": "cooling|радиатор|dvigatel-i-transmissiya|ohlazhdenie",
+      "label": "Охлаждение",
+      "status": "GROUP_REVIEW",
+      "count": 323,
+      "categorySlug": "dvigatel-i-transmissiya",
+      "subcategorySlug": "ohlazhdenie",
+      "confidence": 0.882,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "А-00421 Решётка радиатора 2109, 2110 \"Турбо\"",
+        "А-00649 Решётка радиатора 2108-09 (с сеткой)",
+        "А-00808 Утеплитель радиатора ЗИЛ (новая кабина)",
+        "А-00826 Решётка радиатора 2115 (чёрная)",
+        "А-01987 Решетка радиатора Млечн. Путь 606, 2114",
+        "ДВ-00301 Радиатор Приора 2172 с кондиц. и рессивер",
+        "ДВ-00431 Радиатор 2105 б/датчика",
+        "ДВ-00559 Радиатор ЛАДА-Гранта 2190"
+      ]
+    },
+    {
+      "id": "brake_pads|колод|tormoznaya-sistema|tormoznye-kolodki",
+      "label": "Тормозные колодки",
+      "status": "GROUP_REVIEW",
+      "count": 312,
+      "categorySlug": "tormoznaya-sistema",
+      "subcategorySlug": "tormoznye-kolodki",
+      "confidence": 0.88,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "ИН-00126 Установочный комплект задних колодок Рено",
+        "ИН-00204 Колодки задние Рено Меган № 481 (дисковые",
+        "ИН-00249 Колодки для иномарок передние №041",
+        "ИН-00252 Колодки задние Шевроле-Лачетти № 125",
+        "ИН-00254 Колодки передние Шевроле-Лачетти, Део-Нек",
+        "ИН-00259 Колодки передние Киа-Спектра № 196",
+        "ИН-00262 Колодки передние Шевроле-Авео № 190",
+        "ИН-00275 Колодки дисковые Audi A6 401 022B-SX=390"
+      ]
+    },
+    {
+      "id": "legacy_dvigatel-i-transmissiya_kpp|кпп|dvigatel-i-transmissiya|kpp",
+      "label": "kpp",
+      "status": "GROUP_REVIEW",
+      "count": 290,
+      "categorySlug": "dvigatel-i-transmissiya",
+      "subcategorySlug": "kpp",
+      "confidence": 0.82,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "Ж-00079 Поперечина КПП ГАЗ 3302",
+        "ЗКГ-00015 Раздатка УАЗ-Хантер, 3160 КПП 5-ступ.",
+        "ЗКГ-00185 Крышка КПП УАЗ 5-ступ. верх. в сборе",
+        "ЗКГ-00232 Пластина КПП УАЗ-Хантер",
+        "ЗКГ-00233 Вал промежуточ. Г-3110,3302 Б+ КПП 5-ступ. (дв.406, Камминс 2,8)",
+        "ЗКГ-00303 Траверса КПП-5 ст. УАЗ в сборе",
+        "ЗКГ-00310 Рем. к-т КПП Зил-130, Бычок",
+        "ЗКГ-00316 Шпонка КПП ЗИЛ-130"
+      ]
+    },
+    {
+      "id": "legacy_podveska_rulevye-nakonechniki|рулев|podveska|rulevye-nakonechniki",
+      "label": "rulevye-nakonechniki",
+      "status": "GROUP_REVIEW",
+      "count": 261,
+      "categorySlug": "podveska",
+      "subcategorySlug": "rulevye-nakonechniki",
+      "confidence": 0.82,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "ЗЧМ-00153 Рулевая колонка Москвич 2140 в сборе",
+        "ЗЧМ-00243 Пальцы рулевые в сборе 2141",
+        "ЗЧМ-00304 Рулевая рейка 2141",
+        "ЗЧМ-00322 Ремкомплект рулевых тяг Святогор",
+        "ЗЧМ-00498 Усы рулевой рейки 2141 (1 шт)",
+        "ЗЧМ-00643 Трапеция рулевая 2140-412 (импорт.)",
+        "ИН-00634 915748 Шпилька рулевой тяги AUDI 80/90",
+        "К-00216 Болт рулевой рейки 2108"
+      ]
+    },
+    {
+      "id": "legacy_kuzov-i-optika_fonari|фонар|kuzov-i-optika|fonari",
+      "label": "fonari",
+      "status": "GROUP_REVIEW",
+      "count": 251,
+      "categorySlug": "kuzov-i-optika",
+      "subcategorySlug": "fonari",
+      "confidence": 0.82,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "А-00437 Фонарь-переноска",
+        "А-00728 Компрессор с фонарем",
+        "А-00777 Фонари задние 2108-099 (тюнинг-2 шт)",
+        "А-00951 Фонарь дорожный",
+        "А-00993 Фонарик",
+        "А-01049 Компрессор \"Качок-50\" с фонарём",
+        "А-01138 Фонари задние 2106 тюнинг (2 шт)",
+        "А-01182 Фонари задние 2106 диодные"
+      ]
+    },
+    {
+      "id": "legacy_dvigatel-i-transmissiya_detali-transmissii|шрус|dvigatel-i-transmissiya|detali-transmissii",
+      "label": "detali-transmissii",
+      "status": "GROUP_REVIEW",
+      "count": 208,
+      "categorySlug": "dvigatel-i-transmissiya",
+      "subcategorySlug": "detali-transmissii",
+      "confidence": 0.82,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "ГСМ-01406 721-LUXE Шрус Супер 4МЛ (400 г/картридж)",
+        "ЗЧМ-00005 ШРУС наруж. с монтаж. к-том МОСКВИЧ 2141",
+        "ЗЧМ-00139 Ось шруса 2141",
+        "ЗЧМ-00162 Шрус ГЛО 2141 в сборе",
+        "ЗЧМ-00266 Шрус в сборе 2141",
+        "ЗЧМ-00456 Набор стопоров шруса 2141",
+        "ЗЧМ-00541 Хомут шруса 2141 (за 1 шт)",
+        "ЗЧМ-00547 Флянец внутреннего шруса 2141"
+      ]
+    },
+    {
+      "id": "legacy_podveska_ressory|рессор|podveska|ressory",
+      "label": "ressory",
+      "status": "GROUP_REVIEW",
+      "count": 205,
+      "categorySlug": "podveska",
+      "subcategorySlug": "ressory",
+      "confidence": 0.88,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "ЗЧМ-00133 Отбойник рессор 2140",
+        "КГ-00243 Палец рессор Волга 31105 (1 шт)",
+        "КГ-00268 Болт серьги рессоры ГАЗ-31105 в сборе с с",
+        "КГ-00574 Болт стяжной передней рессоры Бычок",
+        "КГ-01094 Шайба пальца рессоры УАЗ D=25 специальная",
+        "КЗ-00156 Кронштейн передней рессоры Газель",
+        "РЕ-00003 Рессора ГАЗ-3302 перед. 2-х листовая",
+        "РЕ-00015 Рессора Г-3302 NEXT Автобус 4-лист. зад."
+      ]
+    },
+    {
+      "id": "legacy_dvigatel-i-transmissiya_detali-dvigatelya|двигател|dvigatel-i-transmissiya|detali-dvigatelya",
+      "label": "detali-dvigatelya",
+      "status": "GROUP_REVIEW",
+      "count": 202,
+      "categorySlug": "dvigatel-i-transmissiya",
+      "subcategorySlug": "detali-dvigatelya",
+      "confidence": 0.82,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "А-01416 Автоодеяло для двигателя",
+        "А-01625 \"АВТОТЕПЛО\" утеплитель двигателя",
+        "ГСМ-00869 Очист сист впрыска диз двигателей ЛМ-191",
+        "ГСМ-00950 LAVR 2502 Антикокс для двигателя 0.185 л",
+        "ГСМ-01006 Быстрый запуск для бенз. карб. и инжект. 2Т и 4Т двигателя",
+        "ГСМ-01573 Быстрый запуск двигателя, аэрозоль 284 м",
+        "ДВ-00077 Сапун двигателя",
+        "ДВ-00165 Кронштейн двигателя 2110 нижний"
+      ]
+    },
+    {
+      "id": "body_brackets|кронштейн|kuzov-i-optika|kronshteyny-i-krepleniya",
+      "label": "Кронштейны и крепления кузова",
+      "status": "GROUP_REVIEW",
+      "count": 186,
+      "categorySlug": "kuzov-i-optika",
+      "subcategorySlug": "kronshteyny-i-krepleniya",
+      "confidence": 0.848,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "А-00056 Кронштейн антенны",
+        "А-00888 Подлокотник 2110, 2115 (метал. кронштейн)",
+        "А-01789 Кронштейн антенны - желоб",
+        "ДВГ-01031 Кронштейн топливного фильтра Газ-3308 ди",
+        "К-00669 Набор крепления кронштейна растяжки 2108-0",
+        "КГ-01235 Кронштейн номерного знака Газель",
+        "КЗ-00443 Кронштейн крепления рулевой колонки УАЗ-4",
+        "КЗ-00475 Кронштейн крепления зад. фонаря УАЗ-3303"
+      ]
+    },
+    {
+      "id": "pump_engine|насос|dvigatel-i-transmissiya|nasosy",
+      "label": "Насосы двигателя",
+      "status": "GROUP_REVIEW",
+      "count": 185,
+      "categorySlug": "dvigatel-i-transmissiya",
+      "subcategorySlug": "nasosy",
+      "confidence": 0.885,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "А-00128 Насос",
+        "А-01263 \"ALCO\" насос одноцилиндр.",
+        "А-02054 Наконечник для насоса быстрозажимной профе",
+        "А-02055 Наконечник для насоса (евро) хром длинный",
+        "А-02389 Насос EL-02",
+        "ДВ-00178 Масляный насос 2108",
+        "ДВГ-00311 Насос ГУР в сб. МАЗ-236,238",
+        "ДВГ-01963 Трубка подкач. насоса для Comon Reill 40"
+      ]
+    },
+    {
+      "id": "body_exterior|капот|kuzov-i-optika|kuzovnye-detali",
+      "label": "Кузовные детали",
+      "status": "GROUP_REVIEW",
+      "count": 181,
+      "categorySlug": "kuzov-i-optika",
+      "subcategorySlug": "kuzovnye-detali",
+      "confidence": 0.879,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "А-00457 Утеплитель капота 2108",
+        "А-00947 Отбойник капота 31105 н/обр",
+        "А-01063 Отбойник капота (иномарки)",
+        "А-01813 Накладка капота Приора (под покраску)",
+        "Ж-00023 Капот УАЗ-469",
+        "Ж-00169 Крышка капота УАЗ 452",
+        "ЖЛ-00043 Планка капота 2108",
+        "ЖЛ-00049 Капот 2107"
+      ]
+    },
+    {
+      "id": "suspension_arm|рычаг|podveska|rychagi",
+      "label": "Рычаги",
+      "status": "GROUP_REVIEW",
+      "count": 174,
+      "categorySlug": "podveska",
+      "subcategorySlug": "rychagi",
+      "confidence": 0.891,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "ЗКГ-00267 Рем. комплект рычага КПП Газ (шайба+пруж",
+        "ЗЧМ-00215 Рычаг в сборе 2140 верхний",
+        "ЗЧМ-00375 Ось верхнего рычага Москвич",
+        "ИН-00218 Рычаг нижний Дэу-Матиз",
+        "ИН-00571 J49008000 Рычаг DAEWOO MATIZ/SPARK/TICO п",
+        "ИН-00847 Рычаг перед.прCQN2R,лев.CQN2L",
+        "ИН-00940 Рычаг 30936047",
+        "К-00467 Ремкомплект верхних рычагов 2101-07"
+      ]
+    },
+    {
+      "id": "legacy_dvigatel-i-transmissiya_detali-transmissii|кардан|dvigatel-i-transmissiya|detali-transmissii",
+      "label": "detali-transmissii",
+      "status": "GROUP_REVIEW",
+      "count": 173,
+      "categorySlug": "dvigatel-i-transmissiya",
+      "subcategorySlug": "detali-transmissii",
+      "confidence": 0.82,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "ЗЧМ-00459 Крестовина рулевого кардана 2141",
+        "ЗЧМ-00581 Вилка кардана Москвич 412",
+        "КГ-01272 Стопор кардана с болтом Г-3302 (р/к-т вилки) в сб.",
+        "ХС-00107 Кардан передний Нива",
+        "ХС-00354 Кардан Шеви-Нива усилен.",
+        "ХС-00356 Вал карданный промежуточный ВАЗ 21213 (в сборе) без эласт. муфты",
+        "ХСГ-00039 Кардан рул. упр. УАЗ-Хантер усиленный",
+        "ХСГ-00130 Карданчик рулевой 3110"
+      ]
+    },
+    {
+      "id": "exhaust|глушитель|dvigatel-i-transmissiya|vyhlopnaya-sistema",
+      "label": "Выхлопная система",
+      "status": "GROUP_REVIEW",
+      "count": 172,
+      "categorySlug": "dvigatel-i-transmissiya",
+      "subcategorySlug": "vyhlopnaya-sistema",
+      "confidence": 0.915,
+      "homogeneity": 1,
+      "reviewSampleSize": 20,
+      "examples": [
+        "А-01576 Глушитель универсальный \"тюнинг\"",
+        "А-02455 Глушитель прямоточный А 014",
+        "Г-00007 Глушитель 2121 Ижора",
+        "Г-00040 Глушитель УАЗ-469, 3151 ЛЮКС (нержавейка)",
+        "Г-00114 Глушитель 2102 нерж.",
+        "Г-00136 Глушитель ВАЗ 2110 Некс",
+        "Г-00137 Глушитель ЗАЗ (2 шт)",
+        "Г-00161 Глушитель ВАЗ 2115 Универсал нерж."
+      ]
+    }
+  ]
+}

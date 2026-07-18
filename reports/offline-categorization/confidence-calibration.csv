@@ -1,0 +1,6 @@
+band,count,proxyPrecision,note
+0.95-1.00,8897,1,Proxy only: real precision requires filled manual-sample.csv.
+0.90-0.95,6397,0.7139,Proxy only: real precision requires filled manual-sample.csv.
+0.80-0.90,11372,0,Proxy only: real precision requires filled manual-sample.csv.
+0.70-0.80,374,0,Proxy only: real precision requires filled manual-sample.csv.
+below-0.70,3650,0,Proxy only: real precision requires filled manual-sample.csv.

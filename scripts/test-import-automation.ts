@@ -4,6 +4,7 @@ import { catalogTaxonomy, defaultCategorizationRules } from "../src/config/catal
 import { isPublicTaxonomyTarget } from "../src/config/public-taxonomy";
 import { buildDefaultCategorizationContext, categorizeProductName } from "../src/features/categorization/engine";
 import { validateRulePattern } from "../src/features/categorization/learning";
+import { normalizeProductName } from "../src/features/categorization/normalization";
 import type { CategorizationResult } from "../src/features/categorization/types";
 import { createAdminRedirectUrlFromParts } from "../src/middleware";
 import {
@@ -40,6 +41,7 @@ import {
   type SearchIndex,
   type SearchIndexClient
 } from "../src/features/search/meilisearch";
+import { documentMatchesQuery, rankSearchHits } from "../src/features/search/ranking";
 import {
   buildCategorySuggestion,
   getReviewDiagnosticFromRows
@@ -49,7 +51,7 @@ import type {
   ExistingProductSnapshot,
   ImportPreviewReport
 } from "../src/features/import/types";
-import type { SearchProductDocument } from "../src/features/search/types";
+import type { SearchProductDocument, SearchSynonymRecord } from "../src/features/search/types";
 
 const target = {
   categoryId: "cat-1",
@@ -417,6 +419,34 @@ run("fastener-like single token is not auto-published as a new public category",
   assert.equal(needsProductReview(row({ shopCode: "B-1", name: "болт м8" }), result), true);
 });
 
+run("normalizer preserves automotive technical tokens", () => {
+  const result = normalizeProductName("Лампа диодная Т10 W5W H7 12В DOT4 5W-30");
+
+  for (const token of ["t10", "w5w", "h7", "12v", "dot4", "5w-30"]) {
+    assert.ok(result.technicalTokens.includes(token), token);
+  }
+});
+
+run("compressor does not match suspension spring by substring", () => {
+  const result = categorizeProductName("A-2 Компрессор малый", buildDefaultCategorizationContext());
+
+  assert.notEqual(result.target?.subcategorySlug, "ressory");
+});
+
+run("t10 bulb becomes auto-ready while broad sensor stays grouped for review", () => {
+  const context = buildDefaultCategorizationContext();
+  const bulb = categorizeProductName("A-3 Лампа диодная Т10 12В", context);
+  const sensor = categorizeProductName("A-4 Датчик кислорода", context);
+
+  assert.equal(bulb.target?.categorySlug, "elektrika");
+  assert.equal(bulb.target?.subcategorySlug, "lampy");
+  assert.equal(bulb.decisionStatus, "AUTO_READY");
+  assert.equal(needsProductReview(row({ shopCode: "A-3", name: "Лампа диодная Т10 12В" }), bulb), false);
+  assert.equal(sensor.target?.subcategorySlug, "datchiki");
+  assert.equal(sensor.decisionStatus, "GROUP_REVIEW");
+  assert.equal(needsProductReview(row({ shopCode: "A-4", name: "Датчик кислорода" }), sensor), true);
+});
+
 run("broad review rule words are rejected across casing punctuation and forms", () => {
   for (const pattern of [
     "БОЛТ",
@@ -606,6 +636,64 @@ run("search documents query filters active products and public taxonomy", () => 
 
   assert.match(source, /eq\(products\.status,\s*"active"\)/);
   assert.match(source, /publicTaxonomyTargetCondition/);
+});
+
+run("search t10 uses exact technical token and lamp subject", () => {
+  const synonyms: SearchSynonymRecord[] = [];
+  const documents = [
+    searchDocument({
+      id: "lamp-t10",
+      shopCode: "L-1",
+      shopCodeCompact: "L1",
+      name: "Лампа диодная T10 12V",
+      categorySlug: "elektrika",
+      categoryName: "Электрика",
+      subcategorySlug: "lampy",
+      subcategoryName: "Лампы",
+      searchText: "лампа диодная t10 12v"
+    }),
+    searchDocument({
+      id: "lamp-w5w",
+      shopCode: "L-2",
+      shopCodeCompact: "L2",
+      name: "Лампа W5W",
+      categorySlug: "elektrika",
+      categoryName: "Электрика",
+      subcategorySlug: "lampy",
+      subcategoryName: "Лампы",
+      searchText: "лампа w5w"
+    }),
+    searchDocument({
+      id: "tire-t1001",
+      shopCode: "T1001",
+      shopCodeCompact: "T1001",
+      name: "Шина T1001",
+      categorySlug: "aksessuary",
+      categoryName: "Аксессуары",
+      subcategorySlug: "shiny-i-diski",
+      subcategoryName: "Шины и диски",
+      searchText: "шина t1001"
+    }),
+    searchDocument({
+      id: "tool-t10",
+      shopCode: "I-1",
+      shopCodeCompact: "I1",
+      name: "Ключ TORX T10",
+      categorySlug: "aksessuary",
+      categoryName: "Аксессуары",
+      subcategorySlug: "instrumenty",
+      subcategoryName: "Инструменты",
+      searchText: "ключ torx t10"
+    })
+  ];
+
+  const lampCandidates = documents.filter((document) => documentMatchesQuery(document, "лампа t10", synonyms));
+  const t10Candidates = documents.filter((document) => documentMatchesQuery(document, "t10", synonyms));
+  const t10Hits = rankSearchHits(t10Candidates, "t10", synonyms);
+
+  assert.deepEqual(lampCandidates.map((document) => document.id).sort(), ["lamp-t10", "lamp-w5w"]);
+  assert.equal(t10Candidates.some((document) => document.id === "tire-t1001"), false);
+  assert.equal(t10Hits[0]?.id, "lamp-t10");
 });
 
 run("publish prepares search index before active DB transaction", () => {

@@ -1,4 +1,5 @@
 import { searchIntentBoosts } from "@/config/search-synonyms";
+import { normalizeTechnicalToken } from "@/features/categorization/normalization";
 import {
   buildQueryVariants,
   compactShopCode,
@@ -7,6 +8,13 @@ import {
   tokenizeSearchText
 } from "./normalization";
 import type { SearchProductDocument, SearchProductHit, SearchSynonymRecord } from "./types";
+
+const technicalTokenAliases: Record<string, string[]> = {
+  t10: ["t10", "w5w"],
+  w5w: ["w5w", "t10"]
+};
+
+const lampSubjectTokens = new Set(["лампа", "лампы", "лампочка", "лампочки", "led"]);
 
 export function rankSearchHits<T extends SearchProductDocument>(
   documents: T[],
@@ -32,15 +40,22 @@ export function scoreSearchDocument(
   synonyms: SearchSynonymRecord[],
   sourceScore = 0
 ) {
-  const normalizedQuery = normalizeSearchText(query);
-  const compactQuery = compactShopCode(query);
-  const queryTerms = expandQueryTerms(normalizedQuery, synonyms);
-  const queryTokens = tokenizeSearchText(queryTerms.join(" "));
-  const queryVariants = buildQueryVariants(query, synonyms);
+  const profile = buildSearchQueryProfile(query, synonyms);
+  const {
+    normalizedQuery,
+    compactQuery,
+    queryTerms,
+    queryTokens,
+    queryVariants,
+    technicalTokens
+  } = profile;
   const documentText = normalizeSearchText(
     `${document.shopCode} ${document.shopCodeCompact} ${document.name} ${document.categoryName} ${document.subcategoryName} ${document.searchText} ${document.synonymText} ${document.translitText} ${document.brandText}`
   );
+  const semanticDocumentText = buildSemanticDocumentText(document);
   const documentTokens = new Set(tokenizeSearchText(documentText));
+  const semanticDocumentTokens = new Set(tokenizeSearchText(semanticDocumentText));
+  const documentTechnicalTokens = extractTechnicalTokens(semanticDocumentText);
   const normalizedName = normalizeSearchText(document.name);
   let score = sourceScore * 100;
 
@@ -60,6 +75,22 @@ export function scoreSearchDocument(
     score += 950;
   }
 
+  if (technicalTokens.length > 0) {
+    if (hasAllTechnicalTokens(documentTechnicalTokens, technicalTokens)) {
+      score += 700 + technicalTokens.length * 240;
+    } else if (!(compactQuery && document.shopCodeCompact === compactQuery)) {
+      score -= 2500;
+    }
+
+    if (technicalTokens.some(isLampTechnicalToken) && hasLampSubject(document, semanticDocumentTokens)) {
+      score += profile.hasLampSubject ? 550 : 220;
+    }
+
+    if (profile.hasLampSubject && !hasLampSubject(document, semanticDocumentTokens)) {
+      score -= 1600;
+    }
+  }
+
   for (const variant of queryVariants) {
     if (variant.length >= 3 && phraseMatches(documentText, variant)) {
       score += variant.includes(" ") ? 450 : 220;
@@ -68,6 +99,12 @@ export function scoreSearchDocument(
 
   for (const token of queryTokens) {
     if (token.length < 2) {
+      continue;
+    }
+
+    const technicalToken = normalizeTechnicalToken(token);
+    if (technicalToken) {
+      score += hasTechnicalToken(documentTechnicalTokens, technicalToken) ? 360 : -300;
       continue;
     }
 
@@ -92,18 +129,32 @@ export function documentMatchesQuery(
   query: string,
   synonyms: SearchSynonymRecord[]
 ) {
-  const normalizedQuery = normalizeSearchText(query);
-  const compactQuery = compactShopCode(query);
-  const variants = buildQueryVariants(query, synonyms);
+  const profile = buildSearchQueryProfile(query, synonyms);
+  const { normalizedQuery, compactQuery, variants, technicalTokens } = profile;
   const documentText = normalizeSearchText(
     `${document.shopCode} ${document.shopCodeCompact} ${document.name} ${document.searchText} ${document.synonymText} ${document.translitText} ${document.brandText}`
   );
+  const semanticDocumentText = buildSemanticDocumentText(document);
+  const semanticDocumentTokens = new Set(tokenizeSearchText(semanticDocumentText));
+  const documentTechnicalTokens = extractTechnicalTokens(semanticDocumentText);
 
   if (!normalizedQuery) {
     return false;
   }
 
-  if (compactQuery && document.shopCodeCompact.includes(compactQuery)) {
+  if (compactQuery && document.shopCodeCompact === compactQuery) {
+    return true;
+  }
+
+  if (technicalTokens.length > 0) {
+    if (!hasAllTechnicalTokens(documentTechnicalTokens, technicalTokens)) {
+      return false;
+    }
+
+    if (profile.hasLampSubject && !hasLampSubject(document, semanticDocumentTokens)) {
+      return false;
+    }
+  } else if (compactQuery && document.shopCodeCompact.includes(compactQuery)) {
     return true;
   }
 
@@ -111,17 +162,73 @@ export function documentMatchesQuery(
     return true;
   }
 
-  const queryTokens = tokenizeSearchText(expandQueryTerms(normalizedQuery, synonyms).join(" "));
+  const queryTokens = profile.queryTokens;
   const documentTokens = tokenizeSearchText(documentText);
 
   return queryTokens.every((queryToken) =>
-    documentTokens.some(
-      (documentToken) =>
-        documentToken === queryToken ||
-        documentToken.startsWith(queryToken) ||
-        canCompareFuzzy(queryToken, documentToken)
-    )
+    normalizeTechnicalToken(queryToken)
+      ? hasTechnicalToken(documentTechnicalTokens, normalizeTechnicalToken(queryToken))
+      : documentTokens.some(
+          (documentToken) =>
+            documentToken === queryToken ||
+            documentToken.startsWith(queryToken) ||
+            canCompareFuzzy(queryToken, documentToken)
+        )
   );
+}
+
+function buildSearchQueryProfile(query: string, synonyms: SearchSynonymRecord[]) {
+  const normalizedQuery = normalizeSearchText(query);
+  const compactQuery = compactShopCode(query);
+  const queryTerms = expandQueryTerms(normalizedQuery, synonyms);
+  const queryTokens = [...new Set(tokenizeSearchText(queryTerms.join(" ")))];
+  const queryVariants = buildQueryVariants(query, synonyms);
+  const technicalTokens = extractTechnicalTokens(queryTerms.join(" "));
+  const hasLampSubject = queryTokens.some((token) => lampSubjectTokens.has(token));
+
+  return {
+    normalizedQuery,
+    compactQuery,
+    queryTerms,
+    queryTokens,
+    queryVariants,
+    variants: queryVariants,
+    technicalTokens,
+    hasLampSubject
+  };
+}
+
+function buildSemanticDocumentText(document: SearchProductDocument) {
+  return normalizeSearchText(
+    `${document.name} ${document.categoryName} ${document.subcategoryName} ${document.searchText} ${document.synonymText} ${document.translitText} ${document.brandText}`
+  );
+}
+
+function extractTechnicalTokens(value: string) {
+  const tokens = tokenizeSearchText(value)
+    .map(normalizeTechnicalToken)
+    .filter(Boolean);
+  return [...new Set(tokens)];
+}
+
+function hasAllTechnicalTokens(documentTokens: string[], queryTokens: string[]) {
+  return queryTokens.every((token) => hasTechnicalToken(documentTokens, token));
+}
+
+function hasTechnicalToken(documentTokens: string[], queryToken: string) {
+  const aliases = technicalTokenAliases[queryToken] ?? [queryToken];
+  return aliases.some((alias) => documentTokens.includes(alias));
+}
+
+function isLampTechnicalToken(token: string) {
+  return token === "t10" || token === "w5w" || /^h\d{1,2}$/.test(token);
+}
+
+function hasLampSubject(document: SearchProductDocument, documentTokens: Set<string>) {
+  return (
+    document.categorySlug === "elektrika" &&
+      document.subcategorySlug === "lampy"
+  ) || [...lampSubjectTokens].some((token) => documentTokens.has(token));
 }
 
 function scoreSearchIntents(document: SearchProductDocument, queryTerms: string[]) {

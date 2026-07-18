@@ -12,6 +12,19 @@ export function needsProductReview(
     return false;
   }
 
+  if (categorization.decisionStatus === "AUTO_READY") {
+    return false;
+  }
+
+  if (
+    categorization.decisionStatus === "GROUP_REVIEW" ||
+    categorization.decisionStatus === "MANUAL_REVIEW" ||
+    categorization.decisionStatus === "BLOCKED_CONFLICT" ||
+    categorization.decisionStatus === "INVALID_INPUT"
+  ) {
+    return true;
+  }
+
   if (row.status === "needs_review" || categorization.needsReview) {
     return true;
   }

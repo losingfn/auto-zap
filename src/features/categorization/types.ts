@@ -11,6 +11,11 @@ export type CategorizationSource =
   | "strong_multi_token"
   | "single_strong_token"
   | "ambiguous_token"
+  | "family_rule"
+  | "domain_dictionary"
+  | "aggregated_signals"
+  | "blocked_conflict"
+  | "weak_group_candidate"
   | "empty_name"
   | "invalid_name"
   | "invalid_taxonomy_target"
@@ -18,9 +23,34 @@ export type CategorizationSource =
   | "no_match";
 
 export interface CategorizationSignal {
-  kind: "pattern" | "token" | "existing_product" | "validation";
+  kind:
+    | "pattern"
+    | "token"
+    | "phrase"
+    | "family"
+    | "technical"
+    | "negative"
+    | "existing_product"
+    | "neighbor"
+    | "validation";
   value: string;
 }
+
+export type CategorizationDecisionStatus =
+  | "AUTO_READY"
+  | "GROUP_REVIEW"
+  | "MANUAL_REVIEW"
+  | "BLOCKED_CONFLICT"
+  | "INVALID_INPUT";
+
+export interface CategorizationCandidate {
+  categorySlug: string;
+  subcategorySlug: string;
+  score: number;
+  source: CategorizationSource;
+  evidence: string[];
+  negativeEvidence: string[];
+ }
 
 export interface CategorizationRuleRecord {
   id?: string;
@@ -54,6 +84,13 @@ export interface CategorizationResult {
   matchedSignals: CategorizationSignal[];
   needsReview: boolean;
   reviewReason: string | null;
+  decisionStatus?: CategorizationDecisionStatus;
+  familyId?: string | null;
+  familyLabel?: string | null;
+  candidates?: CategorizationCandidate[];
+  negativeSignals?: CategorizationSignal[];
+  confidenceModelVersion?: string;
+  reviewReasonCode?: string | null;
 }
 
 export interface CategorizationContext {

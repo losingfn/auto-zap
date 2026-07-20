@@ -3,10 +3,11 @@ module.exports = {
     {
       name: "autozap",
       cwd: "/var/www/autozap",
-      script: "node_modules/next/dist/bin/next",
-      args: "start -p 3000 -H 127.0.0.1",
+      script: ".next/standalone/server.js",
       env: {
-        NODE_ENV: "production"
+        NODE_ENV: "production",
+        HOSTNAME: "127.0.0.1",
+        PORT: "3000"
       },
       instances: 1,
       exec_mode: "fork",

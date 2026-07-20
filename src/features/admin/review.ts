@@ -279,11 +279,19 @@ type ReviewSuggestion = {
 
 type ReviewDbClient = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+type ReviewQueueStats = {
+  total: number;
+  missingCategory: number;
+  missingSubcategory: number;
+  missingName: number;
+};
+
 const DEFAULT_PAGE_SIZE = 20;
 const LARGE_ACTION_CONFIRMATION_THRESHOLD = 100;
 const READY_CONFIDENCE_THRESHOLD = 0.92;
 const QUICK_CONFIDENCE_THRESHOLD = 0.85;
-const MAX_GROUPING_ROWS = 5000;
+const REVIEW_PAGE_GROUPING_ROWS = 300;
+const MAX_ACTION_REVIEW_ROWS = 5000;
 
 function isReviewableProductStatus(status: string) {
   return REVIEWABLE_PRODUCT_STATUSES.includes(status as "needs_review" | "invalid");
@@ -419,7 +427,9 @@ export async function getAdminReviewPageData(
   const categoryOptions = buildCategoryOptions(categoryRows, subcategoryRows);
   const targetBySlug = buildTargetBySlug(categoryRows, subcategoryRows);
   let workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null);
-  let rows = await getWorkspaceReviewRows(versionContext, workspace.id);
+  let rows = await getWorkspaceReviewRows(versionContext, workspace.id, {
+    limit: REVIEW_PAGE_GROUPING_ROWS
+  });
 
   if (
     options.createWorkspaceIfNeeded &&
@@ -429,9 +439,12 @@ export async function getAdminReviewPageData(
   ) {
     await ensureReviewWorkspace(versionContext.activeVersion?.id ?? null, options.adminUserId);
     workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null);
-    rows = await getWorkspaceReviewRows(versionContext, workspace.id);
+    rows = await getWorkspaceReviewRows(versionContext, workspace.id, {
+      limit: REVIEW_PAGE_GROUPING_ROWS
+    });
   }
 
+  const queueStats = await getReviewQueueStats(versionContext, workspace.id);
   const enrichedRows = rows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug));
   const groups = buildReviewGroups(enrichedRows, categoryRows, subcategoryRows, workspace.id, {
     scope: "workspace",
@@ -457,9 +470,17 @@ export async function getAdminReviewPageData(
     : null;
   const filteredRows = filterReviewRows(enrichedRows, params);
   const offset = (params.page - 1) * params.pageSize;
-  const pageRows = filteredRows.slice(offset, offset + params.pageSize);
+  const directPageRows = canUseDirectReviewPageRows(params)
+    ? await getWorkspaceReviewRows(versionContext, workspace.id, {
+        limit: params.pageSize,
+        offset
+      })
+    : null;
+  const pageRows = directPageRows
+    ? directPageRows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug))
+    : filteredRows.slice(offset, offset + params.pageSize);
   const changes = workspace.id ? await getReviewWorkspaceChanges(workspace.id) : [];
-  const summary = buildReviewQueueSummary(enrichedRows, groups, workspace, versionContext);
+  const summary = buildReviewQueueSummary(enrichedRows, groups, workspace, versionContext, queueStats);
   const reasonOptions = buildReasonOptions(enrichedRows);
   const categoryById = new Map(categoryRows.map((category) => [category.id, category]));
   const subcategoryById = new Map(subcategoryRows.map((subcategory) => [subcategory.id, subcategory]));
@@ -476,15 +497,15 @@ export async function getAdminReviewPageData(
     groupsUnavailable: false,
     selectedGroup,
     queueCount: summary.total,
-    filteredCount: filteredRows.length,
+    filteredCount: directPageRows ? queueStats.total : filteredRows.length,
     changes,
     pagination: {
       page: params.page,
       pageSize: params.pageSize,
-      total: filteredRows.length,
-      from: filteredRows.length === 0 ? 0 : offset + 1,
-      to: Math.min(offset + params.pageSize, filteredRows.length),
-      pageCount: Math.max(1, Math.ceil(filteredRows.length / params.pageSize))
+      total: directPageRows ? queueStats.total : filteredRows.length,
+      from: (directPageRows ? queueStats.total : filteredRows.length) === 0 ? 0 : offset + 1,
+      to: Math.min(offset + params.pageSize, directPageRows ? queueStats.total : filteredRows.length),
+      pageCount: Math.max(1, Math.ceil((directPageRows ? queueStats.total : filteredRows.length) / params.pageSize))
     },
     items: pageRows.map((row) => mapReviewItem(row, categoryById, subcategoryById))
   };
@@ -1381,11 +1402,17 @@ async function getReviewVersionContext(): Promise<VersionContext> {
   };
 }
 
-async function getWorkspaceReviewRows(versionContext: VersionContext, workspaceId: string | null) {
+async function getWorkspaceReviewRows(
+  versionContext: VersionContext,
+  workspaceId: string | null,
+  options: { limit?: number; offset?: number } = {}
+) {
   if (!versionContext.activeVersion) {
     return [];
   }
 
+  const limit = Math.max(1, Math.min(options.limit ?? MAX_ACTION_REVIEW_ROWS, MAX_ACTION_REVIEW_ROWS));
+  const offset = Math.max(0, options.offset ?? 0);
   const rows = await db
     .select({
       reviewId: reviewQueue.id,
@@ -1428,9 +1455,61 @@ async function getWorkspaceReviewRows(versionContext: VersionContext, workspaceI
       )
     )
     .orderBy(asc(reviewQueue.createdAt))
-    .limit(MAX_GROUPING_ROWS);
+    .limit(limit)
+    .offset(offset);
 
   return rows as ReviewRow[];
+}
+
+async function getReviewQueueStats(
+  versionContext: VersionContext,
+  workspaceId: string | null
+): Promise<ReviewQueueStats> {
+  if (!versionContext.activeVersion) {
+    return {
+      total: 0,
+      missingCategory: 0,
+      missingSubcategory: 0,
+      missingName: 0
+    };
+  }
+
+  const [row] = await db
+    .select({
+      total: sql<number>`count(*)::int`,
+      missingCategory: sql<number>`count(*) filter (where ${products.categoryId} is null)::int`,
+      missingSubcategory: sql<number>`count(*) filter (where ${products.subcategoryId} is null)::int`,
+      missingName: sql<number>`count(*) filter (
+        where btrim(${products.name}) = ''
+          or btrim(${products.name}) = btrim(${products.shopCode})
+          or btrim(${products.rawName}) = btrim(${products.shopCode})
+      )::int`
+    })
+    .from(reviewQueue)
+    .innerJoin(products, eq(products.id, reviewQueue.productId))
+    .leftJoin(
+      reviewWorkspaceItems,
+      and(
+        workspaceId ? eq(reviewWorkspaceItems.workspaceId, workspaceId) : sql`false`,
+        eq(reviewWorkspaceItems.productId, products.id),
+        inArray(reviewWorkspaceItems.status, ["pending", "excluded"])
+      )
+    )
+    .where(
+      and(
+        eq(reviewQueue.status, "open"),
+        eq(reviewQueue.catalogVersionId, versionContext.activeVersion.id),
+        inArray(products.status, REVIEWABLE_PRODUCT_STATUSES),
+        sql`${reviewWorkspaceItems.id} is null`
+      )
+    );
+
+  return {
+    total: Number(row?.total ?? 0),
+    missingCategory: Number(row?.missingCategory ?? 0),
+    missingSubcategory: Number(row?.missingSubcategory ?? 0),
+    missingName: Number(row?.missingName ?? 0)
+  };
 }
 
 async function getActionRows(
@@ -1701,10 +1780,11 @@ function buildReviewQueueSummary(
   rows: EnrichedReviewRow[],
   groups: AdminReviewGroup[],
   workspace: ReviewWorkspaceSummary,
-  versionContext: VersionContext
+  versionContext: VersionContext,
+  stats?: ReviewQueueStats
 ): AdminReviewSummary {
   return {
-    total: rows.filter((row) => row.workspaceItemStatus !== "pending" && row.workspaceItemStatus !== "excluded").length,
+    total: stats?.total ?? rows.filter((row) => row.workspaceItemStatus !== "pending" && row.workspaceItemStatus !== "excluded").length,
     readyGroups: groups.filter((group) => group.level === "ready").length,
     readyProducts: groups.filter((group) => group.level === "ready").reduce((sum, group) => sum + group.impactedProductCount, 0),
     quickGroups: groups.filter((group) => group.level === "quick").length,
@@ -1713,11 +1793,11 @@ function buildReviewQueueSummary(
     preparedProducts: workspace.preparedProductCount,
     excludedProducts: workspace.excludedProductCount,
     willPublishProducts: workspace.preparedProductCount,
-    missingCategory: rows.filter((row) => !row.currentCategoryId).length,
-    missingSubcategory: rows.filter((row) => !row.currentSubcategoryId).length,
-    missingName: rows.filter((row) => isMissingName(row)).length,
+    missingCategory: stats?.missingCategory ?? rows.filter((row) => !row.currentCategoryId).length,
+    missingSubcategory: stats?.missingSubcategory ?? rows.filter((row) => !row.currentSubcategoryId).length,
+    missingName: stats?.missingName ?? rows.filter((row) => isMissingName(row)).length,
     conflictingProducts: rows.filter((row) => row.suggestion.conflictingSignals.length > 0).length,
-    activeOpen: versionContext.activeVersion ? rows.length : 0,
+    activeOpen: versionContext.activeVersion ? stats?.total ?? rows.length : 0,
     latestDraftOpen: 0
   };
 }
@@ -1745,6 +1825,15 @@ function filterReviewRows(rows: EnrichedReviewRow[], params: AdminReviewParams) 
     }
     return true;
   });
+}
+
+function canUseDirectReviewPageRows(params: AdminReviewParams) {
+  return (
+    params.issue === "all" &&
+    !params.query &&
+    !params.reason &&
+    !params.group
+  );
 }
 
 function mapReviewItem(

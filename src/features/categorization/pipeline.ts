@@ -358,6 +358,11 @@ function resolveTarget(
     return null;
   }
 
+  const fromTargetMap = context.targetBySlug?.get(`${categorySlug}/${subcategorySlug}`);
+  if (fromTargetMap) {
+    return fromTargetMap;
+  }
+
   const fromRule = context.rules.find(
     (rule) => rule.categorySlug === categorySlug && rule.subcategorySlug === subcategorySlug
   );
@@ -370,11 +375,6 @@ function resolveTarget(
       subcategorySlug: fromRule.subcategorySlug,
       subcategoryName: fromRule.subcategoryName
     };
-  }
-
-  const fromTargetMap = context.targetBySlug?.get(`${categorySlug}/${subcategorySlug}`);
-  if (fromTargetMap) {
-    return fromTargetMap;
   }
 
   const fallback = context.fallbackByCategorySlug.get(categorySlug);

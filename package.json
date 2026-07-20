@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "WATCHPACK_POLLING=true next dev",
     "build": "next build",
+    "postbuild": "node --import tsx scripts/prepare-standalone-release.ts",
     "start": "node .next/standalone/server.js",
     "start:prod": "HOSTNAME=127.0.0.1 PORT=3000 node .next/standalone/server.js",
     "lint": "eslint .",
@@ -54,6 +55,7 @@
     "@typescript-eslint/parser": "^8.61.1",
     "drizzle-kit": "^0.31.0",
     "eslint": "^9.25.0",
+    "playwright-core": "1.61.1",
     "tailwindcss": "^4.1.0",
     "tsx": "^4.20.0",
     "typescript": "^5.8.0"

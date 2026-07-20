@@ -36,9 +36,10 @@
 - [ ] `pnpm typecheck` проходит.
 - [ ] `pnpm lint` проходит.
 - [ ] `pnpm build` проходит.
+- [ ] `.next/standalone/server.js`, `.next/standalone/.next/static` и `.next/standalone/public` существуют после build.
 - [ ] Владелец `/var/www/autozap` совпадает с пользователем PM2; `chmod 777` не используется.
 - [ ] PM2 запускает `.next/standalone/server.js`, а не `next start`.
-- [ ] `pnpm smoke:admin:prod` проходит на локальной/staging БД.
+- [ ] `pnpm smoke:admin:prod` проходит на локальной/staging БД и проверяет HTML, JS/CSS/public assets и browser navigation.
 - [ ] `pm2 start ecosystem.config.cjs` выполнен.
 - [ ] `pm2 save` выполнен.
 - [ ] `pm2 startup systemd` настроен.

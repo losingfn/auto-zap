@@ -5,10 +5,11 @@
     "source": "public/assets/source/logo.jpg",
     "logo": "public/assets/brand/logo.webp",
     "logo_avif": "public/assets/brand/logo.avif",
+    "logo_svg": "public/assets/brand/logo.svg",
     "mark": "public/assets/brand/logo-mark.png",
     "favicon": "public/favicon.ico",
     "favicon_svg": "public/assets/brand/favicon.svg",
-    "note": "favicon.svg is a bitmap wrapper because the approved source is JPG, not vector SVG."
+    "note": "logo.svg and favicon.svg are bitmap wrappers because the approved source is JPG, not vector SVG."
   },
   "store_photos": {
     "facade": {

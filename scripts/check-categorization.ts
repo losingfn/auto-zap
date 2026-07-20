@@ -16,8 +16,8 @@ import type { AnalyzedImportRow } from "../src/features/import/types";
 const [, , inputPath] = process.argv;
 
 if (!inputPath) {
-  console.error("Usage: pnpm categorization:check <path-to-catalog.xls|xlsx>");
-  process.exit(1);
+  runBuiltInFixture();
+  process.exit(0);
 }
 
 const context = buildDefaultCategorizationContext();
@@ -175,4 +175,107 @@ function shouldAutoPublishInShadow(row: AnalyzedImportRow, result: Categorizatio
       result.target &&
       result.confidence >= AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD
   );
+}
+
+function runBuiltInFixture() {
+  const context = buildDefaultCategorizationContext();
+  const cases = [
+    {
+      name: "Болт М8×30 DIN 933",
+      categorySlug: "ves-assortiment",
+      subcategorySlug: "other-products"
+    },
+    {
+      name: "Гайка М10",
+      categorySlug: "ves-assortiment",
+      subcategorySlug: "other-products"
+    },
+    {
+      name: "Шайба медная 14×20",
+      categorySlug: "ves-assortiment",
+      subcategorySlug: "other-products"
+    },
+    {
+      name: "Фитинг прямой 8 мм",
+      categorySlug: "ves-assortiment",
+      subcategorySlug: "other-products"
+    },
+    {
+      name: "Хомут 20–32",
+      categorySlug: "ves-assortiment",
+      subcategorySlug: "other-products"
+    },
+    {
+      name: "Болт колеса",
+      notSubcategorySlug: "other-products"
+    },
+    {
+      name: "Фитинг тормозной трубки",
+      categorySlug: "tormoznaya-sistema"
+    },
+    {
+      name: "Хомут глушителя",
+      subcategorySlug: "vyhlopnaya-sistema"
+    },
+    {
+      name: "Сальник коленвала",
+      subcategorySlug: "detali-dvigatelya"
+    },
+    {
+      name: "123456789",
+      decisionStatus: "DO_NOT_PUBLISH",
+      reviewReasonCode: "CODE_ONLY"
+    },
+    {
+      name: "2101-1005034 Сальник коленвала",
+      notReviewReasonCode: "CODE_ONLY",
+      subcategorySlug: "detali-dvigatelya"
+    }
+  ] as const;
+
+  const results = cases.map((item) => {
+    const result = categorizeProductName(item.name, context);
+    assertFixture(
+      !("categorySlug" in item) || !item.categorySlug || result.target?.categorySlug === item.categorySlug,
+      `${item.name}: expected category ${"categorySlug" in item ? item.categorySlug : ""}, got ${result.target?.categorySlug}`
+    );
+    assertFixture(
+      !("subcategorySlug" in item) || !item.subcategorySlug || result.target?.subcategorySlug === item.subcategorySlug,
+      `${item.name}: expected subcategory ${"subcategorySlug" in item ? item.subcategorySlug : ""}, got ${result.target?.subcategorySlug}`
+    );
+    assertFixture(
+      !("notSubcategorySlug" in item) || result.target?.subcategorySlug !== item.notSubcategorySlug,
+      `${item.name}: should not target ${"notSubcategorySlug" in item ? item.notSubcategorySlug : ""}`
+    );
+    assertFixture(
+      !("decisionStatus" in item) || result.decisionStatus === item.decisionStatus,
+      `${item.name}: expected status ${"decisionStatus" in item ? item.decisionStatus : ""}, got ${result.decisionStatus}`
+    );
+    assertFixture(
+      !("reviewReasonCode" in item) || result.reviewReasonCode === item.reviewReasonCode,
+      `${item.name}: expected reason ${"reviewReasonCode" in item ? item.reviewReasonCode : ""}, got ${result.reviewReasonCode}`
+    );
+    assertFixture(
+      !("notReviewReasonCode" in item) || result.reviewReasonCode !== item.notReviewReasonCode,
+      `${item.name}: should not be ${"notReviewReasonCode" in item ? item.notReviewReasonCode : ""}`
+    );
+
+    return {
+      name: item.name,
+      decisionStatus: result.decisionStatus,
+      reviewReasonCode: result.reviewReasonCode,
+      categorySlug: result.target?.categorySlug ?? null,
+      subcategorySlug: result.target?.subcategorySlug ?? null,
+      source: result.source,
+      confidence: result.confidence
+    };
+  });
+
+  console.log(JSON.stringify({ fixture: "built-in", passed: true, results }, null, 2));
+}
+
+function assertFixture(condition: unknown, message: string): asserts condition {
+  if (!condition) {
+    throw new Error(message);
+  }
 }

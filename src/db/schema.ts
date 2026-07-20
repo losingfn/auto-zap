@@ -63,6 +63,24 @@ export const reviewWorkspaceItemStatus = pgEnum("review_workspace_item_status", 
   "undone",
   "published"
 ]);
+export const reviewReapplyRunMode = pgEnum("review_reapply_run_mode", ["dry_run", "apply"]);
+export const reviewReapplyRunStatus = pgEnum("review_reapply_run_status", [
+  "pending",
+  "running",
+  "paused",
+  "completed",
+  "completed_with_errors",
+  "failed",
+  "cancelled"
+]);
+export const reviewReapplyRunItemStatus = pgEnum("review_reapply_run_item_status", [
+  "pending",
+  "processed",
+  "prepared",
+  "already_pending",
+  "skipped",
+  "error"
+]);
 export const ruleMatchType = pgEnum("rule_match_type", [
   "contains",
   "starts_with",
@@ -504,6 +522,155 @@ export const reviewWorkspaceItems = pgTable(
       table.status
     ),
     productIdx: index("review_workspace_items_product_idx").on(table.productId)
+  })
+);
+
+export const reviewReapplyRuns = pgTable(
+  "review_reapply_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    mode: reviewReapplyRunMode("mode").notNull(),
+    status: reviewReapplyRunStatus("status").notNull().default("pending"),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => reviewWorkspaces.id, { onDelete: "cascade" }),
+    sourceCatalogVersionId: uuid("source_catalog_version_id").references(
+      () => catalogVersions.id,
+      { onDelete: "set null" }
+    ),
+    dryRunId: uuid("dry_run_id"),
+    pipelineVersion: varchar("pipeline_version", { length: 160 }).notNull(),
+    scopeFingerprint: varchar("scope_fingerprint", { length: 128 }).notNull(),
+    filters: jsonb("filters").notNull().default(sql`'{}'::jsonb`),
+    totalRows: integer("total_rows").notNull().default(0),
+    processedRows: integer("processed_rows").notNull().default(0),
+    preparedRows: integer("prepared_rows").notNull().default(0),
+    skippedRows: integer("skipped_rows").notNull().default(0),
+    manualRows: integer("manual_rows").notNull().default(0),
+    blockedRows: integer("blocked_rows").notNull().default(0),
+    doNotPublishRows: integer("do_not_publish_rows").notNull().default(0),
+    groupReviewRows: integer("group_review_rows").notNull().default(0),
+    autoReadyRows: integer("auto_ready_rows").notNull().default(0),
+    errorRows: integer("error_rows").notNull().default(0),
+    alreadyPendingRows: integer("already_pending_rows").notNull().default(0),
+    currentCursorCreatedAt: timestamp("current_cursor_created_at", { withTimezone: true }),
+    currentCursorReviewId: uuid("current_cursor_review_id"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }),
+    lockedBy: varchar("locked_by", { length: 120 }),
+    lockExpiresAt: timestamp("lock_expires_at", { withTimezone: true }),
+    createdBy: uuid("created_by").references(() => adminUsers.id, { onDelete: "set null" }),
+    errorSummary: jsonb("error_summary").notNull().default(sql`'{}'::jsonb`),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    ...timestamps
+  },
+  (table) => ({
+    workspaceStatusIdx: index("review_reapply_runs_workspace_status_idx").on(
+      table.workspaceId,
+      table.status,
+      table.createdAt
+    ),
+    dryRunIdx: index("review_reapply_runs_dry_run_idx").on(table.dryRunId),
+    activeWorkspaceUnique: uniqueIndex("review_reapply_runs_one_active_workspace_idx")
+      .on(table.workspaceId)
+      .where(sql`${table.status} IN ('pending', 'running', 'paused')`)
+  })
+);
+
+export const reviewReapplyRunItems = pgTable(
+  "review_reapply_run_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => reviewReapplyRuns.id, { onDelete: "cascade" }),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => reviewWorkspaces.id, { onDelete: "cascade" }),
+    reviewQueueId: uuid("review_queue_id")
+      .notNull()
+      .references(() => reviewQueue.id, { onDelete: "cascade" }),
+    reviewQueueCreatedAt: timestamp("review_queue_created_at", { withTimezone: true }).notNull(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    status: reviewReapplyRunItemStatus("status").notNull().default("pending"),
+    decisionStatus: varchar("decision_status", { length: 40 }),
+    categoryId: uuid("category_id").references(() => categories.id, { onDelete: "set null" }),
+    subcategoryId: uuid("subcategory_id").references(() => subcategories.id, {
+      onDelete: "set null"
+    }),
+    confidence: numeric("confidence", { precision: 6, scale: 4 }),
+    reason: text("reason"),
+    reviewReasonCode: varchar("review_reason_code", { length: 120 }),
+    groupKey: varchar("group_key", { length: 255 }),
+    pipelineVersion: varchar("pipeline_version", { length: 160 }).notNull(),
+    resultFingerprint: varchar("result_fingerprint", { length: 128 }),
+    workspaceActionId: uuid("workspace_action_id").references(() => reviewWorkspaceActions.id, {
+      onDelete: "set null"
+    }),
+    workspaceItemId: uuid("workspace_item_id").references(() => reviewWorkspaceItems.id, {
+      onDelete: "set null"
+    }),
+    errorCode: varchar("error_code", { length: 120 }),
+    errorMessage: text("error_message"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    ...timestamps
+  },
+  (table) => ({
+    runReviewUnique: unique("review_reapply_run_items_run_review_unique").on(
+      table.runId,
+      table.reviewQueueId
+    ),
+    runCursorIdx: index("review_reapply_run_items_run_cursor_idx").on(
+      table.runId,
+      table.reviewQueueCreatedAt,
+      table.reviewQueueId
+    ),
+    workspaceReviewIdx: index("review_reapply_run_items_workspace_review_idx").on(
+      table.workspaceId,
+      table.reviewQueueId
+    ),
+    decisionIdx: index("review_reapply_run_items_decision_idx").on(table.runId, table.decisionStatus)
+  })
+);
+
+export const reviewReapplyGroups = pgTable(
+  "review_reapply_groups",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => reviewReapplyRuns.id, { onDelete: "cascade" }),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => reviewWorkspaces.id, { onDelete: "cascade" }),
+    decisionStatus: varchar("decision_status", { length: 40 }).notNull(),
+    groupKey: varchar("group_key", { length: 255 }).notNull(),
+    categoryId: uuid("category_id").references(() => categories.id, { onDelete: "set null" }),
+    subcategoryId: uuid("subcategory_id").references(() => subcategories.id, {
+      onDelete: "set null"
+    }),
+    productCount: integer("product_count").notNull().default(0),
+    confidenceMin: numeric("confidence_min", { precision: 6, scale: 4 }),
+    confidenceMax: numeric("confidence_max", { precision: 6, scale: 4 }),
+    sample: jsonb("sample").notNull().default(sql`'[]'::jsonb`),
+    reasonSummary: text("reason_summary"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    ...timestamps
+  },
+  (table) => ({
+    runDecisionGroupUnique: unique("review_reapply_groups_run_decision_group_unique").on(
+      table.runId,
+      table.decisionStatus,
+      table.groupKey
+    ),
+    runDecisionIdx: index("review_reapply_groups_run_decision_idx").on(
+      table.runId,
+      table.decisionStatus
+    )
   })
 );
 

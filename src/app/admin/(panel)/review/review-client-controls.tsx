@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import type { AdminReviewActionFilters, AdminReviewCategoryOption, AdminReviewGroup } from "@/features/admin/review";
 import {
   applyReviewGroupAction,
-  applySelectedReviewItemsAction,
-  reapplyReviewRulesAction
+  applySelectedReviewItemsAction
 } from "./actions";
 
 type ReviewControlsProps = {
@@ -413,62 +412,6 @@ export function ReviewBulkSelectionForm({ categories, filters }: ReviewControlsP
         className={`mt-5 ${primaryButtonClassName}`}
       >
         Применить категорию к выбранным
-      </button>
-    </form>
-  );
-}
-
-export function ReviewReapplyRulesForm({
-  filters,
-  count
-}: {
-  filters: AdminReviewActionFilters;
-  count: number;
-}) {
-  const bulkDisabled = filters.scope !== "workspace";
-  const requiresTypedConfirmation = count > LARGE_ACTION_THRESHOLD;
-  const [confirmationCount, setConfirmationCount] = useState("");
-  const countConfirmed = !requiresTypedConfirmation || confirmationCount.trim() === String(count);
-
-  return (
-    <form
-      action={reapplyReviewRulesAction}
-      onSubmit={(event) => {
-        if (bulkDisabled) {
-          event.preventDefault();
-          window.alert(DRAFT_ONLY_MESSAGE);
-          return;
-        }
-
-        if (requiresTypedConfirmation && !countConfirmed) {
-          event.preventDefault();
-          window.alert(`Для подтверждения введите: ${count}`);
-          return;
-        }
-
-        if (!window.confirm(`Повторно применить правила к ${count} открытым товарам текущего фильтра? Каталог не будет опубликован.`)) {
-          event.preventDefault();
-        }
-      }}
-    >
-      <HiddenReviewFilters filters={filters} />
-      <input type="hidden" name="confirmationCount" value={confirmationCount} />
-      {bulkDisabled ? <DisabledBulkNotice compact /> : null}
-      {requiresTypedConfirmation ? (
-        <TypedCountConfirmation
-          count={count}
-          value={confirmationCount}
-          disabled={bulkDisabled}
-          onChange={setConfirmationCount}
-          compact
-        />
-      ) : null}
-      <button
-        type="submit"
-        disabled={bulkDisabled || !countConfirmed}
-        className={secondaryButtonClassName}
-      >
-        Применить правила к очереди
       </button>
     </form>
   );

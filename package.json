@@ -25,6 +25,7 @@
     "search:sync": "scripts/with-env.sh node --import tsx scripts/sync-search-index.ts",
     "search:check": "scripts/with-env.sh node --import tsx scripts/check-search.ts",
     "search:fixture": "node --import tsx scripts/check-search-fixture.ts",
+    "social:preview:check": "node --import tsx scripts/check-social-preview.ts",
     "search:sync-synonyms-seed": "node --import tsx scripts/sync-search-synonyms-seed.ts",
     "admin:create": "scripts/with-env.sh node --import tsx scripts/create-admin.ts",
     "db:migrate": "scripts/with-env.sh node --import tsx scripts/migrate.ts",

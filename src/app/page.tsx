@@ -24,38 +24,9 @@ import { env } from "@/lib/env";
 export const dynamic = "force-dynamic";
 
 const homeUrl = publicAbsoluteUrl("/");
-const homeTitle = "Автозапчасти в Талдоме — магазин на Салтыкова-Щедрина";
-const homeDescription =
-  "Более 30 000 автозапчастей на собственном складе в Талдоме. Актуальные цены, удобный поиск и помощь в подборе.";
-const homeOgImageUrl = publicAbsoluteUrl("/og-image-v3.png") ?? "https://autozapchast-taldom.ru/og-image-v3.png";
 
 export const metadata: Metadata = {
-  title: homeTitle,
-  description: homeDescription,
-  ...(homeUrl ? { alternates: { canonical: homeUrl } } : {}),
-  openGraph: {
-    type: "website",
-    locale: "ru_RU",
-    siteName: "Автозапчасти на Салтыкова-Щедрина",
-    url: homeUrl,
-    title: homeTitle,
-    description: homeDescription,
-    images: [
-      {
-        url: homeOgImageUrl,
-        width: 1200,
-        height: 630,
-        alt: "Автозапчасти на Салтыкова-Щедрина в Талдоме",
-        type: "image/png"
-      }
-    ]
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: homeTitle,
-    description: homeDescription,
-    images: [homeOgImageUrl]
-  }
+  ...(homeUrl ? { alternates: { canonical: homeUrl } } : {})
 };
 
 const aboutFacts = [

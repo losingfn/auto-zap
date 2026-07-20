@@ -3,7 +3,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   getAdminReviewPageData,
-  REVIEW_RECALCULATION_CONFIRMATION,
   REVIEW_PAGE_SIZE_OPTIONS,
   type AdminReviewActionFilters,
   type AdminReviewCategoryOption,
@@ -13,9 +12,7 @@ import {
 import { requireAdminSession } from "@/features/admin/auth";
 import {
   publishReviewWorkspaceAction,
-  recalculateReviewSuggestionsAction,
   resolveReviewItemAction,
-  rollbackReviewRecalculationAction,
   undoLastReviewWorkspaceAction
 } from "./actions";
 import {
@@ -42,13 +39,6 @@ const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
   day: "2-digit",
   month: "2-digit",
   year: "numeric"
-});
-const dateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit"
 });
 
 const versionStatusLabels: Record<string, string> = {
@@ -84,9 +74,6 @@ const errorLabels: Record<string, string> = {
   rules_failed: "Не удалось повторно применить правила к очереди.",
   undo_failed: "Не удалось отменить последнее неопубликованное действие.",
   publish_failed: "Не удалось опубликовать рабочую сессию. Активный каталог и поиск не изменены.",
-  recalculate_failed: "Не удалось пересчитать предложения. Активный каталог, импорт и поиск не изменены.",
-  recalculate_confirmation_required: `Для пересчёта введите ${REVIEW_RECALCULATION_CONFIRMATION}.`,
-  recalc_rollback_failed: "Не удалось откатить последний пересчёт.",
   bulk_scope_forbidden: "Массовые действия разрешены только в рабочей сессии.",
   bulk_confirmation_required: "Для массового действия больше 100 товаров нужно ввести точное количество.",
   bulk_preview_stale: "Состав группы изменился. Обновите preview и повторите действие.",
@@ -122,21 +109,15 @@ export default async function AdminReviewPage({ searchParams }: ReviewPageProps)
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard label="Осталось в очереди" value={data.summary.total} />
-        <SummaryCard label="AUTO_READY" value={data.summary.autoReadyProducts} />
-        <SummaryCard label="GROUP_REVIEW" value={data.summary.groupReviewProducts} />
-        <SummaryCard label="DO_NOT_PUBLISH" value={data.summary.doNotPublishProducts} />
         <SummaryCard label="Готовые группы" value={data.summary.readyGroups} />
         <SummaryCard label="Готовые товары" value={data.summary.readyProducts} />
         <SummaryCard label="Быстрая проверка" value={data.summary.quickProducts} />
         <SummaryCard label="Только вручную" value={data.summary.manualProducts} />
-        <SummaryCard label="Прочие товары" value={data.summary.otherProducts} />
-        <SummaryCard label="Точные назначения" value={data.summary.exactAssignments} />
         <SummaryCard label="Уже распределены" value={data.summary.preparedProducts} />
         <SummaryCard label="Исключены" value={data.summary.excludedProducts} />
         <SummaryCard label="Будет опубликовано" value={data.summary.willPublishProducts} />
       </section>
 
-      <RecalculationPanel data={data} />
       <WorkspacePanel data={data} />
       <FilterPanel data={data} />
 
@@ -339,132 +320,6 @@ function WorkspacePanel({ data }: { data: Awaited<ReturnType<typeof getAdminRevi
   );
 }
 
-function RecalculationPanel({ data }: { data: Awaited<ReturnType<typeof getAdminReviewPageData>> }) {
-  const { preview, latest, running } = data.recalculation;
-  const after = latest?.afterSummary ?? preview.estimatedAfterSummary;
-  const before = latest?.beforeSummary ?? preview.beforeSummary;
-  const canRun = Boolean(preview.previewToken && !running);
-
-  return (
-    <section className="mt-6 rounded-card border border-[#243249] bg-[#101827] p-5">
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-start">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#9DBDFB]">
-            Production preview
-          </p>
-          <h2 className="mt-2 text-lg font-semibold">Пересчёт предложений</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#8FA1B8]">
-            Пересчёт использует текущие товары review-сессии и только обновляет предложения проверки.
-            Импорт, активный каталог, цены, публикация и Meilisearch не запускаются.
-          </p>
-
-          <dl className="mt-4 grid gap-2 text-sm text-[#C8D1DF] md:grid-cols-2">
-            <CompactRow label="Workspace" value={preview.workspaceId ?? "не создан"} />
-            <CompactRow
-              label="Создан"
-              value={preview.workspaceCreatedAt ? dateTimeFormatter.format(preview.workspaceCreatedAt) : "—"}
-            />
-            <CompactRow label="Исходных товаров" value={numberFormatter.format(preview.sourceProductCount)} />
-            <CompactRow label="Ожидают проверки" value={numberFormatter.format(preview.pendingReviewCount)} />
-            <CompactRow label="Будет обработано" value={numberFormatter.format(preview.estimatedProcessingCount)} />
-            <CompactRow label="Правила" value={preview.rulesVersion} />
-            <CompactRow label="Commit" value={preview.commitHash ?? "local/unknown"} />
-            <CompactRow label="Предупреждение" value={preview.warning} />
-          </dl>
-
-          <div className="mt-4 grid gap-2 text-sm text-[#C8D1DF] md:grid-cols-2 xl:grid-cols-4">
-            <SafetyBadge ok={preview.safety.activeCatalogUnchanged}>Каталог не изменится</SafetyBadge>
-            <SafetyBadge ok={preview.safety.importNotStarted}>Импорт не запускается</SafetyBadge>
-            <SafetyBadge ok={preview.safety.productsNotPublished}>Товары не публикуются</SafetyBadge>
-            <SafetyBadge ok={preview.safety.meilisearchUnchanged}>Meilisearch не меняется</SafetyBadge>
-          </div>
-
-          {latest ? (
-            <div className="mt-5 rounded-card border border-[#243249] bg-[#0B1220] p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="font-semibold text-[#C8D1DF]">Последний пересчёт</p>
-                <Badge>
-                  {latest.completedAt ? dateTimeFormatter.format(latest.completedAt) : latest.status}
-                </Badge>
-              </div>
-              <dl className="mt-3 grid gap-2 text-sm text-[#C8D1DF] md:grid-cols-2">
-                <CompactRow label="Обработано" value={numberFormatter.format(latest.processedCount)} />
-                <CompactRow label="Ошибки" value={numberFormatter.format(latest.errorCount)} />
-                <CompactRow label="Было индивидуально" value={numberFormatter.format(before.individualReviewCount)} />
-                <CompactRow label="Стало индивидуально" value={numberFormatter.format(after.individualReviewCount)} />
-                <CompactRow label="Действий оператора" value={numberFormatter.format(after.approximateOperatorActions)} />
-                <CompactRow label="Rollback" value={latest.id} />
-              </dl>
-              {latest.diagnostics.reductionIsLow ? (
-                <p className="mt-3 text-sm leading-6 text-[#FDE68A]">
-                  Снижение небольшое. {latest.diagnostics.reasons.join(" ")}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4">
-          <p className="font-semibold text-[#C8D1DF]">Ожидаемый результат</p>
-          <dl className="mt-3 grid gap-2 text-sm text-[#C8D1DF]">
-            <CompactRow label="AUTO_READY" value={numberFormatter.format(after.statusCounts.AUTO_READY)} />
-            <CompactRow label="GROUP_REVIEW" value={numberFormatter.format(after.statusCounts.GROUP_REVIEW)} />
-            <CompactRow label="Групп GROUP_REVIEW" value={numberFormatter.format(after.groupReviewGroups)} />
-            <CompactRow label="MANUAL_REVIEW" value={numberFormatter.format(after.statusCounts.MANUAL_REVIEW)} />
-            <CompactRow label="BLOCKED_CONFLICT" value={numberFormatter.format(after.statusCounts.BLOCKED_CONFLICT)} />
-            <CompactRow label="DO_NOT_PUBLISH" value={numberFormatter.format(after.statusCounts.DO_NOT_PUBLISH)} />
-            <CompactRow label="Прочие товары" value={numberFormatter.format(after.otherProducts)} />
-            <CompactRow label="Точные назначения" value={numberFormatter.format(after.exactAssignments)} />
-            <CompactRow label="Всего обработано" value={numberFormatter.format(after.processedTotal)} />
-          </dl>
-
-          {running ? (
-            <Notice>Пересчёт выполняется: {numberFormatter.format(running.processedCount)} из {numberFormatter.format(running.totalCount)}.</Notice>
-          ) : null}
-
-          <form action={recalculateReviewSuggestionsAction} className="mt-4 space-y-3">
-            <input type="hidden" name="previewToken" value={preview.previewToken ?? ""} />
-            <label className="block">
-              <span className="text-sm font-medium text-[#C8D1DF]">Подтверждение</span>
-              <input
-                name="confirmation"
-                placeholder={REVIEW_RECALCULATION_CONFIRMATION}
-                disabled={!canRun}
-                className={canRun ? inputClassName : disabledInputClassName}
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={!canRun}
-              className="inline-flex h-11 w-full items-center justify-center rounded-card bg-[#73A0F5] px-5 text-sm font-semibold text-[#07101F] transition hover:bg-[#9DBDFB] disabled:cursor-not-allowed disabled:bg-[#31415F] disabled:text-[#8FA1B8]"
-            >
-              Пересчитать предложения
-            </button>
-          </form>
-
-          <form action={rollbackReviewRecalculationAction} className="mt-3">
-            <button
-              type="submit"
-              disabled={!latest || Boolean(running)}
-              className="inline-flex h-11 w-full items-center justify-center rounded-card border border-[#4169A8] px-5 text-sm font-semibold text-white transition hover:border-[#73A0F5] hover:bg-[#1A2740] disabled:cursor-not-allowed disabled:border-[#243249] disabled:text-[#536174]"
-            >
-              Откатить пересчёт
-            </button>
-          </form>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SafetyBadge({ ok, children }: { ok: boolean; children: ReactNode }) {
-  return (
-    <span className={`rounded-card border px-3 py-2 ${ok ? "border-[#2F6B4F] bg-[#0F2A1E] text-[#BBF7D0]" : "border-[#7F1D1D] bg-[#2A1218] text-[#FECACA]"}`}>
-      {children}
-    </span>
-  );
-}
-
 function Notices({ params }: { params: Record<string, string | string[] | undefined> }) {
   const resolved = readParam(params.resolved);
   const rule = readParam(params.rule);
@@ -478,12 +333,6 @@ function Notices({ params }: { params: Record<string, string | string[] | undefi
   const rulesAfter = readParam(params.rulesAfter);
   const undoCount = readParam(params.undoCount);
   const publishedCount = readParam(params.publishedCount);
-  const recalculatedCount = readParam(params.recalculatedCount);
-  const autoReady = readParam(params.autoReady);
-  const groupReview = readParam(params.groupReview);
-  const manualReview = readParam(params.manualReview);
-  const doNotPublish = readParam(params.doNotPublish);
-  const recalcRollbackCount = readParam(params.recalcRollbackCount);
 
   return (
     <>
@@ -508,14 +357,6 @@ function Notices({ params }: { params: Record<string, string | string[] | undefi
       ) : null}
       {undoCount ? <Notice>Отменено последнее неопубликованное действие: {undoCount} товаров.</Notice> : null}
       {publishedCount ? <Notice>Рабочая сессия опубликована: {publishedCount} товаров переведены в active.</Notice> : null}
-      {recalculatedCount ? (
-        <Notice>
-          Пересчёт завершён: {recalculatedCount} товаров. AUTO_READY: {autoReady || "0"},
-          GROUP_REVIEW: {groupReview || "0"}, MANUAL_REVIEW: {manualReview || "0"},
-          DO_NOT_PUBLISH: {doNotPublish || "0"}.
-        </Notice>
-      ) : null}
-      {recalcRollbackCount ? <Notice>Rollback пересчёта выполнен: восстановлено {recalcRollbackCount} строк.</Notice> : null}
       {error ? <Notice tone="danger">{errorLabels[error] ?? "Не удалось выполнить действие."}</Notice> : null}
     </>
   );
@@ -538,7 +379,7 @@ function FilterPanel({ data }: { data: Awaited<ReturnType<typeof getAdminReviewP
           <select name="issue" defaultValue={data.params.issue} className={inputClassName}>
             {Object.entries(data.issueLabels).map(([value, label]) => (
               <option key={value} value={value}>
-                {formatIssueFilterLabel(data, value, label)}
+                {label}
               </option>
             ))}
           </select>
@@ -590,37 +431,6 @@ function FilterPanel({ data }: { data: Awaited<ReturnType<typeof getAdminReviewP
       </div>
     </form>
   );
-}
-
-function formatIssueFilterLabel(
-  data: Awaited<ReturnType<typeof getAdminReviewPageData>>,
-  value: string,
-  label: string
-) {
-  const count = issueFilterCount(data, value);
-  return count === null ? label : `${label} · ${numberFormatter.format(count)}`;
-}
-
-function issueFilterCount(data: Awaited<ReturnType<typeof getAdminReviewPageData>>, value: string) {
-  const counts: Record<string, number> = {
-    all: data.summary.total,
-    auto_ready: data.summary.autoReadyProducts,
-    group_review: data.summary.groupReviewProducts,
-    ready: data.summary.readyProducts,
-    quick: data.summary.quickProducts,
-    manual: data.summary.manualProducts,
-    blocked_conflict: data.summary.blockedConflictProducts,
-    do_not_publish: data.summary.doNotPublishProducts,
-    other_products: data.summary.otherProducts,
-    prepared: data.summary.preparedProducts,
-    excluded: data.summary.excludedProducts,
-    missing_category: data.summary.missingCategory,
-    missing_subcategory: data.summary.missingSubcategory,
-    missing_name: data.summary.missingName,
-    conflicting: data.summary.conflictingProducts
-  };
-
-  return value in counts ? counts[value] : null;
 }
 
 function SelectedGroupPanel({
@@ -698,8 +508,6 @@ function ReviewCard({
               Выбрать
             </label>
             <Badge>{workspaceStatusLabels[item.workspaceStatus]}</Badge>
-            <Badge>{item.decisionStatus}</Badge>
-            {item.isOtherProducts ? <Badge>Прочие товары</Badge> : null}
             <Badge>{suggestionLevelLabels[item.suggestionLevel]}</Badge>
             <Badge>{item.confidenceLabel} · {Math.round(item.confidence * 100)}%</Badge>
             <Badge>{versionStatusLabels[item.catalogVersionStatus] ?? item.catalogVersionStatus}</Badge>

@@ -3,9 +3,9 @@ import "./globals.css";
 import { siteConfig } from "@/config/site";
 import { publicAbsoluteUrl } from "@/features/seo/structured-data";
 
-const metadataTitle = "Автозапчасти в Талдоме — магазин на Салтыкова-Щедрина";
+const metadataTitle = "Автозапчасти в Талдоме — Салтыкова-Щедрина";
 const metadataDescription =
-  "Более 30 000 автозапчастей на собственном складе в Талдоме. Актуальные цены, удобный поиск и помощь в подборе.";
+  "Оригинальные и аналоговые автозапчасти в Талдоме. Большой ассортимент, помощь в подборе, честные цены, удобное расположение и реальные отзывы покупателей.";
 const ogImagePath = "/og-image-v3.png";
 
 export const viewport: Viewport = {
@@ -28,7 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title: metadataTitle,
       description: metadataDescription,
       ...(publicUrl ? { url: publicUrl } : {}),
-      siteName: "Автозапчасти на Салтыкова-Щедрина",
+      siteName: "Автозапчасти в Талдоме",
       locale: "ru_RU",
       type: "website",
       images: [
@@ -36,8 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
           url: ogImageUrl,
           width: 1200,
           height: 630,
-          alt: "Автозапчасти на Салтыкова-Щедрина в Талдоме",
-          type: "image/png"
+          alt: "Автозапчасти в Талдоме"
         }
       ]
     },

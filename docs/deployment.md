@@ -126,9 +126,27 @@ pnpm typecheck
 pnpm build
 ```
 
+Проект собирается с `output: "standalone"`, поэтому production запуск должен идти через
+`.next/standalone/server.js`, а не через `next start`.
+`pnpm build` запускает `postbuild`, который копирует `.next/static` в
+`.next/standalone/.next/static` и `public` в `.next/standalone/public`.
+Не копируйте `.next/standalone` внутрь самого себя.
+
 В автоматических shell-скриптах без TTY можно использовать `CI=true pnpm ...`, чтобы pnpm не задавал интерактивные вопросы при проверке зависимостей.
 
 Если build в ограниченной среде пишет предупреждения о недоступной БД, но завершается успешно, это допустимо для локального sandbox. На сервере PostgreSQL должен быть доступен до build.
+
+После build убедитесь, что весь релиз принадлежит пользователю, от которого работает PM2. Это
+устраняет EACCES на Next artifacts вроде `.next/server/app/robots.txt.body` без небезопасного
+`chmod 777`:
+
+```bash
+DEPLOY_USER=autozap
+sudo chown -R "$DEPLOY_USER":"$DEPLOY_USER" /var/www/autozap
+sudo chmod -R u+rwX,go+rX,go-w /var/www/autozap
+chmod +x /var/www/autozap/scripts/*.sh
+chmod +x /var/www/autozap/deploy/scripts/*.sh
+```
 
 ## 8. PM2
 
@@ -154,7 +172,12 @@ pm2 startup systemd
 pm2 status
 pm2 logs autozap
 curl -I http://127.0.0.1:3000
+pnpm smoke:admin:prod
 ```
+
+PM2 должен запускать `node .next/standalone/server.js` с `HOSTNAME=127.0.0.1` и `PORT=3000`.
+Если в логах есть `next start does not work with output: standalone`, PM2 использует старый
+entrypoint и его нужно перезапустить из актуального `ecosystem.config.cjs`.
 
 ## 9. Nginx
 
@@ -203,6 +226,8 @@ git pull
 pnpm install --frozen-lockfile
 pnpm db:migrate
 pnpm build
+DEPLOY_USER=autozap
+sudo chown -R "$DEPLOY_USER":"$DEPLOY_USER" /var/www/autozap
 pm2 restart autozap
 pm2 status
 ```

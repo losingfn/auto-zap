@@ -387,7 +387,12 @@ export const reviewQueue = pgTable(
   },
   (table) => ({
     statusIdx: index("review_queue_status_idx").on(table.status),
-    versionIdx: index("review_queue_version_idx").on(table.catalogVersionId)
+    versionIdx: index("review_queue_version_idx").on(table.catalogVersionId),
+    versionStatusCreatedIdx: index("review_queue_version_status_created_idx").on(
+      table.catalogVersionId,
+      table.status,
+      table.createdAt
+    )
   })
 );
 

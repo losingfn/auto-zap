@@ -129,6 +129,15 @@ const safeHighConfidenceSingleRules = new Set([
   "kuzov-i-optika/povtoriteli:поворотник"
 ]);
 
+type CompiledCategorizationRule = {
+  pattern: string;
+  tokens: string[];
+  patternTokens: string[];
+  regex: RegExp | null;
+};
+
+const compiledRuleCache = new WeakMap<CategorizationRuleRecord, CompiledCategorizationRule>();
+
 export function normalizeForCategorization(value: string) {
   return normalizeProductText(normalizeText(value));
 }
@@ -175,11 +184,19 @@ export function categorizeProductName(
     });
   }
 
-  const matchedRule = [...context.rules]
-    .sort((a, b) => a.priority - b.priority || b.pattern.length - a.pattern.length)
-    .find((rule) => ruleMatches(rule, text));
+  const textTokens = tokenizeNormalizedProductText(text);
+  let matchedRule: CategorizationRuleRecord | null = null;
+  let matchedCompiledRule: CompiledCategorizationRule | null = null;
+  for (const rule of context.rules) {
+    const compiledRule = getCompiledRule(rule);
+    if (ruleMatches(rule, compiledRule, text, textTokens)) {
+      matchedRule = rule;
+      matchedCompiledRule = compiledRule;
+      break;
+    }
+  }
 
-  if (!matchedRule) {
+  if (!matchedRule || !matchedCompiledRule) {
     return classifyWithDomainPipeline(
       productName,
       context,
@@ -191,7 +208,7 @@ export function categorizeProductName(
     );
   }
 
-  const score = scoreMatchedRule(matchedRule, text);
+  const score = scoreMatchedRule(matchedRule, matchedCompiledRule, text);
   const target = targetFromRule(matchedRule);
   if (!isPublicTaxonomyTarget(target.categorySlug, target.subcategorySlug)) {
     return classifyWithDomainPipeline(
@@ -259,8 +276,10 @@ export function buildDefaultCategorizationContext(): CategorizationContext {
   }
 
   return {
-    rules: rules.filter((rule) =>
-      isPublicTaxonomyTarget(rule.categorySlug, rule.subcategorySlug)
+    rules: sortCategorizationRules(
+      rules.filter((rule) =>
+        isPublicTaxonomyTarget(rule.categorySlug, rule.subcategorySlug)
+      )
     ),
     fallbackByCategorySlug: new Map<string, CategorizationTarget>(),
     targetBySlug
@@ -269,6 +288,7 @@ export function buildDefaultCategorizationContext(): CategorizationContext {
 
 function scoreMatchedRule(
   rule: CategorizationRuleRecord,
+  compiledRule: CompiledCategorizationRule,
   normalizedText: string
 ): {
   confidence: number;
@@ -276,8 +296,7 @@ function scoreMatchedRule(
   reason: string;
   matchedSignals: CategorizationSignal[];
 } {
-  const pattern = normalizeForCategorization(rule.pattern);
-  const tokens = tokenizePattern(pattern);
+  const { pattern, tokens } = compiledRule;
   const matchedSignals = [
     { kind: "pattern" as const, value: pattern },
     ...tokens.map((token) => ({ kind: "token" as const, value: token }))
@@ -418,6 +437,36 @@ function tokenizePattern(pattern: string) {
     );
 }
 
+function sortCategorizationRules(rules: CategorizationRuleRecord[]) {
+  return [...rules].sort((a, b) => a.priority - b.priority || b.pattern.length - a.pattern.length);
+}
+
+function getCompiledRule(rule: CategorizationRuleRecord): CompiledCategorizationRule {
+  const cached = compiledRuleCache.get(rule);
+  if (cached) {
+    return cached;
+  }
+
+  const pattern = normalizeForCategorization(rule.pattern);
+  let regex: RegExp | null = null;
+  if (rule.matchType === "regex") {
+    try {
+      regex = new RegExp(rule.pattern, "iu");
+    } catch {
+      regex = null;
+    }
+  }
+
+  const compiled = {
+    pattern,
+    tokens: tokenizePattern(pattern),
+    patternTokens: pattern.includes(" ") ? tokenizeNormalizedProductText(pattern) : [],
+    regex
+  };
+  compiledRuleCache.set(rule, compiled);
+  return compiled;
+}
+
 function looksLikeExactArticleRule(pattern: string, normalizedText: string) {
   return (
     pattern.length >= 4 &&
@@ -438,8 +487,13 @@ function isExactPrefixRule(
   );
 }
 
-function ruleMatches(rule: CategorizationRuleRecord, normalizedText: string) {
-  const pattern = normalizeForCategorization(rule.pattern);
+function ruleMatches(
+  rule: CategorizationRuleRecord,
+  compiledRule: CompiledCategorizationRule,
+  normalizedText: string,
+  normalizedTextTokens: string[]
+) {
+  const { pattern } = compiledRule;
   if (!pattern) {
     return false;
   }
@@ -450,24 +504,23 @@ function ruleMatches(rule: CategorizationRuleRecord, normalizedText: string) {
     case "starts_with":
       return normalizedText.startsWith(pattern);
     case "regex":
-      try {
-        return new RegExp(rule.pattern, "iu").test(normalizedText);
-      } catch {
-        return false;
-      }
+      return compiledRule.regex?.test(normalizedText) ?? false;
     case "contains":
     default:
-      return patternMatchesNormalizedText(pattern, normalizedText);
+      return patternMatchesNormalizedText(compiledRule, normalizedText, normalizedTextTokens);
   }
 }
 
-function patternMatchesNormalizedText(pattern: string, normalizedText: string) {
+function patternMatchesNormalizedText(
+  compiledRule: CompiledCategorizationRule,
+  normalizedText: string,
+  normalizedTextTokens: string[]
+) {
+  const { pattern } = compiledRule;
   if (pattern.includes(" ")) {
-    const patternTokens = tokenizeNormalizedProductText(pattern);
-    const textTokens = tokenizeNormalizedProductText(normalizedText);
     let cursor = 0;
-    for (const patternToken of patternTokens) {
-      const nextIndex = textTokens.findIndex(
+    for (const patternToken of compiledRule.patternTokens) {
+      const nextIndex = normalizedTextTokens.findIndex(
         (token, index) => index >= cursor && token.startsWith(patternToken)
       );
       if (nextIndex === -1) {
@@ -478,7 +531,7 @@ function patternMatchesNormalizedText(pattern: string, normalizedText: string) {
     return true;
   }
 
-  return tokenizeNormalizedProductText(normalizedText).some(
+  return normalizedTextTokens.some(
     (token) => token === pattern || token.startsWith(pattern)
   );
 }

@@ -101,6 +101,8 @@ const weakTokens = new Set([
   "элемент"
 ]);
 
+const phrasePatternCache = new Map<string, RegExp>();
+
 export interface NormalizedProductName {
   original: string;
   normalized: string;
@@ -225,11 +227,17 @@ export function containsPhrase(features: Pick<NormalizedProductName, "normalized
     return false;
   }
 
-  const pattern = normalizedPhrase
-    .split(/\s+/)
-    .map(escapeRegExp)
-    .join("\\s+");
-  return new RegExp(`(^|\\s)${pattern}(\\s|$)`, "iu").test(features.normalized);
+  let pattern = phrasePatternCache.get(normalizedPhrase);
+  if (!pattern) {
+    const source = normalizedPhrase
+      .split(/\s+/)
+      .map(escapeRegExp)
+      .join("\\s+");
+    pattern = new RegExp(`(^|\\s)${source}(\\s|$)`, "iu");
+    phrasePatternCache.set(normalizedPhrase, pattern);
+  }
+
+  return pattern.test(features.normalized);
 }
 
 function buildPhrases(tokens: string[]) {

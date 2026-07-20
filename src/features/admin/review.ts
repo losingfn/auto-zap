@@ -1,6 +1,6 @@
-import { createHash, createHmac, randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
-import { isOtherProductsTarget, isPublicTaxonomyTarget } from "@/config/public-taxonomy";
+import { isPublicTaxonomyTarget } from "@/config/public-taxonomy";
 import { db } from "@/db/client";
 import {
   adminUsers,
@@ -9,8 +9,6 @@ import {
   categories,
   categorizationRules,
   products,
-  reviewRecalculationItems,
-  reviewRecalculations,
   reviewQueue,
   reviewWorkspaceActions,
   reviewWorkspaceItems,
@@ -28,14 +26,9 @@ import {
 } from "@/features/categorization/learning";
 import { getCategorizationContext } from "@/features/categorization/repository";
 import type {
-  CategorizationCandidate,
   CategorizationContext,
-  CategorizationDecisionStatus,
-  CategorizationSignal,
-  CategorizationSource,
   CategorizationTarget
 } from "@/features/categorization/types";
-import { CATEGORIZATION_PIPELINE_VERSION } from "@/features/categorization/pipeline";
 import { buildProductSearchText } from "@/features/search/documents";
 import {
   activatePreparedCatalogSearchIndex,
@@ -45,20 +38,14 @@ import { getSearchSynonyms } from "@/features/search/synonyms";
 import { getAdminSessionSecret } from "@/features/admin/session-cookie";
 
 export const REVIEW_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
-export const REVIEW_RECALCULATION_CONFIRMATION = "ПЕРЕСЧИТАТЬ";
 const REVIEWABLE_PRODUCT_STATUSES = ["needs_review", "invalid"] as const;
 
 export type AdminReviewVersionScope = "workspace" | "active" | "all";
 export type AdminReviewIssueFilter =
   | "all"
-  | "auto_ready"
-  | "group_review"
   | "ready"
   | "quick"
   | "manual"
-  | "blocked_conflict"
-  | "do_not_publish"
-  | "other_products"
   | "prepared"
   | "excluded"
   | "missing_category"
@@ -100,8 +87,6 @@ export type ReviewWorkspaceSummary = {
   sourceCatalogVersionStatus: string | null;
   sourceCatalogVersionPublishedAt: Date | null;
   status: "logical" | "open" | "publishing" | "published" | "abandoned";
-  createdAt: Date | null;
-  updatedAt: Date | null;
   preparedProductCount: number;
   excludedProductCount: number;
   actionCount: number;
@@ -110,18 +95,11 @@ export type ReviewWorkspaceSummary = {
 
 export type AdminReviewSummary = {
   total: number;
-  autoReadyProducts: number;
-  groupReviewProducts: number;
-  groupReviewGroups: number;
   readyGroups: number;
   readyProducts: number;
   quickGroups: number;
   quickProducts: number;
   manualProducts: number;
-  blockedConflictProducts: number;
-  doNotPublishProducts: number;
-  otherProducts: number;
-  exactAssignments: number;
   preparedProducts: number;
   excludedProducts: number;
   willPublishProducts: number;
@@ -131,69 +109,6 @@ export type AdminReviewSummary = {
   conflictingProducts: number;
   activeOpen: number;
   latestDraftOpen: number;
-};
-
-export type ReviewRecalculationStatusCounts = Record<CategorizationDecisionStatus, number>;
-
-export type ReviewRecalculationSummary = {
-  statusCounts: ReviewRecalculationStatusCounts;
-  groupReviewGroups: number;
-  otherProducts: number;
-  exactAssignments: number;
-  processedTotal: number;
-  individualReviewCount: number;
-  approximateOperatorActions: number;
-};
-
-export type ReviewRecalculationPreview = {
-  workspaceId: string | null;
-  sourceCatalogVersionId: string | null;
-  sourceCreatedAt: Date | null;
-  workspaceCreatedAt: Date | null;
-  previewToken: string | null;
-  rulesVersion: string;
-  commitHash: string | null;
-  sourceProductCount: number;
-  pendingReviewCount: number;
-  estimatedProcessingCount: number;
-  beforeSummary: ReviewRecalculationSummary;
-  estimatedAfterSummary: ReviewRecalculationSummary;
-  warning: string;
-  safety: {
-    activeCatalogUnchanged: true;
-    importNotStarted: true;
-    productsNotPublished: true;
-    meilisearchUnchanged: true;
-  };
-};
-
-export type ReviewRecalculationResult = {
-  id: string;
-  status: string;
-  rulesVersion: string;
-  commitHash: string | null;
-  processedCount: number;
-  errorCount: number;
-  startedAt: Date;
-  completedAt: Date | null;
-  beforeSummary: ReviewRecalculationSummary;
-  afterSummary: ReviewRecalculationSummary;
-  diagnostics: {
-    individualReviewDelta: number;
-    reductionIsLow: boolean;
-    reasons: string[];
-  };
-};
-
-export type ReviewRecalculationPageState = {
-  running: {
-    id: string;
-    startedAt: Date;
-    processedCount: number;
-    totalCount: number;
-  } | null;
-  latest: ReviewRecalculationResult | null;
-  preview: ReviewRecalculationPreview;
 };
 
 export type AdminReviewItem = {
@@ -220,8 +135,6 @@ export type AdminReviewItem = {
   confidence: number;
   confidenceLabel: string;
   suggestionLevel: ReviewSuggestionLevel;
-  decisionStatus: CategorizationDecisionStatus;
-  isOtherProducts: boolean;
   explanation: string;
   matchedSignals: string[];
   conflictingSignals: string[];
@@ -298,8 +211,7 @@ export class AdminReviewBulkSafetyError extends Error {
       | "preview_stale"
       | "empty_workspace"
       | "invalid_target"
-      | "post_condition_failed"
-      | "confirmation_required",
+      | "post_condition_failed",
     message: string,
     readonly ruleSkippedReason?: string
   ) {
@@ -312,14 +224,12 @@ type VersionContext = {
   activeVersion: {
     id: string;
     sourceFileName: string | null;
-    totalRows: number;
     createdAt: Date;
     publishedAt: Date | null;
   } | null;
   latestDraft: {
     id: string;
     sourceFileName: string | null;
-    totalRows: number;
     createdAt: Date;
   } | null;
 };
@@ -361,75 +271,10 @@ type ReviewSuggestion = {
   subcategoryId: string | null;
   categoryName: string | null;
   subcategoryName: string | null;
-  decisionStatus: CategorizationDecisionStatus;
-  source: CategorizationSource;
-  reviewReasonCode: string | null;
-  familyId: string | null;
-  familyLabel: string | null;
-  candidates: CategorizationCandidate[];
-  negativeSignals: string[];
-  isOtherProducts: boolean;
-  isExactAssignment: boolean;
   explanation: string;
   matchedSignals: string[];
   conflictingSignals: string[];
   rulePattern: string | null;
-};
-
-type ReviewRecalculationItemSuggestion = {
-  reviewQueueId: string | null;
-  productId: string;
-  newSuggestedCategoryId: string | null;
-  newSuggestedSubcategoryId: string | null;
-  categoryName: string | null;
-  subcategoryName: string | null;
-  decisionStatus: CategorizationDecisionStatus;
-  decisionSource: CategorizationSource;
-  reviewReasonCode: string | null;
-  confidence: string;
-  familyId: string | null;
-  familyLabel: string | null;
-  matchedSignals: unknown;
-  negativeSignals: unknown;
-  candidates: unknown;
-  isOtherProducts: boolean;
-  isExactAssignment: boolean;
-  metadata: unknown;
-};
-
-type ReviewRecalculationPlanItem = {
-  reviewQueueId: string;
-  productId: string;
-  oldSuggestedCategoryId: string | null;
-  oldSuggestedSubcategoryId: string | null;
-  newSuggestedCategoryId: string | null;
-  newSuggestedSubcategoryId: string | null;
-  oldReason: string;
-  newReason: string;
-  decisionStatus: CategorizationDecisionStatus;
-  decisionSource: CategorizationSource;
-  reviewReasonCode: string | null;
-  confidence: number;
-  familyId: string | null;
-  familyLabel: string | null;
-  matchedSignals: string[];
-  negativeSignals: string[];
-  candidates: CategorizationCandidate[];
-  isOtherProducts: boolean;
-  isExactAssignment: boolean;
-  originalProductStatus: string;
-  groupKey: string;
-  rulePattern: string | null;
-};
-
-type ReviewRecalculationPlan = {
-  items: ReviewRecalculationPlanItem[];
-  beforeSummary: ReviewRecalculationSummary;
-  afterSummary: ReviewRecalculationSummary;
-  inputFingerprint: string;
-  previewToken: string;
-  rulesVersion: string;
-  commitHash: string | null;
 };
 
 type ReviewDbClient = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -446,14 +291,9 @@ function isReviewableProductStatus(status: string) {
 
 const ISSUE_LABELS: Record<AdminReviewIssueFilter, string> = {
   all: "Все",
-  auto_ready: "AUTO_READY",
-  group_review: "GROUP_REVIEW",
   ready: "Готовые предложения",
   quick: "Требуют быстрого просмотра",
   manual: "Только вручную",
-  blocked_conflict: "BLOCKED_CONFLICT",
-  do_not_publish: "DO_NOT_PUBLISH",
-  other_products: "Прочие товары",
   prepared: "Уже распределены",
   excluded: "Исключённые",
   missing_category: "Без категории",
@@ -536,14 +376,9 @@ export function normalizeAdminReviewParams(input: Partial<Record<string, string 
     input.issue ?? input.filter,
     [
       "all",
-      "auto_ready",
-      "group_review",
       "ready",
       "quick",
       "manual",
-      "blocked_conflict",
-      "do_not_publish",
-      "other_products",
       "prepared",
       "excluded",
       "missing_category",
@@ -597,17 +432,7 @@ export async function getAdminReviewPageData(
     rows = await getWorkspaceReviewRows(versionContext, workspace.id);
   }
 
-  const recalculationRows = workspace.id
-    ? await getReviewRecalculationRowsForWorkspace(workspace.id)
-    : { running: null, latest: null, latestItems: new Map<string, ReviewRecalculationItemSuggestion>() };
-  const enrichedRows = rows.map((row) =>
-    enrichReviewRow(
-      row,
-      categorizationContext,
-      targetBySlug,
-      recalculationRows.latestItems.get(row.reviewId)
-    )
-  );
+  const enrichedRows = rows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug));
   const groups = buildReviewGroups(enrichedRows, categoryRows, subcategoryRows, workspace.id, {
     scope: "workspace",
     issue: "all",
@@ -638,12 +463,6 @@ export async function getAdminReviewPageData(
   const reasonOptions = buildReasonOptions(enrichedRows);
   const categoryById = new Map(categoryRows.map((category) => [category.id, category]));
   const subcategoryById = new Map(subcategoryRows.map((subcategory) => [subcategory.id, subcategory]));
-  const recalculationPreview = buildReviewRecalculationPreview({
-    workspace,
-    versionContext,
-    rows,
-    enrichedRows: rows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug))
-  });
 
   return {
     params,
@@ -659,11 +478,6 @@ export async function getAdminReviewPageData(
     queueCount: summary.total,
     filteredCount: filteredRows.length,
     changes,
-    recalculation: {
-      running: recalculationRows.running,
-      latest: recalculationRows.latest,
-      preview: recalculationPreview
-    },
     pagination: {
       page: params.page,
       pageSize: params.pageSize,
@@ -687,8 +501,6 @@ export async function getReviewWorkspace(sourceCatalogVersionId: string | null):
       sourceCatalogVersionId: reviewWorkspaces.sourceCatalogVersionId,
       status: reviewWorkspaces.status,
       publishedAt: reviewWorkspaces.publishedAt,
-      createdAt: reviewWorkspaces.createdAt,
-      updatedAt: reviewWorkspaces.updatedAt,
       sourceCatalogVersionStatus: catalogVersions.status,
       sourceCatalogVersionPublishedAt: catalogVersions.publishedAt
     })
@@ -720,8 +532,6 @@ export async function getReviewWorkspace(sourceCatalogVersionId: string | null):
     sourceCatalogVersionStatus: workspace.sourceCatalogVersionStatus,
     sourceCatalogVersionPublishedAt: workspace.sourceCatalogVersionPublishedAt,
     status: workspace.status,
-    createdAt: workspace.createdAt,
-    updatedAt: workspace.updatedAt,
     preparedProductCount,
     excludedProductCount,
     actionCount,
@@ -894,255 +704,6 @@ export async function reapplyCategorizationRulesToReviewQueue(input: {
     before: rows.length,
     resolved,
     remaining: Math.max(0, rows.length - resolved)
-  };
-}
-
-export async function recalculateReviewWorkspaceSuggestions(input: {
-  adminUserId: string;
-  confirmation: string;
-  previewToken: string;
-}) {
-  if (input.confirmation.trim() !== REVIEW_RECALCULATION_CONFIRMATION) {
-    throw new AdminReviewBulkSafetyError(
-      "confirmation_required",
-      `Введите ${REVIEW_RECALCULATION_CONFIRMATION}, чтобы подтвердить пересчёт.`
-    );
-  }
-
-  const [versionContext, context, targetBySlug] = await Promise.all([
-    getReviewVersionContext(),
-    getCategorizationContext(),
-    getTargetBySlugFromDb()
-  ]);
-  const workspace = await ensureReviewWorkspace(
-    versionContext.activeVersion?.id ?? null,
-    input.adminUserId
-  );
-  const existingByToken = await getReviewRecalculationByPreviewToken(workspace.id, input.previewToken);
-  if (existingByToken?.status === "completed") {
-    const summary = parseRecalculationSummary(existingByToken.afterSummary);
-    return {
-      id: existingByToken.id,
-      processedCount: existingByToken.processedCount,
-      statusCounts: summary.statusCounts,
-      duplicate: true
-    };
-  }
-  if (existingByToken?.status === "running") {
-    throw new AdminReviewBulkSafetyError(
-      "preview_stale",
-      "Пересчёт уже выполняется. Обновите страницу через несколько секунд."
-    );
-  }
-
-  const rows = await getWorkspaceReviewRows(versionContext, workspace.id);
-  const plan = buildReviewRecalculationPlan({
-    workspaceId: workspace.id,
-    sourceCatalogVersionId: versionContext.activeVersion?.id ?? null,
-    rows,
-    context,
-    targetBySlug
-  });
-
-  if (plan.previewToken !== input.previewToken) {
-    throw new AdminReviewBulkSafetyError(
-      "preview_stale",
-      "Preview устарел. Обновите страницу и повторите пересчёт."
-    );
-  }
-
-  const startedAt = Date.now();
-  let recalculationId = "";
-
-  await db.transaction(async (tx) => {
-    const [running] = await tx
-      .insert(reviewRecalculations)
-      .values({
-        workspaceId: workspace.id,
-        sourceCatalogVersionId: versionContext.activeVersion?.id ?? null,
-        status: "running",
-        rulesVersion: plan.rulesVersion,
-        commitHash: plan.commitHash,
-        inputFingerprint: plan.inputFingerprint,
-        previewToken: plan.previewToken,
-        totalCount: plan.items.length,
-        processedCount: 0,
-        errorCount: 0,
-        beforeSummary: plan.beforeSummary,
-        afterSummary: {},
-        diagnostics: {},
-        createdBy: input.adminUserId,
-        metadata: {
-          safety: {
-            activeCatalogUnchanged: true,
-            importNotStarted: true,
-            productsNotPublished: true,
-            meilisearchUnchanged: true
-          }
-        }
-      })
-      .onConflictDoNothing()
-      .returning({ id: reviewRecalculations.id });
-
-    if (!running) {
-      throw new AdminReviewBulkSafetyError(
-        "preview_stale",
-        "Пересчёт уже запущен или такой preview уже был применён."
-      );
-    }
-
-    recalculationId = running.id;
-
-    for (const chunk of chunked(plan.items, 1000)) {
-      if (chunk.length === 0) continue;
-
-      await tx.insert(reviewRecalculationItems).values(
-        chunk.map((item) => ({
-          recalculationId,
-          reviewQueueId: item.reviewQueueId,
-          productId: item.productId,
-          oldSuggestedCategoryId: item.oldSuggestedCategoryId,
-          oldSuggestedSubcategoryId: item.oldSuggestedSubcategoryId,
-          newSuggestedCategoryId: item.newSuggestedCategoryId,
-          newSuggestedSubcategoryId: item.newSuggestedSubcategoryId,
-          oldReason: item.oldReason,
-          newReason: item.newReason,
-          decisionStatus: item.decisionStatus,
-          decisionSource: item.decisionSource,
-          reviewReasonCode: item.reviewReasonCode,
-          confidence: item.confidence.toFixed(4),
-          familyId: item.familyId,
-          familyLabel: item.familyLabel,
-          matchedSignals: item.matchedSignals,
-          negativeSignals: item.negativeSignals,
-          candidates: item.candidates,
-          isOtherProducts: item.isOtherProducts,
-          isExactAssignment: item.isExactAssignment,
-          originalProductStatus: item.originalProductStatus,
-          metadata: {
-            groupKey: item.groupKey,
-            rulePattern: item.rulePattern
-          }
-        }))
-      );
-
-      for (const item of chunk) {
-        await tx
-          .update(reviewQueue)
-          .set({
-            suggestedCategoryId: item.newSuggestedCategoryId,
-            suggestedSubcategoryId: item.newSuggestedSubcategoryId,
-            reason: item.newReason,
-            updatedAt: new Date()
-          })
-          .where(eq(reviewQueue.id, item.reviewQueueId));
-      }
-    }
-
-    const diagnostics = buildRecalculationDiagnostics(plan.beforeSummary, plan.afterSummary);
-    await tx
-      .update(reviewRecalculations)
-      .set({
-        status: "completed",
-        processedCount: plan.items.length,
-        errorCount: 0,
-        afterSummary: plan.afterSummary,
-        diagnostics,
-        completedAt: new Date(),
-        updatedAt: new Date()
-      })
-      .where(eq(reviewRecalculations.id, recalculationId));
-
-    await tx.insert(auditLogs).values({
-      adminUserId: input.adminUserId,
-      action: "review.workspace.recalculate",
-      entityType: "review_workspace",
-      entityId: workspace.id,
-      metadata: {
-        recalculationId,
-        sourceCatalogVersionId: versionContext.activeVersion?.id ?? null,
-        processedCount: plan.items.length,
-        durationMs: Date.now() - startedAt,
-        rulesVersion: plan.rulesVersion,
-        commitHash: plan.commitHash,
-        statusCounts: plan.afterSummary.statusCounts,
-        rollbackReference: recalculationId
-      }
-    });
-  });
-
-  return {
-    id: recalculationId,
-    processedCount: plan.items.length,
-    statusCounts: plan.afterSummary.statusCounts,
-    duplicate: false
-  };
-}
-
-export async function rollbackLatestReviewRecalculation(input: { adminUserId: string }) {
-  const versionContext = await getReviewVersionContext();
-  const workspace = await ensureReviewWorkspace(
-    versionContext.activeVersion?.id ?? null,
-    input.adminUserId
-  );
-  const latest = await getLatestCompletedReviewRecalculation(workspace.id);
-  if (!latest) {
-    throw new Error("Нет завершённого пересчёта для rollback.");
-  }
-
-  const items = await getReviewRecalculationRestoreItems(latest.id);
-  await db.transaction(async (tx) => {
-    const [rolledBack] = await tx
-      .update(reviewRecalculations)
-      .set({
-        status: "rolled_back",
-        completedAt: new Date(),
-        updatedAt: new Date(),
-        metadata: {
-          rollbackBy: input.adminUserId,
-          rollbackAt: new Date().toISOString()
-        }
-      })
-      .where(and(eq(reviewRecalculations.id, latest.id), eq(reviewRecalculations.status, "completed")))
-      .returning({ id: reviewRecalculations.id });
-
-    if (!rolledBack) {
-      throw new AdminReviewBulkSafetyError(
-        "preview_stale",
-        "Пересчёт уже был изменён другим действием."
-      );
-    }
-
-    for (const chunk of chunked(items, 1000)) {
-      for (const item of chunk) {
-        if (!item.reviewQueueId) continue;
-        await tx
-          .update(reviewQueue)
-          .set({
-            suggestedCategoryId: item.oldSuggestedCategoryId,
-            suggestedSubcategoryId: item.oldSuggestedSubcategoryId,
-            reason: item.oldReason ?? "MANUAL_REVIEW: restored previous review reason.",
-            updatedAt: new Date()
-          })
-          .where(eq(reviewQueue.id, item.reviewQueueId));
-      }
-    }
-
-    await tx.insert(auditLogs).values({
-      adminUserId: input.adminUserId,
-      action: "review.workspace.recalculate.rollback",
-      entityType: "review_workspace",
-      entityId: workspace.id,
-      metadata: {
-        recalculationId: latest.id,
-        restoredRows: items.length
-      }
-    });
-  });
-
-  return {
-    recalculationId: latest.id,
-    restoredRows: items.length
   };
 }
 
@@ -1516,483 +1077,6 @@ export async function getReviewWorkspaceChanges(workspaceId: string): Promise<Re
     .limit(20);
 }
 
-async function getReviewRecalculationRowsForWorkspace(workspaceId: string): Promise<{
-  running: ReviewRecalculationPageState["running"];
-  latest: ReviewRecalculationResult | null;
-  latestItems: Map<string, ReviewRecalculationItemSuggestion>;
-}> {
-  const [[running], latest] = await Promise.all([
-    db
-      .select({
-        id: reviewRecalculations.id,
-        startedAt: reviewRecalculations.startedAt,
-        processedCount: reviewRecalculations.processedCount,
-        totalCount: reviewRecalculations.totalCount
-      })
-      .from(reviewRecalculations)
-      .where(and(eq(reviewRecalculations.workspaceId, workspaceId), eq(reviewRecalculations.status, "running")))
-      .orderBy(desc(reviewRecalculations.createdAt))
-      .limit(1),
-    getLatestCompletedReviewRecalculation(workspaceId)
-  ]);
-
-  const latestItems = latest
-    ? await getReviewRecalculationItemSuggestionMap(latest.id)
-    : new Map<string, ReviewRecalculationItemSuggestion>();
-
-  return {
-    running: running
-      ? {
-          id: running.id,
-          startedAt: running.startedAt,
-          processedCount: running.processedCount,
-          totalCount: running.totalCount
-        }
-      : null,
-    latest: latest ? mapRecalculationResult(latest) : null,
-    latestItems
-  };
-}
-
-async function getLatestCompletedReviewRecalculation(workspaceId: string) {
-  const [row] = await db
-    .select({
-      id: reviewRecalculations.id,
-      status: reviewRecalculations.status,
-      rulesVersion: reviewRecalculations.rulesVersion,
-      commitHash: reviewRecalculations.commitHash,
-      processedCount: reviewRecalculations.processedCount,
-      errorCount: reviewRecalculations.errorCount,
-      beforeSummary: reviewRecalculations.beforeSummary,
-      afterSummary: reviewRecalculations.afterSummary,
-      diagnostics: reviewRecalculations.diagnostics,
-      startedAt: reviewRecalculations.startedAt,
-      completedAt: reviewRecalculations.completedAt
-    })
-    .from(reviewRecalculations)
-    .where(and(eq(reviewRecalculations.workspaceId, workspaceId), eq(reviewRecalculations.status, "completed")))
-    .orderBy(desc(reviewRecalculations.completedAt), desc(reviewRecalculations.createdAt))
-    .limit(1);
-
-  return row ?? null;
-}
-
-async function getReviewRecalculationByPreviewToken(workspaceId: string, previewToken: string) {
-  const [row] = await db
-    .select({
-      id: reviewRecalculations.id,
-      status: reviewRecalculations.status,
-      processedCount: reviewRecalculations.processedCount,
-      afterSummary: reviewRecalculations.afterSummary
-    })
-    .from(reviewRecalculations)
-    .where(
-      and(
-        eq(reviewRecalculations.workspaceId, workspaceId),
-        eq(reviewRecalculations.previewToken, previewToken)
-      )
-    )
-    .orderBy(desc(reviewRecalculations.createdAt))
-    .limit(1);
-
-  return row ?? null;
-}
-
-async function getReviewRecalculationItemSuggestionMap(recalculationId: string) {
-  const rows = await db
-    .select({
-      reviewQueueId: reviewRecalculationItems.reviewQueueId,
-      productId: reviewRecalculationItems.productId,
-      newSuggestedCategoryId: reviewRecalculationItems.newSuggestedCategoryId,
-      newSuggestedSubcategoryId: reviewRecalculationItems.newSuggestedSubcategoryId,
-      categoryName: categories.name,
-      subcategoryName: subcategories.name,
-      decisionStatus: reviewRecalculationItems.decisionStatus,
-      decisionSource: reviewRecalculationItems.decisionSource,
-      reviewReasonCode: reviewRecalculationItems.reviewReasonCode,
-      confidence: reviewRecalculationItems.confidence,
-      familyId: reviewRecalculationItems.familyId,
-      familyLabel: reviewRecalculationItems.familyLabel,
-      matchedSignals: reviewRecalculationItems.matchedSignals,
-      negativeSignals: reviewRecalculationItems.negativeSignals,
-      candidates: reviewRecalculationItems.candidates,
-      isOtherProducts: reviewRecalculationItems.isOtherProducts,
-      isExactAssignment: reviewRecalculationItems.isExactAssignment,
-      metadata: reviewRecalculationItems.metadata
-    })
-    .from(reviewRecalculationItems)
-    .leftJoin(categories, eq(categories.id, reviewRecalculationItems.newSuggestedCategoryId))
-    .leftJoin(subcategories, eq(subcategories.id, reviewRecalculationItems.newSuggestedSubcategoryId))
-    .where(eq(reviewRecalculationItems.recalculationId, recalculationId));
-
-  return new Map(
-    rows
-      .filter((row) => row.reviewQueueId)
-      .map((row) => [
-        row.reviewQueueId!,
-        {
-          ...row,
-          decisionStatus: row.decisionStatus as CategorizationDecisionStatus,
-          decisionSource: row.decisionSource as CategorizationSource,
-          confidence: String(row.confidence)
-        }
-      ])
-  );
-}
-
-async function getReviewRecalculationRestoreItems(recalculationId: string) {
-  return db
-    .select({
-      reviewQueueId: reviewRecalculationItems.reviewQueueId,
-      oldSuggestedCategoryId: reviewRecalculationItems.oldSuggestedCategoryId,
-      oldSuggestedSubcategoryId: reviewRecalculationItems.oldSuggestedSubcategoryId,
-      oldReason: reviewRecalculationItems.oldReason
-    })
-    .from(reviewRecalculationItems)
-    .where(eq(reviewRecalculationItems.recalculationId, recalculationId));
-}
-
-function buildReviewRecalculationPlan(input: {
-  workspaceId: string;
-  sourceCatalogVersionId: string | null;
-  rows: ReviewRow[];
-  context: CategorizationContext;
-  targetBySlug: Map<string, CategorizationTarget>;
-}): ReviewRecalculationPlan {
-  const enrichedRows = input.rows.map((row) => enrichReviewRow(row, input.context, input.targetBySlug));
-  const items: ReviewRecalculationPlanItem[] = enrichedRows.map((row) => ({
-    reviewQueueId: row.reviewId,
-    productId: row.productId,
-    oldSuggestedCategoryId: row.suggestedCategoryId,
-    oldSuggestedSubcategoryId: row.suggestedSubcategoryId,
-    newSuggestedCategoryId:
-      row.suggestion.decisionStatus === "DO_NOT_PUBLISH" ? null : row.suggestion.categoryId,
-    newSuggestedSubcategoryId:
-      row.suggestion.decisionStatus === "DO_NOT_PUBLISH" ? null : row.suggestion.subcategoryId,
-    oldReason: row.reason,
-    newReason: buildRecalculatedReviewReason(row.suggestion),
-    decisionStatus: row.suggestion.decisionStatus,
-    decisionSource: row.suggestion.source,
-    reviewReasonCode: row.suggestion.reviewReasonCode,
-    confidence: row.suggestion.confidence,
-    familyId: row.suggestion.familyId,
-    familyLabel: row.suggestion.familyLabel,
-    matchedSignals: row.suggestion.matchedSignals,
-    negativeSignals: row.suggestion.negativeSignals,
-    candidates: row.suggestion.candidates,
-    isOtherProducts: row.suggestion.isOtherProducts,
-    isExactAssignment: row.suggestion.isExactAssignment,
-    originalProductStatus: row.productStatus,
-    groupKey: row.groupKey,
-    rulePattern: row.suggestion.rulePattern
-  }));
-  const beforeSummary = summarizeCurrentReviewRows(input.rows);
-  const afterSummary = summarizeReviewRecalculationItems(items);
-  const inputFingerprint = buildRecalculationInputFingerprint(input.rows);
-  const rulesVersion = CATEGORIZATION_PIPELINE_VERSION;
-  const commitHash = getCurrentCommitHash();
-  const previewToken = buildRecalculationPreviewToken({
-    workspaceId: input.workspaceId,
-    sourceCatalogVersionId: input.sourceCatalogVersionId,
-    inputFingerprint,
-    rulesVersion,
-    count: items.length
-  });
-
-  return {
-    items,
-    beforeSummary,
-    afterSummary,
-    inputFingerprint,
-    previewToken,
-    rulesVersion,
-    commitHash
-  };
-}
-
-function buildReviewRecalculationPreview(input: {
-  workspace: ReviewWorkspaceSummary;
-  versionContext: VersionContext;
-  rows: ReviewRow[];
-  enrichedRows: EnrichedReviewRow[];
-}): ReviewRecalculationPreview {
-  const beforeSummary = summarizeCurrentReviewRows(input.rows);
-  const estimatedAfterSummary = summarizeReviewRecalculationItems(
-    input.enrichedRows.map((row) => ({
-      reviewQueueId: row.reviewId,
-      productId: row.productId,
-      oldSuggestedCategoryId: row.suggestedCategoryId,
-      oldSuggestedSubcategoryId: row.suggestedSubcategoryId,
-      newSuggestedCategoryId: row.suggestion.categoryId,
-      newSuggestedSubcategoryId: row.suggestion.subcategoryId,
-      oldReason: row.reason,
-      newReason: buildRecalculatedReviewReason(row.suggestion),
-      decisionStatus: row.suggestion.decisionStatus,
-      decisionSource: row.suggestion.source,
-      reviewReasonCode: row.suggestion.reviewReasonCode,
-      confidence: row.suggestion.confidence,
-      familyId: row.suggestion.familyId,
-      familyLabel: row.suggestion.familyLabel,
-      matchedSignals: row.suggestion.matchedSignals,
-      negativeSignals: row.suggestion.negativeSignals,
-      candidates: row.suggestion.candidates,
-      isOtherProducts: row.suggestion.isOtherProducts,
-      isExactAssignment: row.suggestion.isExactAssignment,
-      originalProductStatus: row.productStatus,
-      groupKey: row.groupKey,
-      rulePattern: row.suggestion.rulePattern
-    }))
-  );
-  const inputFingerprint = buildRecalculationInputFingerprint(input.rows);
-  const rulesVersion = CATEGORIZATION_PIPELINE_VERSION;
-  const previewToken = input.workspace.id
-    ? buildRecalculationPreviewToken({
-        workspaceId: input.workspace.id,
-        sourceCatalogVersionId: input.versionContext.activeVersion?.id ?? null,
-        inputFingerprint,
-        rulesVersion,
-        count: input.rows.length
-      })
-    : null;
-
-  return {
-    workspaceId: input.workspace.id,
-    sourceCatalogVersionId: input.versionContext.activeVersion?.id ?? null,
-    sourceCreatedAt: input.versionContext.activeVersion?.createdAt ?? null,
-    workspaceCreatedAt: input.workspace.createdAt,
-    previewToken,
-    rulesVersion,
-    commitHash: getCurrentCommitHash(),
-    sourceProductCount: input.versionContext.activeVersion?.totalRows ?? input.rows.length,
-    pendingReviewCount: input.rows.length,
-    estimatedProcessingCount: input.rows.length,
-    beforeSummary,
-    estimatedAfterSummary,
-    warning: "Offline replay и production могут отличаться из-за текущего каталога, правил и ручных правок.",
-    safety: {
-      activeCatalogUnchanged: true,
-      importNotStarted: true,
-      productsNotPublished: true,
-      meilisearchUnchanged: true
-    }
-  };
-}
-
-function summarizeCurrentReviewRows(rows: ReviewRow[]): ReviewRecalculationSummary {
-  const statusCounts = emptyStatusCounts();
-  for (const row of rows) {
-    statusCounts[inferDecisionStatusFromReviewReason(row.reason)] += 1;
-  }
-
-  return finalizeRecalculationSummary({
-    statusCounts,
-    groupReviewGroups: 0,
-    otherProducts: 0,
-    exactAssignments: rows.filter((row) => Boolean(row.suggestedCategoryId && row.suggestedSubcategoryId)).length,
-    processedTotal: rows.length
-  });
-}
-
-export function summarizeReviewRecalculationItems(
-  items: Array<Pick<
-    ReviewRecalculationPlanItem,
-    "decisionStatus" | "groupKey" | "isOtherProducts" | "isExactAssignment"
-  >>
-): ReviewRecalculationSummary {
-  const statusCounts = emptyStatusCounts();
-  const groupKeys = new Set<string>();
-
-  for (const item of items) {
-    statusCounts[item.decisionStatus] += 1;
-    if (item.decisionStatus === "GROUP_REVIEW") {
-      groupKeys.add(item.groupKey);
-    }
-  }
-
-  return finalizeRecalculationSummary({
-    statusCounts,
-    groupReviewGroups: groupKeys.size,
-    otherProducts: items.filter((item) => item.isOtherProducts).length,
-    exactAssignments: items.filter((item) => item.isExactAssignment).length,
-    processedTotal: items.length
-  });
-}
-
-function finalizeRecalculationSummary(input: {
-  statusCounts: ReviewRecalculationStatusCounts;
-  groupReviewGroups: number;
-  otherProducts: number;
-  exactAssignments: number;
-  processedTotal: number;
-}): ReviewRecalculationSummary {
-  const individualReviewCount =
-    input.statusCounts.MANUAL_REVIEW +
-    input.statusCounts.BLOCKED_CONFLICT +
-    input.statusCounts.DO_NOT_PUBLISH +
-    input.statusCounts.INVALID_INPUT;
-  const approximateOperatorActions =
-    (input.statusCounts.AUTO_READY > 0 ? 1 : 0) +
-    input.groupReviewGroups +
-    individualReviewCount;
-
-  return {
-    statusCounts: input.statusCounts,
-    groupReviewGroups: input.groupReviewGroups,
-    otherProducts: input.otherProducts,
-    exactAssignments: input.exactAssignments,
-    processedTotal: input.processedTotal,
-    individualReviewCount,
-    approximateOperatorActions
-  };
-}
-
-function emptyStatusCounts(): ReviewRecalculationStatusCounts {
-  return {
-    AUTO_READY: 0,
-    GROUP_REVIEW: 0,
-    MANUAL_REVIEW: 0,
-    BLOCKED_CONFLICT: 0,
-    DO_NOT_PUBLISH: 0,
-    INVALID_INPUT: 0
-  };
-}
-
-function inferDecisionStatusFromReviewReason(reason: string): CategorizationDecisionStatus {
-  const prefix = reason.split(":")[0]?.trim();
-  if (
-    prefix === "AUTO_READY" ||
-    prefix === "GROUP_REVIEW" ||
-    prefix === "MANUAL_REVIEW" ||
-    prefix === "BLOCKED_CONFLICT" ||
-    prefix === "DO_NOT_PUBLISH" ||
-    prefix === "INVALID_INPUT"
-  ) {
-    return prefix;
-  }
-  return "MANUAL_REVIEW";
-}
-
-function buildRecalculatedReviewReason(suggestion: ReviewSuggestion) {
-  const code = suggestion.reviewReasonCode ? ` (${suggestion.reviewReasonCode})` : "";
-  return `${suggestion.decisionStatus}${code}: ${suggestion.explanation}`;
-}
-
-function buildRecalculationInputFingerprint(rows: ReviewRow[]) {
-  const payload = rows
-    .map((row) => ({
-      reviewId: row.reviewId,
-      productId: row.productId,
-      shopCode: row.shopCode,
-      name: row.name,
-      rawName: row.rawName,
-      reason: row.reason,
-      suggestedCategoryId: row.suggestedCategoryId,
-      suggestedSubcategoryId: row.suggestedSubcategoryId
-    }))
-    .sort((a, b) => a.reviewId.localeCompare(b.reviewId));
-
-  return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
-}
-
-function buildRecalculationPreviewToken(input: {
-  workspaceId: string;
-  sourceCatalogVersionId: string | null;
-  inputFingerprint: string;
-  rulesVersion: string;
-  count: number;
-}) {
-  return createHmac("sha256", getAdminSessionSecret())
-    .update(JSON.stringify({ version: 1, ...input }))
-    .digest("hex")
-    .slice(0, 48);
-}
-
-function getCurrentCommitHash() {
-  return (
-    process.env.GIT_COMMIT_SHA ??
-    process.env.VERCEL_GIT_COMMIT_SHA ??
-    process.env.COMMIT_SHA ??
-    null
-  );
-}
-
-function buildRecalculationDiagnostics(
-  beforeSummary: ReviewRecalculationSummary,
-  afterSummary: ReviewRecalculationSummary
-) {
-  const individualReviewDelta =
-    beforeSummary.individualReviewCount - afterSummary.individualReviewCount;
-  const reductionIsLow =
-    beforeSummary.processedTotal > 0 &&
-    individualReviewDelta < Math.max(10, Math.floor(beforeSummary.processedTotal * 0.05));
-  const reasons: string[] = [];
-
-  if (reductionIsLow) {
-    reasons.push("Небольшое снижение индивидуальной проверки: production-набор может отличаться от offline snapshot.");
-  }
-  if (afterSummary.statusCounts.DO_NOT_PUBLISH > 0) {
-    reasons.push("Часть строк получила DO_NOT_PUBLISH из-за недостаточных смысловых данных.");
-  }
-  if (afterSummary.statusCounts.BLOCKED_CONFLICT > 0) {
-    reasons.push("Есть товары с конфликтующими признаками, они оставлены для ручной проверки.");
-  }
-
-  return {
-    individualReviewDelta,
-    reductionIsLow,
-    reasons
-  };
-}
-
-function mapRecalculationResult(row: NonNullable<Awaited<ReturnType<typeof getLatestCompletedReviewRecalculation>>>): ReviewRecalculationResult {
-  return {
-    id: row.id,
-    status: row.status,
-    rulesVersion: row.rulesVersion,
-    commitHash: row.commitHash,
-    processedCount: row.processedCount,
-    errorCount: row.errorCount,
-    startedAt: row.startedAt,
-    completedAt: row.completedAt,
-    beforeSummary: parseRecalculationSummary(row.beforeSummary),
-    afterSummary: parseRecalculationSummary(row.afterSummary),
-    diagnostics: parseRecalculationDiagnostics(row.diagnostics)
-  };
-}
-
-function parseRecalculationSummary(value: unknown): ReviewRecalculationSummary {
-  const source = isRecord(value) ? value : {};
-  const statusCounts = emptyStatusCounts();
-  const rawStatusCounts = isRecord(source.statusCounts) ? source.statusCounts : {};
-  for (const key of Object.keys(statusCounts) as CategorizationDecisionStatus[]) {
-    statusCounts[key] = toSafeInteger(rawStatusCounts[key]);
-  }
-
-  return {
-    statusCounts,
-    groupReviewGroups: toSafeInteger(source.groupReviewGroups),
-    otherProducts: toSafeInteger(source.otherProducts),
-    exactAssignments: toSafeInteger(source.exactAssignments),
-    processedTotal: toSafeInteger(source.processedTotal),
-    individualReviewCount: toSafeInteger(source.individualReviewCount),
-    approximateOperatorActions: toSafeInteger(source.approximateOperatorActions)
-  };
-}
-
-function parseRecalculationDiagnostics(value: unknown): ReviewRecalculationResult["diagnostics"] {
-  const source = isRecord(value) ? value : {};
-  return {
-    individualReviewDelta: toSafeInteger(source.individualReviewDelta),
-    reductionIsLow: source.reductionIsLow === true,
-    reasons: parseStringArray(source.reasons)
-  };
-}
-
-function toSafeInteger(value: unknown) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : 0;
-}
-
 async function applyReviewRuleToWorkspace(input: {
   filters: AdminReviewActionFilters;
   reviewQueueIds?: string[];
@@ -2272,7 +1356,6 @@ async function getReviewVersionContext(): Promise<VersionContext> {
       .select({
         id: catalogVersions.id,
         sourceFileName: catalogVersions.sourceFileName,
-        totalRows: catalogVersions.totalRows,
         createdAt: catalogVersions.createdAt
       })
       .from(catalogVersions)
@@ -2283,7 +1366,6 @@ async function getReviewVersionContext(): Promise<VersionContext> {
       .select({
         id: catalogVersions.id,
         sourceFileName: catalogVersions.sourceFileName,
-        totalRows: catalogVersions.totalRows,
         createdAt: catalogVersions.createdAt,
         publishedAt: catalogVersions.publishedAt
       })
@@ -2436,12 +1518,9 @@ async function getRowsByReviewIds(reviewQueueIds: string[], workspaceId: string 
 function enrichReviewRow(
   row: ReviewRow,
   context: CategorizationContext,
-  targetBySlug: Map<string, CategorizationTarget>,
-  recalculationItem?: ReviewRecalculationItemSuggestion
+  targetBySlug: Map<string, CategorizationTarget>
 ): EnrichedReviewRow {
-  const suggestion = recalculationItem
-    ? suggestionFromRecalculationItem(row, recalculationItem)
-    : buildCategorySuggestion(row, context, targetBySlug);
+  const suggestion = buildCategorySuggestion(row, context, targetBySlug);
   const groupKey = buildGroupKey(row, suggestion);
   const groupLabel = buildGroupLabel(groupKey, row, suggestion);
 
@@ -2451,7 +1530,7 @@ function enrichReviewRow(
     groupKey,
     groupLabel,
     safeToApply:
-      (suggestion.decisionStatus === "AUTO_READY" || suggestion.decisionStatus === "GROUP_REVIEW") &&
+      suggestion.level !== "manual" &&
       Boolean(suggestion.categoryId && suggestion.subcategoryId) &&
       suggestion.conflictingSignals.length === 0
   };
@@ -2477,15 +1556,6 @@ export function buildCategorySuggestion(
         subcategoryId: target.subcategoryId,
         categoryName: target.categoryName ?? null,
         subcategoryName: target.subcategoryName ?? null,
-        decisionStatus: "AUTO_READY",
-        source: "family_rule",
-        reviewReasonCode: null,
-        familyId: "admin_context_rule",
-        familyLabel: contextRule.label,
-        candidates: [],
-        negativeSignals: [],
-        isOtherProducts: isOtherProductsTarget(target.categorySlug, target.subcategorySlug),
-        isExactAssignment: true,
         explanation: contextRule.explanation,
         matchedSignals: contextRule.includeAll,
         conflictingSignals: [],
@@ -2497,15 +1567,7 @@ export function buildCategorySuggestion(
   const result = categorizeProductName(`${row.shopCode} ${row.name || row.rawName}`, context);
   const target = result.target;
   if (!target?.categoryId || !target.subcategoryId) {
-    return manualSuggestion(result.reason, result.matchedSignals.map((signal) => signal.value), {
-      decisionStatus: result.decisionStatus ?? "MANUAL_REVIEW",
-      source: result.source,
-      reviewReasonCode: result.reviewReasonCode ?? null,
-      familyId: result.familyId ?? null,
-      familyLabel: result.familyLabel ?? null,
-      candidates: result.candidates ?? [],
-      negativeSignals: signalValues(result.negativeSignals)
-    });
+    return manualSuggestion(result.reason, result.matchedSignals.map((signal) => signal.value));
   }
 
   const hasBroadSingleSignal =
@@ -2518,20 +1580,6 @@ export function buildCategorySuggestion(
     : confidence >= QUICK_CONFIDENCE_THRESHOLD
       ? "quick"
       : "manual";
-  const decisionStatus = conflictingSignals.length > 0
-    ? "BLOCKED_CONFLICT"
-    : normalizeReviewDecisionStatus(result.decisionStatus, level);
-  const baseFields = {
-    decisionStatus,
-    source: result.source,
-    reviewReasonCode: result.reviewReasonCode ?? null,
-    familyId: result.familyId ?? null,
-    familyLabel: result.familyLabel ?? null,
-    candidates: result.candidates ?? [],
-    negativeSignals: signalValues(result.negativeSignals),
-    isOtherProducts: isOtherProductsTarget(target.categorySlug, target.subcategorySlug),
-    isExactAssignment: isExactAssignment(result.source, decisionStatus)
-  };
 
   if (level === "manual") {
     return {
@@ -2541,7 +1589,6 @@ export function buildCategorySuggestion(
       subcategoryId: target.subcategoryId,
       categoryName: target.categoryName ?? null,
       subcategoryName: target.subcategoryName ?? null,
-      ...baseFields,
       explanation: conflictingSignals.length > 0
         ? "Есть конфликтующие признаки, товар лучше проверить вручную."
         : result.reason,
@@ -2558,7 +1605,6 @@ export function buildCategorySuggestion(
     subcategoryId: target.subcategoryId,
     categoryName: target.categoryName ?? null,
     subcategoryName: target.subcategoryName ?? null,
-    ...baseFields,
     explanation: result.reason,
     matchedSignals: result.matchedSignals.map((signal) => signal.value),
     conflictingSignals,
@@ -2657,29 +1703,21 @@ function buildReviewQueueSummary(
   workspace: ReviewWorkspaceSummary,
   versionContext: VersionContext
 ): AdminReviewSummary {
-  const openRows = rows.filter((row) => row.workspaceItemStatus !== "pending" && row.workspaceItemStatus !== "excluded");
   return {
-    total: openRows.length,
-    autoReadyProducts: openRows.filter((row) => row.suggestion.decisionStatus === "AUTO_READY").length,
-    groupReviewProducts: openRows.filter((row) => row.suggestion.decisionStatus === "GROUP_REVIEW").length,
-    groupReviewGroups: groups.filter((group) => group.level === "quick").length,
+    total: rows.filter((row) => row.workspaceItemStatus !== "pending" && row.workspaceItemStatus !== "excluded").length,
     readyGroups: groups.filter((group) => group.level === "ready").length,
     readyProducts: groups.filter((group) => group.level === "ready").reduce((sum, group) => sum + group.impactedProductCount, 0),
     quickGroups: groups.filter((group) => group.level === "quick").length,
     quickProducts: groups.filter((group) => group.level === "quick").reduce((sum, group) => sum + group.impactedProductCount, 0),
-    manualProducts: openRows.filter((row) => row.suggestion.decisionStatus === "MANUAL_REVIEW").length,
-    blockedConflictProducts: openRows.filter((row) => row.suggestion.decisionStatus === "BLOCKED_CONFLICT").length,
-    doNotPublishProducts: openRows.filter((row) => row.suggestion.decisionStatus === "DO_NOT_PUBLISH").length,
-    otherProducts: openRows.filter((row) => row.suggestion.isOtherProducts).length,
-    exactAssignments: openRows.filter((row) => row.suggestion.isExactAssignment).length,
+    manualProducts: rows.filter((row) => row.suggestion.level === "manual").length,
     preparedProducts: workspace.preparedProductCount,
     excludedProducts: workspace.excludedProductCount,
     willPublishProducts: workspace.preparedProductCount,
-    missingCategory: openRows.filter((row) => !row.currentCategoryId).length,
-    missingSubcategory: openRows.filter((row) => !row.currentSubcategoryId).length,
-    missingName: openRows.filter((row) => isMissingName(row)).length,
-    conflictingProducts: openRows.filter((row) => row.suggestion.conflictingSignals.length > 0).length,
-    activeOpen: versionContext.activeVersion ? openRows.length : 0,
+    missingCategory: rows.filter((row) => !row.currentCategoryId).length,
+    missingSubcategory: rows.filter((row) => !row.currentSubcategoryId).length,
+    missingName: rows.filter((row) => isMissingName(row)).length,
+    conflictingProducts: rows.filter((row) => row.suggestion.conflictingSignals.length > 0).length,
+    activeOpen: versionContext.activeVersion ? rows.length : 0,
     latestDraftOpen: 0
   };
 }
@@ -2690,14 +1728,9 @@ function filterReviewRows(rows: EnrichedReviewRow[], params: AdminReviewParams) 
     if (params.issue !== "prepared" && params.issue !== "excluded") {
       if (row.workspaceItemStatus === "pending" || row.workspaceItemStatus === "excluded") return false;
     }
-    if (params.issue === "auto_ready" && row.suggestion.decisionStatus !== "AUTO_READY") return false;
-    if (params.issue === "group_review" && row.suggestion.decisionStatus !== "GROUP_REVIEW") return false;
     if (params.issue === "ready" && row.suggestion.level !== "ready") return false;
     if (params.issue === "quick" && row.suggestion.level !== "quick") return false;
-    if (params.issue === "manual" && row.suggestion.decisionStatus !== "MANUAL_REVIEW") return false;
-    if (params.issue === "blocked_conflict" && row.suggestion.decisionStatus !== "BLOCKED_CONFLICT") return false;
-    if (params.issue === "do_not_publish" && row.suggestion.decisionStatus !== "DO_NOT_PUBLISH") return false;
-    if (params.issue === "other_products" && !row.suggestion.isOtherProducts) return false;
+    if (params.issue === "manual" && row.suggestion.level !== "manual") return false;
     if (params.issue === "prepared" && row.workspaceItemStatus !== "pending") return false;
     if (params.issue === "excluded" && row.workspaceItemStatus !== "excluded") return false;
     if (params.issue === "missing_category" && row.currentCategoryId) return false;
@@ -2743,8 +1776,6 @@ function mapReviewItem(
     confidence: row.suggestion.confidence,
     confidenceLabel: confidenceLabel(row.suggestion.confidence),
     suggestionLevel: row.suggestion.level,
-    decisionStatus: row.suggestion.decisionStatus,
-    isOtherProducts: row.suggestion.isOtherProducts,
     explanation: row.suggestion.explanation,
     matchedSignals: row.suggestion.matchedSignals,
     conflictingSignals: row.suggestion.conflictingSignals,
@@ -3035,8 +2066,6 @@ function emptyWorkspace(sourceCatalogVersionId: string | null): ReviewWorkspaceS
     sourceCatalogVersionStatus: sourceCatalogVersionId ? "active" : null,
     sourceCatalogVersionPublishedAt: null,
     status: "logical",
-    createdAt: null,
-    updatedAt: null,
     preparedProductCount: 0,
     excludedProductCount: 0,
     actionCount: 0,
@@ -3120,57 +2149,7 @@ function findConflictingSignals(tokens: string[], categorySlug?: string, subcate
   return conflicts;
 }
 
-function suggestionFromRecalculationItem(
-  row: ReviewRow,
-  item: ReviewRecalculationItemSuggestion
-): ReviewSuggestion {
-  const decisionStatus = item.decisionStatus;
-  const level = decisionStatus === "AUTO_READY"
-    ? "ready"
-    : decisionStatus === "GROUP_REVIEW"
-      ? "quick"
-      : "manual";
-  const metadata = isRecord(item.metadata) ? item.metadata : {};
-
-  return {
-    level,
-    confidence: Number(item.confidence),
-    categoryId: item.newSuggestedCategoryId,
-    subcategoryId: item.newSuggestedSubcategoryId,
-    categoryName: item.categoryName,
-    subcategoryName: item.subcategoryName,
-    decisionStatus,
-    source: item.decisionSource,
-    reviewReasonCode: item.reviewReasonCode,
-    familyId: item.familyId,
-    familyLabel: item.familyLabel,
-    candidates: parseCandidates(item.candidates),
-    negativeSignals: parseStringArray(item.negativeSignals),
-    isOtherProducts: item.isOtherProducts,
-    isExactAssignment: item.isExactAssignment,
-    explanation: row.reason,
-    matchedSignals: parseStringArray(item.matchedSignals),
-    conflictingSignals: decisionStatus === "BLOCKED_CONFLICT"
-      ? parseStringArray(item.negativeSignals)
-      : [],
-    rulePattern: typeof metadata.rulePattern === "string" ? metadata.rulePattern : null
-  };
-}
-
-function manualSuggestion(
-  reason: string,
-  signals: string[],
-  overrides: Partial<Pick<
-    ReviewSuggestion,
-    | "decisionStatus"
-    | "source"
-    | "reviewReasonCode"
-    | "familyId"
-    | "familyLabel"
-    | "candidates"
-    | "negativeSignals"
-  >> = {}
-): ReviewSuggestion {
+function manualSuggestion(reason: string, signals: string[]): ReviewSuggestion {
   return {
     level: "manual",
     confidence: 0,
@@ -3178,64 +2157,11 @@ function manualSuggestion(
     subcategoryId: null,
     categoryName: null,
     subcategoryName: null,
-    decisionStatus: overrides.decisionStatus ?? "MANUAL_REVIEW",
-    source: overrides.source ?? "no_match",
-    reviewReasonCode: overrides.reviewReasonCode ?? null,
-    familyId: overrides.familyId ?? null,
-    familyLabel: overrides.familyLabel ?? null,
-    candidates: overrides.candidates ?? [],
-    negativeSignals: overrides.negativeSignals ?? [],
-    isOtherProducts: false,
-    isExactAssignment: false,
     explanation: reason,
     matchedSignals: signals,
     conflictingSignals: [],
     rulePattern: null
   };
-}
-
-function normalizeReviewDecisionStatus(
-  status: CategorizationDecisionStatus | undefined,
-  level: ReviewSuggestionLevel
-): CategorizationDecisionStatus {
-  if (status === "DO_NOT_PUBLISH" || status === "BLOCKED_CONFLICT") {
-    return status;
-  }
-  if (level === "ready") return "AUTO_READY";
-  if (level === "quick") return "GROUP_REVIEW";
-  return status === "AUTO_READY" || status === "GROUP_REVIEW" ? "MANUAL_REVIEW" : (status ?? "MANUAL_REVIEW");
-}
-
-function isExactAssignment(source: CategorizationSource, status: CategorizationDecisionStatus) {
-  return (
-    status === "AUTO_READY" &&
-    [
-      "existing_product_category",
-      "exact_article_rule",
-      "exact_prefix_rule",
-      "verified_learning_rule",
-      "strong_multi_token",
-      "family_rule"
-    ].includes(source)
-  );
-}
-
-function signalValues(signals: CategorizationSignal[] | undefined) {
-  return signals?.map((signal) => signal.value).filter(Boolean) ?? [];
-}
-
-function parseStringArray(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === "string");
-}
-
-function parseCandidates(value: unknown): CategorizationCandidate[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is CategorizationCandidate => isRecord(item));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 function contextRule(

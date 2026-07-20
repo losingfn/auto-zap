@@ -12,9 +12,7 @@ import {
   applySelectedReviewCorrections,
   normalizeAdminReviewParams,
   publishReviewWorkspace,
-  recalculateReviewWorkspaceSuggestions,
   reapplyCategorizationRulesToReviewQueue,
-  rollbackLatestReviewRecalculation,
   rollbackReviewAction,
   type AdminReviewActionFilters
 } from "@/features/admin/review";
@@ -168,48 +166,6 @@ export async function reapplyReviewRulesAction(formData: FormData) {
   redirect(target);
 }
 
-export async function recalculateReviewSuggestionsAction(formData: FormData) {
-  await assertSameOriginReviewAction();
-  const session = await requireAdminSession();
-  let target = "/admin/review";
-
-  try {
-    const result = await recalculateReviewWorkspaceSuggestions({
-      adminUserId: session.user.id,
-      confirmation: String(formData.get("confirmation") ?? ""),
-      previewToken: String(formData.get("previewToken") ?? "")
-    });
-
-    revalidatePath("/admin/review");
-    revalidatePath("/admin");
-    target = `/admin/review?recalculated=${encodeURIComponent(result.id)}&recalculatedCount=${result.processedCount}&autoReady=${result.statusCounts.AUTO_READY}&groupReview=${result.statusCounts.GROUP_REVIEW}&manualReview=${result.statusCounts.MANUAL_REVIEW}&doNotPublish=${result.statusCounts.DO_NOT_PUBLISH}`;
-  } catch (error) {
-    target = buildReviewRedirect(
-      { scope: "workspace", issue: "all", query: "", reason: "", group: "" },
-      errorParamsForBulkFailure(error, "recalculate_failed")
-    );
-  }
-
-  redirect(target);
-}
-
-export async function rollbackReviewRecalculationAction() {
-  await assertSameOriginReviewAction();
-  const session = await requireAdminSession();
-  let target = "/admin/review";
-
-  try {
-    const result = await rollbackLatestReviewRecalculation({ adminUserId: session.user.id });
-    revalidatePath("/admin/review");
-    revalidatePath("/admin");
-    target = `/admin/review?recalcRollback=${encodeURIComponent(result.recalculationId)}&recalcRollbackCount=${result.restoredRows}`;
-  } catch {
-    target = "/admin/review?error=recalc_rollback_failed";
-  }
-
-  redirect(target);
-}
-
 export async function undoLastReviewWorkspaceAction() {
   await assertSameOriginReviewAction();
   const session = await requireAdminSession();
@@ -296,8 +252,6 @@ function errorParamsForBulkFailure(error: unknown, fallback: string) {
       error:
         error.code === "scope_forbidden"
           ? "bulk_scope_forbidden"
-          : error.code === "confirmation_required"
-            ? "recalculate_confirmation_required"
           : error.code === "count_confirmation_required"
             ? "bulk_confirmation_required"
             : error.code === "preview_stale"

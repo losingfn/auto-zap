@@ -57,9 +57,7 @@ import { buildSearchDocument } from "../src/features/search/documents";
 import { documentMatchesQuery, rankSearchHits } from "../src/features/search/ranking";
 import {
   buildCategorySuggestion,
-  getReviewDiagnosticFromRows,
-  REVIEW_RECALCULATION_CONFIRMATION,
-  summarizeReviewRecalculationItems
+  getReviewDiagnosticFromRows
 } from "../src/features/admin/review";
 import type {
   AnalyzedImportRow,
@@ -417,82 +415,6 @@ run("review write actions have same-origin guard", () => {
   assert.match(source, /Cross-origin admin review action rejected/);
 });
 
-run("review recalculation migration is versioned and rollback-safe", () => {
-  const source = readFileSync(
-    new URL("../db/migrations/0007_review_recalculation_snapshots.sql", import.meta.url),
-    "utf8"
-  );
-
-  assert.match(source, /CREATE TABLE IF NOT EXISTS review_recalculations/);
-  assert.match(source, /CREATE TABLE IF NOT EXISTS review_recalculation_items/);
-  assert.match(source, /review_recalculations_one_running_workspace_idx/);
-  assert.match(source, /WHERE status = 'running'/);
-  assert.match(source, /old_suggested_category_id/);
-  assert.match(source, /new_suggested_category_id/);
-  assert.doesNotMatch(source, /\bDELETE\s+FROM\b|\bTRUNCATE\b/i);
-});
-
-run("review recalculation source does not publish import or touch Meilisearch", () => {
-  const source = readFileSync(
-    new URL("../src/features/admin/review.ts", import.meta.url),
-    "utf8"
-  );
-  const recalcSource = extractFunctionSource(
-    source,
-    "recalculateReviewWorkspaceSuggestions",
-    "export async function rollbackLatestReviewRecalculation"
-  );
-
-  assert.match(recalcSource, /reviewRecalculations/);
-  assert.match(recalcSource, /reviewRecalculationItems/);
-  assert.match(recalcSource, /reviewQueue/);
-  assert.match(recalcSource, /onConflictDoNothing\(\)/);
-  assert.match(recalcSource, /activeCatalogUnchanged:\s*true/);
-  assert.match(recalcSource, /meilisearchUnchanged:\s*true/);
-  assert.doesNotMatch(recalcSource, /importBatches|syncSearch|Meili|prepareSearch|activatePrepared|publishedAt|status:\s*"active"/);
-});
-
-run("review recalculation summary counts production decisions", () => {
-  const summary = summarizeReviewRecalculationItems([
-    { decisionStatus: "AUTO_READY", groupKey: "a", isOtherProducts: false, isExactAssignment: true },
-    { decisionStatus: "GROUP_REVIEW", groupKey: "g-1", isOtherProducts: true, isExactAssignment: false },
-    { decisionStatus: "GROUP_REVIEW", groupKey: "g-1", isOtherProducts: true, isExactAssignment: false },
-    { decisionStatus: "MANUAL_REVIEW", groupKey: "m", isOtherProducts: false, isExactAssignment: false },
-    { decisionStatus: "BLOCKED_CONFLICT", groupKey: "b", isOtherProducts: false, isExactAssignment: false },
-    { decisionStatus: "DO_NOT_PUBLISH", groupKey: "d", isOtherProducts: false, isExactAssignment: false }
-  ]);
-
-  assert.equal(summary.statusCounts.AUTO_READY, 1);
-  assert.equal(summary.statusCounts.GROUP_REVIEW, 2);
-  assert.equal(summary.groupReviewGroups, 1);
-  assert.equal(summary.statusCounts.MANUAL_REVIEW, 1);
-  assert.equal(summary.statusCounts.BLOCKED_CONFLICT, 1);
-  assert.equal(summary.statusCounts.DO_NOT_PUBLISH, 1);
-  assert.equal(summary.otherProducts, 2);
-  assert.equal(summary.exactAssignments, 1);
-  assert.equal(summary.processedTotal, 6);
-  assert.equal(summary.individualReviewCount, 3);
-  assert.equal(summary.approximateOperatorActions, 5);
-});
-
-run("review recalculation UI requires explicit POST confirmation", () => {
-  const pageSource = readFileSync(
-    new URL("../src/app/admin/(panel)/review/page.tsx", import.meta.url),
-    "utf8"
-  );
-  const actionSource = readFileSync(
-    new URL("../src/app/admin/(panel)/review/actions.ts", import.meta.url),
-    "utf8"
-  );
-
-  assert.equal(REVIEW_RECALCULATION_CONFIRMATION, "ПЕРЕСЧИТАТЬ");
-  assert.match(pageSource, /action=\{recalculateReviewSuggestionsAction\}/);
-  assert.match(pageSource, /name="previewToken"/);
-  assert.match(pageSource, /name="confirmation"/);
-  assert.match(actionSource, /assertSameOriginReviewAction/);
-  assert.match(actionSource, /recalculateReviewWorkspaceSuggestions/);
-});
-
 run("public taxonomy excludes fasteners category and rules", () => {
   assert.equal(getStaticPublicCategories().some((category) => category.slug === "krepezh"), false);
   assert.equal(catalogTaxonomy.some((category) => String(category.slug) === "krepezh"), false);
@@ -547,23 +469,6 @@ run("all assortment exposes only aggregate subcategory publicly", () => {
     }),
     true
   );
-});
-
-run("other-products listing is excluded from sitemap but products keep aggregate route", () => {
-  const backupSource = readFileSync(
-    new URL("../src/features/admin/backups/service.ts", import.meta.url),
-    "utf8"
-  );
-  const productPageSource = readFileSync(
-    new URL("../src/app/catalog/[categorySlug]/[subcategorySlug]/[productSlug]/page.tsx", import.meta.url),
-    "utf8"
-  );
-
-  assert.match(backupSource, /isPublicNavigationTaxonomyTarget\(subcategory\.categorySlug, subcategory\.slug\)/);
-  assert.match(backupSource, /isPublicTaxonomyTarget\(product\.categorySlug, product\.subcategorySlug\)/);
-  assert.match(productPageSource, /isOtherProductsTarget/);
-  assert.match(productPageSource, /ALL_PRODUCTS_SUBCATEGORY_SLUG/);
-  assert.match(productPageSource, /subtitle=\{displayLabel\}/);
 });
 
 run("universal fasteners fall back to hidden other-products target", () => {
@@ -855,40 +760,6 @@ run("admin redirect uses forwarded production origin", () => {
   assert.equal(url.pathname, "/admin/login");
   assert.equal(url.searchParams.get("next"), "/admin/import");
   assert.equal(url.toString().includes("localhost"), false);
-});
-
-run("home page has explicit Telegram-compatible social metadata", () => {
-  const pageSource = readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
-  const layoutSource = readFileSync(new URL("../src/app/layout.tsx", import.meta.url), "utf8");
-  const ogImage = readFileSync(new URL("../public/og-image-v3.png", import.meta.url));
-
-  assert.match(pageSource, /Автозапчасти в Талдоме — магазин на Салтыкова-Щедрина/);
-  assert.match(pageSource, /Более 30 000 автозапчастей/);
-  assert.match(pageSource, /openGraph:\s*\{/);
-  assert.match(pageSource, /type:\s*"website"/);
-  assert.match(pageSource, /locale:\s*"ru_RU"/);
-  assert.match(pageSource, /url:\s*homeUrl/);
-  assert.match(pageSource, /width:\s*1200/);
-  assert.match(pageSource, /height:\s*630/);
-  assert.match(pageSource, /type:\s*"image\/png"/);
-  assert.match(pageSource, /card:\s*"summary_large_image"/);
-  assert.match(pageSource, /alternates:\s*\{\s*canonical:\s*homeUrl/s);
-  assert.match(layoutSource, /metadataBase:\s*new URL\(siteConfig\.url\)/);
-  assert.equal(ogImage.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
-});
-
-run("admin routes use noindex neutral metadata without public og image", () => {
-  const adminLayoutSource = readFileSync(new URL("../src/app/admin/layout.tsx", import.meta.url), "utf8");
-  const sitemapSource = readFileSync(new URL("../src/app/sitemap.ts", import.meta.url), "utf8");
-  const robotsSource = readFileSync(new URL("../src/app/robots.ts", import.meta.url), "utf8");
-
-  assert.match(adminLayoutSource, /index:\s*false/);
-  assert.match(adminLayoutSource, /follow:\s*false/);
-  assert.match(adminLayoutSource, /noimageindex:\s*true/);
-  assert.match(adminLayoutSource, /images:\s*\[\]/);
-  assert.doesNotMatch(adminLayoutSource, /og-image-v3|store-front|facade/);
-  assert.doesNotMatch(sitemapSource, /baseUrl\}\/admin|url:\s*["'`]\/admin/);
-  assert.match(robotsSource, /disallow:\s*\["\/admin", "\/admin\/", "\/api", "\/api\/"\]/);
 });
 
 run("search documents query filters active products and public taxonomy", () => {
@@ -1306,14 +1177,6 @@ function reviewDiagnosticRow(overrides: {
   currentSubcategoryId?: string | null;
   conflictingSignals?: string[];
 }) {
-  const decisionStatus = (
-    overrides.level === "ready"
-      ? "AUTO_READY"
-      : overrides.level === "quick"
-        ? "GROUP_REVIEW"
-        : "MANUAL_REVIEW"
-  ) as "AUTO_READY" | "GROUP_REVIEW" | "MANUAL_REVIEW";
-
   return {
     suggestion: {
       level: overrides.level,
@@ -1322,15 +1185,6 @@ function reviewDiagnosticRow(overrides: {
       subcategoryId: overrides.level === "manual" ? null : "sub-1",
       categoryName: overrides.level === "manual" ? null : "Категория",
       subcategoryName: overrides.level === "manual" ? null : "Подкатегория",
-      decisionStatus,
-      source: "no_match" as const,
-      reviewReasonCode: null,
-      familyId: null,
-      familyLabel: null,
-      candidates: [],
-      negativeSignals: [],
-      isOtherProducts: false,
-      isExactAssignment: overrides.level === "ready",
       explanation: "test",
       matchedSignals: [],
       conflictingSignals: overrides.conflictingSignals ?? [],

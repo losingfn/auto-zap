@@ -1,5 +1,5 @@
 export const DOMAIN_DICTIONARY_VERSION = "domain-dictionary-v2";
-export const DOMAIN_RULES_VERSION = "domain-rules-v2";
+export const DOMAIN_RULES_VERSION = "domain-rules-v3";
 export const CONFIDENCE_MODEL_VERSION = "confidence-model-v2";
 export const GROUPING_MODEL_VERSION = "grouping-v2";
 
@@ -185,6 +185,28 @@ export const familyDefinitions: ProductFamilyDefinition[] = [
     autoReadyMinEvidence: 2,
     baseConfidence: 0.92,
     description: "Фильтр с явным топливным контекстом."
+  }),
+  family({
+    id: "power_steering_hoses",
+    label: "Шланги и трубки ГУР",
+    categorySlug: "podveska",
+    subcategorySlug: "shlangi-gur",
+    requiredAny: ["шланг", "шланги", "трубка", "трубки"],
+    contextAny: ["гур"],
+    strongPhrases: ["шланг гур", "шланги гур", "трубка гур", "трубки гур"],
+    negative: [
+      "бак",
+      "бачок",
+      "насос",
+      "ремкомплект",
+      "рейка",
+      "руль",
+      "вал",
+      "штуцер"
+    ],
+    autoReadyMinEvidence: 2,
+    baseConfidence: 0.92,
+    description: "Шланги и трубки ГУР с явным ГУР-контекстом; бачки, насосы, ремкомплекты и штуцеры исключены."
   }),
   family({
     id: "brake_pads",
@@ -568,13 +590,46 @@ export const familyDefinitions: ProductFamilyDefinition[] = [
     label: "Печка и отопитель",
     categorySlug: "dvigatel-i-transmissiya",
     subcategorySlug: "ohlazhdenie",
-    requiredAny: ["печка", "печки", "отопитель", "кран", "корпус", "кожух", "отвод", "трубка", "трубки"],
+    requiredAny: [
+      "печка",
+      "печки",
+      "отопитель",
+      "кран",
+      "корпус",
+      "кожух",
+      "отвод",
+      "заслонка",
+      "крышка",
+      "тяжка"
+    ],
     contextAny: ["печк", "отопител"],
-    strongPhrases: ["кран печки", "корпус печки", "кожух печки", "отвод печки", "трубки печки", "печка в сборе"],
-    negative: ["переключатель", "сопротивление", "мотор"],
-    autoReadyMinEvidence: 99,
-    baseConfidence: 0.84,
-    description: "Краны, корпус и трубки печки группируются как охлаждение/отопитель, но не публикуются автоматически."
+    strongPhrases: [
+      "кран печки",
+      "корпус печки",
+      "кожух печки",
+      "отвод печки",
+      "заслонка печки",
+      "крышка печки",
+      "тяжка печки",
+      "печка в сборе"
+    ],
+    negative: [
+      "патрубок",
+      "патрубки",
+      "переключатель",
+      "ремкомплект",
+      "сопротивление",
+      "трос",
+      "труб",
+      "трубка",
+      "трубки",
+      "мотор",
+      "шланг",
+      "шланги"
+    ],
+    autoReadyMinEvidence: 2,
+    baseConfidence: 0.91,
+    description: "Корпусные детали печки и отопителя; трубки, патрубки, моторы и электрика исключены."
   }),
   family({
     id: "cooling_hoses",
@@ -617,10 +672,22 @@ export const familyDefinitions: ProductFamilyDefinition[] = [
       "планка форсунок",
       "рампа форсунок"
     ],
-    negative: ["фильтр", "омывател"],
-    autoReadyMinEvidence: 2,
-    baseConfidence: 0.87,
-    description: "Топливные баки, карбюраторы, форсунки и топливные магистрали."
+    optional: ["бак", "гайка", "кольцо", "пробка", "скоба", "труб", "форсунк", "шайба", "шланг", "штуцер"],
+    negative: [
+      "индикатор",
+      "качества",
+      "кольцо форсунки",
+      "омывател",
+      "очистител",
+      "присадк",
+      "смеси",
+      "стекл",
+      "стробоскоп",
+      "фильтр"
+    ],
+    autoReadyMinEvidence: 1,
+    baseConfidence: 0.925,
+    description: "Явные элементы топливной системы; омыватель, диагностические приборы, очистители и фильтры исключены."
   }),
   family({
     id: "throttle_cables",
@@ -665,21 +732,54 @@ export const familyDefinitions: ProductFamilyDefinition[] = [
     label: "Детали двигателя",
     categorySlug: "dvigatel-i-transmissiya",
     subcategorySlug: "detali-dvigatelya",
-    requiredAny: ["клапан", "клапаны", "клапанов", "тарелка", "втулка", "втулки"],
-    contextAny: ["клапан", "клапанн", "клапанов", "гбц", "голов", "двигател", "впуск", "выпуск", "кл", "16v", "8v"],
+    requiredAny: [
+      "клапан",
+      "клапаны",
+      "клапанов",
+      "клапанная",
+      "клапанной",
+      "тарелка",
+      "тарелки",
+      "втулка",
+      "втулки",
+      "сухарик",
+      "сухарики"
+    ],
+    contextAny: ["клапанн", "клапанов", "гбц", "голов", "двигател", "впуск", "выпуск", "кл", "16v", "8v"],
     strongPhrases: [
       "втулки клапанов",
       "втулка клапанов",
       "тарелки клапанов",
+      "сухарики клапанов",
+      "крышка клапанов",
+      "крышка клапанная",
+      "клапанная крышка",
       "клапан двигателя",
       "клапан гбц",
       "клапаны 16",
-      "клапаны 8"
+      "клапаны 8",
+      "клапаны 2101",
+      "клапаны 2108"
     ],
-    negative: ["рециркуляции", "электромагнитный", "обратки", "паров", "сепаратора"],
+    negative: [
+      "адсорбер",
+      "обратный",
+      "обратки",
+      "паров",
+      "прокач",
+      "рециркуляции",
+      "сепаратора",
+      "топлив",
+      "форсунк",
+      "хода",
+      "хол",
+      "холостой",
+      "холост",
+      "электромагнитный"
+    ],
     autoReadyMinEvidence: 2,
-    baseConfidence: 0.84,
-    description: "Клапаны и связанные детали двигателя."
+    baseConfidence: 0.91,
+    description: "Клапаны и клапанные детали двигателя; топливные, обратные, прокачные и idle-клапаны исключены."
   }),
   family({
     id: "exhaust",
@@ -880,13 +980,28 @@ export const familyDefinitions: ProductFamilyDefinition[] = [
     label: "Скотч и клейкие ленты",
     categorySlug: "aksessuary",
     subcategorySlug: "prochie-aksessuary",
-    requiredAny: ["скотч"],
-    contextAny: ["армирован", "малярн", "прозрачн", "сторон", "боди", "car", "мм"],
-    strongPhrases: ["скотч армированный", "скотч малярный", "скотч двухсторонний"],
-    negative: ["антискотч", "удалитель"],
-    autoReadyMinEvidence: 4,
-    baseConfidence: 0.82,
-    description: "Клейкие ленты как узкая низкоуверенная accessory-группа для подтверждения."
+    requiredAny: ["скотч", "лента"],
+    contextAny: ["армирован", "клейк", "малярн", "прозрачн", "сторон", "боди", "body", "car", "мм"],
+    strongPhrases: [
+      "скотч",
+      "скотч армированный",
+      "скотч малярный",
+      "скотч двухсторонний",
+      "лента двухсторонняя",
+      "лента клейкая"
+    ],
+    negative: [
+      "антискотч",
+      "диод",
+      "изолента",
+      "свето",
+      "стеклоочист",
+      "строп",
+      "удалитель"
+    ],
+    autoReadyMinEvidence: 1,
+    baseConfidence: 0.92,
+    description: "Подтвержденные скотчи и клейкие ленты; изолента, светодиодные ленты, стропы и ленты стеклоочистителя исключены."
   }),
   family({
     id: "steering_wheel_accessories",
@@ -983,23 +1098,56 @@ export const familyDefinitions: ProductFamilyDefinition[] = [
     subcategorySlug: "shiny-i-diski",
     requiredAny: ["колпаки", "колпак"],
     contextAny: ["хром", "д.", "r13", "r14", "r15", "r16", "13", "14", "15", "16", "17", "газель", "волга"],
-    strongPhrases: ["колпаки", "колпаки хром", "колпаки декоративные", "колпаки газель", "колпаки волга"],
-    negative: ["защитный", "кронштейн", "крепления", "ступицы"],
-    autoReadyMinEvidence: 3,
-    baseConfidence: 0.85,
-    description: "Декоративные колёсные колпаки; защитные колпаки узлов не включаются."
+    strongPhrases: [
+      "колпаки",
+      "колпаки колес",
+      "колпаки колесные",
+      "колпаки хром",
+      "колпаки декоративные",
+      "колпаки газель",
+      "колпаки волга",
+      "колпак колеса"
+    ],
+    negative: [
+      "вентил",
+      "защитный",
+      "золотник",
+      "колпачки",
+      "колпачок",
+      "кронштейн",
+      "крепления",
+      "маслосъем",
+      "ниппел",
+      "ступицы",
+      "фар"
+    ],
+    autoReadyMinEvidence: 1,
+    baseConfidence: 0.92,
+    description: "Декоративные колёсные колпаки; мелкие колпачки, маслосъемные и защитные колпаки исключены."
   }),
   family({
     id: "car_audio",
     label: "Автоаудио",
     categorySlug: "aksessuary",
     subcategorySlug: "prochie-aksessuary",
-    requiredAny: ["магнитола", "автомагнитола", "колонки", "автоколонки", "динамик", "динамиков", "сабвуфер", "савбуфер", "антенна"],
-    strongPhrases: ["автомагнитола", "автоколонки", "колонки автомобильные", "кольца проставочные динамиков", "сабвуфер"],
-    negative: ["ремкомплект", "провод"],
-    autoReadyMinEvidence: 3,
-    baseConfidence: 0.85,
-    description: "Автомобильные аудиоустройства и связанные аксессуары."
+    requiredAny: ["магнитола", "автомагнитола", "колонки", "автоколонки", "динамик", "динамиков", "сабвуфер", "савбуфер"],
+    strongPhrases: ["магнитола", "автомагнитола", "автоколонки", "колонки автомобильные", "сабвуфер", "савбуфер"],
+    negative: [
+      "кольца",
+      "кольцо",
+      "накладка",
+      "накладк",
+      "провод",
+      "проставка",
+      "простав",
+      "ремкомплект",
+      "решетка",
+      "решётка",
+      "сетка"
+    ],
+    autoReadyMinEvidence: 1,
+    baseConfidence: 0.92,
+    description: "Автомагнитолы, колонки и сабвуферы; монтажные кольца, накладки, сетки и провода исключены."
   }),
   family({
     id: "car_vacuums",
@@ -1017,13 +1165,13 @@ export const familyDefinitions: ProductFamilyDefinition[] = [
     label: "Водительская электроника",
     categorySlug: "aksessuary",
     subcategorySlug: "prochie-aksessuary",
-    requiredAny: ["антирадар", "алкотестер", "рация", "телевизор", "инвертор", "мультитроник"],
-    contextAny: ["автомобильный", "12", "220", "оптим", "cobra", "sho-me", "alan", "megajet"],
-    strongPhrases: ["антирадар", "алкотестер", "автомобильный телевизор", "автомобильный инвертор", "мультитроник"],
+    requiredAny: ["антирадар", "алкотестер", "инвертор", "мультитроник", "компьютер"],
+    contextAny: ["автомобильный", "борт", "12", "220", "cobra", "sho-me"],
+    strongPhrases: ["антирадар", "алкотестер", "автомобильный инвертор", "мультитроник", "борт компьютер", "бортовой компьютер"],
     negative: ["датчик", "генератор", "стартер"],
-    autoReadyMinEvidence: 99,
-    baseConfidence: 0.83,
-    description: "Антирадары, алкотестеры, рации и автоинверторы остаются группой для подтверждения."
+    autoReadyMinEvidence: 1,
+    baseConfidence: 0.92,
+    description: "Антирадары, алкотестеры, бортовые компьютеры, Мультитроники и автомобильные инверторы."
   }),
   family({
     id: "roof_rails",
@@ -1197,11 +1345,30 @@ export const familyDefinitions: ProductFamilyDefinition[] = [
     subcategorySlug: "prochie-aksessuary",
     requiredAny: ["дворник", "дворники", "стеклоочиститель", "стеклооч", "щетка", "щетки", "щётка", "щётки", "поводок"],
     contextAny: ["стеклоочист", "очистител", "с/очист", "дворник", "каркасн", "бескаркасн", "гибридн", "задний"],
-    strongPhrases: ["щетка стеклоочистителя", "щетки стеклоочистителя", "поводок стеклоочистителя", "поводок"],
-    negative: ["генератор", "стартера", "электродвигателя", "снега", "мытья", "телескопическая"],
+    strongPhrases: [
+      "щетка стеклоочистителя",
+      "щетки стеклоочистителя",
+      "поводок стеклоочистителя",
+      "трапеция стеклоочистителя",
+      "мотор стеклоочистителя",
+      "лента стеклоочистителя",
+      "переключатель стеклоочистителя",
+      "поводок"
+    ],
+    negative: [
+      "воздухоочист",
+      "генератор",
+      "мытья",
+      "омывател",
+      "снега",
+      "стартера",
+      "стеклоомыв",
+      "телескопическая",
+      "электродвигателя"
+    ],
     autoReadyMinEvidence: 1,
-    baseConfidence: 0.9,
-    description: "Щетки и элементы стеклоочистителя."
+    baseConfidence: 0.92,
+    description: "Щетки и механизмы стеклоочистителя; воздухоочистители и омыватели исключены."
   }),
   family({
     id: "wheel_accessories",
@@ -1291,6 +1458,25 @@ export const familyDefinitions: ProductFamilyDefinition[] = [
     autoReadyMinEvidence: 3,
     baseConfidence: 0.84,
     description: "Буферы/отбойники подвески остаются в подтверждаемой группе из-за слабых активных аналогов."
+  }),
+  family({
+    id: "accessory_recorders",
+    label: "Видеорегистраторы и камеры заднего вида",
+    categorySlug: "aksessuary",
+    subcategorySlug: "prochie-aksessuary",
+    requiredAny: ["видеорегистратор", "видеорегистраторы", "камера"],
+    contextAny: ["зад", "заднего"],
+    strongPhrases: [
+      "видеорегистратор",
+      "видеорегистраторы",
+      "камера зад",
+      "камера заднего вида",
+      "камера з/в"
+    ],
+    negative: ["сгорания"],
+    autoReadyMinEvidence: 1,
+    baseConfidence: 0.92,
+    description: "Видеорегистраторы и камеры заднего вида; generic камеры без заднего контекста не открывают правило."
   }),
   family({
     id: "accessory_electronics",
@@ -1395,13 +1581,43 @@ export const familyDefinitions: ProductFamilyDefinition[] = [
     label: "Колёсные болты, гайки и шпильки",
     categorySlug: "aksessuary",
     subcategorySlug: "shiny-i-diski",
-    requiredAny: ["болт", "гайка", "шпилька", "шайба"],
-    contextAny: ["колес", "колесн", "диск"],
-    strongPhrases: ["болт колеса", "болт колес", "гайка колеса", "гайка колес", "шпилька колеса"],
-    negative: ["гбц", "двигател", "кпп", "кардан", "рессор", "суппорт", "генератор", "глушител"],
-    autoReadyMinEvidence: 3,
-    baseConfidence: 0.86,
-    description: "Колёсный метиз распознаётся только при явном контексте колеса или диска."
+    requiredAny: ["болт", "болты", "гайка", "гайки", "шпилька", "шпильки"],
+    contextAny: ["колес", "колесн"],
+    strongPhrases: [
+      "болт колеса",
+      "болт колес",
+      "болт крепления запасного колеса",
+      "гайка колеса",
+      "гайка колес",
+      "гайки колес",
+      "шпилька колеса",
+      "шпилька колес",
+      "шпильки колес"
+    ],
+    negative: [
+      "гбц",
+      "генератор",
+      "глушител",
+      "двигател",
+      "диск",
+      "кардан",
+      "колпак",
+      "колпач",
+      "кпп",
+      "направляющ",
+      "обод",
+      "ось",
+      "привод",
+      "прижим",
+      "проставка",
+      "рессор",
+      "секретк",
+      "суппорт",
+      "пыльник"
+    ],
+    autoReadyMinEvidence: 2,
+    baseConfidence: 0.91,
+    description: "Колёсные гайки, болты и шпильки; колпаки, прижимы, приводы, ободы и прочие колесные детали исключены."
   }),
   family({
     id: "hub_hardware",
@@ -1879,6 +2095,40 @@ export const familyDefinitions: ProductFamilyDefinition[] = [
     description: "Инструменты и принадлежности для обслуживания."
   }),
   family({
+    id: "interior_specific",
+    label: "Явные элементы салона",
+    categorySlug: "kuzov-i-optika",
+    subcategorySlug: "elementy-salona",
+    requiredAny: ["пепельница", "пепельницы", "консоль", "полка", "обшивка", "торпеда", "торпеды"],
+    contextAny: ["зад", "задний", "пола", "салон", "торпед"],
+    strongPhrases: [
+      "пепельница",
+      "пепельницы",
+      "пепельница-стакан",
+      "полка задняя",
+      "полка зад",
+      "задняя полка",
+      "задней обшивки",
+      "обшивка пола",
+      "обшивка перед",
+      "обшивка перед.",
+      "обшивка передний",
+      "накладка торпеды"
+    ],
+    negative: [
+      "акустич",
+      "бака",
+      "детск",
+      "люка",
+      "номер",
+      "подогрев",
+      "сидень"
+    ],
+    autoReadyMinEvidence: 1,
+    baseConfidence: 0.92,
+    description: "Подтвержденные салонные элементы: пепельницы, консоли, задние полки, обшивки и торпеда."
+  }),
+  family({
     id: "interior",
     label: "Элементы салона",
     categorySlug: "kuzov-i-optika",
@@ -1923,11 +2173,42 @@ export const familyDefinitions: ProductFamilyDefinition[] = [
     subcategorySlug: "stekla",
     requiredAny: ["стекло", "стекла", "уплотнитель"],
     contextAny: ["лоб", "ветров", "зад", "бок", "двер", "окна", "ветр"],
-    strongPhrases: ["стекло двери", "стекло заднее", "стекло лобовое", "уплотнитель стекла"],
-    negative: ["фары", "фонаря", "лампа", "стеклоочист", "стеклоподъем", "стеклоподъём", "часы", "поводок"],
+    strongPhrases: [
+      "стекло двери",
+      "стекло заднее",
+      "стекло лобовое",
+      "стекло ветров",
+      "стекло ветр",
+      "стекло боковое",
+      "стекло бок",
+      "стекло-уголок",
+      "уплотнитель стекла",
+      "уплотнитель заднего стекла",
+      "уплотнитель лобового стекла"
+    ],
+    negative: [
+      "маяк",
+      "накладк",
+      "обогрев",
+      "омывател",
+      "переключатель",
+      "пленк",
+      "поводок",
+      "повторител",
+      "поворот",
+      "противотуман",
+      "ручка",
+      "стеклоочист",
+      "стеклоподъем",
+      "стеклоподъём",
+      "упор",
+      "фар",
+      "фонар",
+      "часы"
+    ],
     autoReadyMinEvidence: 2,
-    baseConfidence: 0.86,
-    description: "Автомобильные стекла и уплотнители стекол без оптики."
+    baseConfidence: 0.91,
+    description: "Основные автомобильные стекла и уплотнители; оптика, поворотники, стеклоочистители, пленки и обогрев исключены."
   }),
   family({
     id: "optics_glass",
@@ -1979,6 +2260,17 @@ export const familyDefinitions: ProductFamilyDefinition[] = [
     autoReadyMinEvidence: 3,
     baseConfidence: 0.85,
     description: "Декоративные элементы фар без крепежных наборов и ламп."
+  }),
+  family({
+    id: "body_jabo",
+    label: "Жабо",
+    categorySlug: "kuzov-i-optika",
+    subcategorySlug: "kuzovnye-detali",
+    requiredAny: ["жабо"],
+    strongPhrases: ["жабо"],
+    autoReadyMinEvidence: 1,
+    baseConfidence: 0.94,
+    description: "Жабо как однозначная кузовная деталь."
   }),
   family({
     id: "body_small_exterior",
@@ -2083,6 +2375,7 @@ export const familyDefinitions: ProductFamilyDefinition[] = [
     categorySlug: "kuzov-i-optika",
     subcategorySlug: "zerkala",
     requiredAny: ["зеркало", "зеркал"],
+    negative: ["видеорегистратор"],
     autoReadyMinEvidence: 1,
     baseConfidence: 0.91,
     description: "Автомобильные зеркала."

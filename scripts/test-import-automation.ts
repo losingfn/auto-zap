@@ -523,12 +523,335 @@ run("residual context families group without reopening generic fasteners", () =>
   assert.equal(copperTube.target?.subcategorySlug, "tormoznye-trubki");
   assert.equal(pneumaticFitting.decisionStatus, "GROUP_REVIEW");
   assert.equal(pneumaticFitting.target?.subcategorySlug, "prochaya-tormoznaya-sistema");
-  assert.equal(valveBushing.decisionStatus, "GROUP_REVIEW");
+  assert.equal(valveBushing.decisionStatus, "AUTO_READY");
   assert.equal(valveBushing.target?.subcategorySlug, "detali-dvigatelya");
-  assert.equal(heaterValve.decisionStatus, "GROUP_REVIEW");
+  assert.equal(heaterValve.decisionStatus, "AUTO_READY");
   assert.equal(heaterValve.target?.subcategorySlug, "ohlazhdenie");
   assert.equal(genericDin.decisionStatus, "MANUAL_REVIEW");
   assert.equal(genericDin.target, null);
+});
+
+run("confirmed residual categorization rules auto-ready only their safe examples", () => {
+  const context = buildDefaultCategorizationContext();
+  const rules = [
+    {
+      name: "power steering hoses",
+      familyId: "power_steering_hoses",
+      target: ["podveska", "shlangi-gur"],
+      positives: [
+        "ХСГ-01364 Шланг ГУР NEXT, Е-5",
+        "ХСГ-01335 Шланги Гура д.16",
+        "ХС-00394 Шланги ГУРа 2110 ст. обр. (2 шт)",
+        "ХСГ-00979 Шланг ГУР ГАЗ-3302 Б+ сливной с након.",
+        "ХСГ-00928 Шланг ГУРа Бычок",
+        "ХСГ-00481 Шланг ГУР УАЗ",
+        "ХСГ-00511 Трубка КАМАЗ ГУР низкого давления",
+        "ХСГ-01144 Шланг ГУР УАЗ-Патриот",
+        "ХСГ-01409 Шланг ГУР ГАЗ-3308 нагнетательный",
+        "ХСГ-01363 Шланг ГУР Иватек дв.274"
+      ],
+      negatives: [
+        "ХСГ-01180 Бак масляный ГУР МАЗ",
+        "ХСГ-00899 Бачок масляного ГУРа ГАЗ-3302",
+        "РГ-00218 Рем.к-т ГУР КАМАЗ",
+        "ХСГ-00001 Штуцер шланга ГУР"
+      ]
+    },
+    {
+      name: "wheel fasteners",
+      familyId: "wheel_fasteners",
+      target: ["aksessuary", "shiny-i-diski"],
+      positives: [
+        "КГ-00771 Гайка колёс М12х1,5 ключ 19",
+        "ЗЧМ-00041 Гайка колес Москвич 2140",
+        "ХСГ-00121 Шпилька колес Волга 2410",
+        "ХСГ-00018 Шпилька колёс ЗИЛ",
+        "ХСГ-00315 Шпилька колес Зил-Бычок перед.- зад.",
+        "КГ-00904 Гайка колёс 12х1.25 шестигр.",
+        "КР-00409 Болт крепления запасного колеса 2108",
+        "КР-00408 Болт крепления запасного колеса 2104",
+        "КГ-00687 Гайка колёс 12х1,5 ключ 21 закр.",
+        "КГ-00820 Гайка колёс М12х1.25"
+      ],
+      negatives: [
+        "ХС-00190 Пыльник колес Нива",
+        "К-00380 Колпачки колёс пластмасса",
+        "ХСГ-00238 Прижим колес КАМАЗ",
+        "ОК-00028 Ось заднего колеса"
+      ]
+    },
+    {
+      name: "heater core parts",
+      familyId: "heater_cooling_parts",
+      target: ["dvigatel-i-transmissiya", "ohlazhdenie"],
+      positives: [
+        "ДВ-00361 Кожух печки 2108",
+        "ДВ-00102 Заслонка печки 2110",
+        "ЗЧМ-00651 Кран печки 2141",
+        "ДВ-00008 Корпус печки 2101-2105",
+        "КР-00334 Печка в сборе 2108",
+        "КР-00414 Печка в сборе 2110",
+        "А-01669 Крышка печки 2105",
+        "ЗЧМ-00528 Кран печки Москвич 2140",
+        "КР-00019 Отвод печки бол.",
+        "К-00321 Тяжка печки 2108"
+      ],
+      negatives: [
+        "ИН-00626 Сопротивление печки Рено",
+        "ОК-00325 Патрубок печки Ока",
+        "КР-00641 К-т трубок печки Веста",
+        "ИН-00644 Мотор печки Рено Логан"
+      ]
+    },
+    {
+      name: "engine valve parts",
+      familyId: "engine_valves",
+      target: ["dvigatel-i-transmissiya", "detali-dvigatelya"],
+      positives: [
+        "КГ-00081 Сухарики клапанов Волга",
+        "ДВ-00629 Тарелки клапанов 2101-07",
+        "ДВ-00314 Клапан 2108 выпуск.",
+        "ДВ-00447 Крышка клапанов 2108 инжектор",
+        "ДВ-00692 Клапаны 2101 АВТОВАЗ",
+        "ДВ-00631 Клапаны 2108 SM-1500",
+        "ИН-01417 К-т клапанов Дэу-Нексиа 16 кл.",
+        "ДВ-00720 К-т клапанов ВАЗ 11182",
+        "ЗЧМ-00461 Клапаны впускные Таврия",
+        "ДВ-00439 Крышка клапанов Нива 21214"
+      ],
+      negatives: [
+        "ИН-00623 Клапан хол. хода Рено Логан",
+        "КГ-01292 Клапан обратный д.6 метал.",
+        "КГ-01293 Клапан обратный д.8 метал",
+        "ДВ-00001 Клапан топливный форсунки"
+      ]
+    },
+    {
+      name: "explicit fuel system",
+      familyId: "fuel_system",
+      target: ["dvigatel-i-transmissiya", "toplivnaya-sistema"],
+      positives: [
+        "ИН-01406 Форсунки Рено Логан 8 кл. длинные",
+        "ДВ-00730 Штуцер топливных трубок Гранта прямой",
+        "КГ-00498 Гайка топливная упорная М24",
+        "ДВ-00588 Трубки топливные Нива 2131",
+        "ДВ-00253 Кольцо топливное ВАЗ 2110",
+        "ОК-00246 Пробка топливного бака с ключом",
+        "ДВ-00771 Шланг Ларгус длинный топливный",
+        "ДВ-00704 Скоба крепления форсунки Vesta",
+        "КГ-00497 Гайка топливная упорная М18",
+        "ДВ-00460 Трубки топливные магистральные 2108"
+      ],
+      negatives: [
+        "ДВ-00254 Кольцо форсунки ВАЗ 2110",
+        "А-02266 Стробоскоп СТ-03 бензин",
+        "А-01663 Индикатор качества топливной смеси",
+        "К-00913 Форсунка омывателя стекла Peugeot"
+      ]
+    },
+    {
+      name: "car audio",
+      familyId: "car_audio",
+      target: ["aksessuary", "prochie-aksessuary"],
+      positives: [
+        "А-00512 Колонки автомобильные MRM 16 см",
+        "А-01304 Магнитола № 8059",
+        "А-01288 Магнитола АМ7010",
+        "А-00489 Колонки PIONEER 1320",
+        "А-02080 Автомагнитола Eplutus СА712",
+        "А-01447 Автомагнитола Eplutus CA304 24V",
+        "А-00694 Автомагнитола AM Eplutus СА310",
+        "А-00443 Автомагнитола МОК-4041",
+        "А-00741 Колонки FV 16 см",
+        "А-01507 Савбуфер SONY 121"
+      ],
+      negatives: [
+        "А-00898 Накладка динамика 2109 левая",
+        "А-01893 Кольца простав. динамиков 16 см",
+        "А-00506 Накладка динамика 2107",
+        "А-01891 Сетка для динамиков"
+      ]
+    },
+    {
+      name: "driver electronics",
+      familyId: "driver_electronics",
+      target: ["aksessuary", "prochie-aksessuary"],
+      positives: [
+        "А-01028 Алкотестер",
+        "А-01373 Мультитроник VS 731",
+        "А-01326 Антирадар Кобра",
+        "А-01283 Борт. компьютер Мультитроник Х 2110",
+        "А-01032 Алкотестер 3000",
+        "А-01986 Антирадар Кармера GPS 330",
+        "А-00835 Антирадар SHO-ME",
+        "А-01282 Борт. компьютер Мультитроник ГАЗЕЛЬ",
+        "А-01633 Автомобильный инвертор 12-220В",
+        "А-02193 Алкотестер AD 2600"
+      ],
+      negatives: ["А-00001 Датчик генератора", "А-00002 Стартер инверторный стенд"]
+    },
+    {
+      name: "specific interior",
+      familyId: "interior_specific",
+      target: ["kuzov-i-optika", "elementy-salona"],
+      positives: [
+        "А-00552 Пепельница 2105-06-09",
+        "КР-00326 Обшивка пола Нива средняя",
+        "КР-00319 Комплект задней обшивки 2108",
+        "А-00379 Полка зад. 21099",
+        "А-00236 Пепельница ВАЗ",
+        "КР-00303 Обшивка перед. Нива 21213",
+        "КР-00331 Комплект задней обшивки 21099",
+        "А-01229 Пепельница-стакан",
+        "А-00028 Полка задняя Нива",
+        "А-00263 Накладка торпеды 2106"
+      ],
+      negatives: [
+        "А-00001 Сиденье детское",
+        "А-00002 Подогрев сиденья",
+        "А-00003 Полка акустическая",
+        "А-00004 Накладка сиденья"
+      ]
+    },
+    {
+      name: "body glass",
+      familyId: "body_glass",
+      target: ["kuzov-i-optika", "stekla"],
+      positives: [
+        "ЗЧМ-00645 Уплотнитель зад. стекла 2141",
+        "О-00427 Стекло ветр. КАМАЗ",
+        "О-00074 Стекло на метал. крышу УАЗ-469 боковое",
+        "ОК-00273 Уплотнитель лобового стекла ОКА",
+        "О-00426 Стекло ветр. УАЗ-452 полоса",
+        "О-00722 Стекло-уголок зад. 2109",
+        "О-00425 Стекло ветр. УАЗ-3160",
+        "О-00553 Стекло ветр. ГАЗ-3307",
+        "А-01509 Уплотнитель стекла 21213 низ. хром",
+        "О-00903 Стекло Лада Ларгус заднее левое"
+      ],
+      negatives: [
+        "О-00001 Стекло повторителя УАЗ",
+        "О-00002 Стекло маяка",
+        "О-00003 Стекло поворота 2140",
+        "О-00004 Трапеция стеклоочистителя"
+      ]
+    },
+    {
+      name: "wheel caps",
+      familyId: "wheel_caps",
+      target: ["aksessuary", "shiny-i-diski"],
+      positives: [
+        "А-00001 Колпаки колесные 13 VERSACO",
+        "А-00002 Колпаки колесные 14 SKS",
+        "А-00003 Колпаки колесные 15 Star",
+        "А-00004 Колпаки колесные 16 Jestic",
+        "А-00005 Колпаки колесные 13 Гранта",
+        "А-00006 Колпаки колесные 14 Логан",
+        "А-00007 Колпаки колесные 15 универсальные",
+        "А-00008 Колпак колеса",
+        "А-00009 Колпаки декоративные колесные",
+        "А-00010 Колпаки хром Волга"
+      ],
+      negatives: [
+        "К-00380 Колпачки колёс пластмасса",
+        "А-00011 Колпачок вентиля",
+        "А-00012 Колпачки маслосъемные",
+        "А-00013 Колпак фары"
+      ]
+    },
+    {
+      name: "wipers",
+      familyId: "wiper",
+      target: ["aksessuary", "prochie-aksessuary"],
+      positives: [
+        "ИН-01062 Трапеция стеклоочистителя Матиз",
+        "К-00531 Рем.к-т стеклоочистителя Приора",
+        "ЗЧМ-00611 Мотор стеклоочистителя 2140-412",
+        "ИН-00198 Переключатель стеклоочистителя Дэу-Нексиа",
+        "КР-00117 Трапеция стеклоочистителя Lada Largus",
+        "К-00165 Гайка поводка стеклоочистителя 2101-07",
+        "А-00350 Лента стеклоочистителя ХОРС 54см",
+        "КР-00156 Ремкомплект трапеции стеклоочистителя 210",
+        "КР-00460 Трапеция стеклоочистителя в сборе 2110",
+        "А-01342 Лента стеклоочистителя Хорс 51 см"
+      ],
+      negatives: [
+        "К-00280 Планка воздухоочистителя 2101-07",
+        "ДВ-00280 Отвод воздухоочистителя 2108-09",
+        "ЗЧМ-00177 Крышка воздухоочистителя 2141",
+        "А-00001 Форсунка стеклоомывателя"
+      ]
+    },
+    {
+      name: "jabo",
+      familyId: "body_jabo",
+      target: ["kuzov-i-optika", "kuzovnye-detali"],
+      positives: [
+        "КР-00001 Жабо 2108",
+        "КР-00002 Жабо 2110",
+        "КР-00003 Жабо Приора",
+        "КР-00004 Жабо Калина",
+        "КР-00005 Жабо Гранта",
+        "КР-00006 Жабо Нива",
+        "КР-00007 Жабо Ларгус",
+        "КР-00008 Жабо Веста",
+        "КР-00009 Жабо УАЗ",
+        "КР-00010 Жабо Газель"
+      ],
+      negatives: ["КР-00011 Штуцер латунь"]
+    },
+    {
+      name: "recorders and rear cameras",
+      familyId: "accessory_recorders",
+      target: ["aksessuary", "prochie-aksessuary"],
+      positives: [
+        "А-00001 Видеорегистратор",
+        "А-00002 Видеорегистратор зеркало",
+        "А-00003 Видеорегистратор 2 камеры",
+        "А-00004 Видеорегистратор автомобильный",
+        "А-00005 Видеорегистратор Full HD",
+        "А-00006 Камера заднего вида",
+        "А-00007 Камера з/в",
+        "А-00008 Камера заднего вида универсальная",
+        "А-00009 Камера заднего вида рамка",
+        "А-00010 Камера з/в врезная"
+      ],
+      negatives: ["А-02346 Камера М-892", "А-02347 Камера Wi-Fi", "А-00011 Камера сгорания"]
+    },
+    {
+      name: "adhesive tapes",
+      familyId: "adhesive_tapes",
+      target: ["aksessuary", "prochie-aksessuary"],
+      positives: [
+        "А-00001 Скотч 2-х сторонний",
+        "А-00002 Скотч двухсторонний 3М",
+        "А-00003 Скотч прозрачный",
+        "А-00004 Скотч армированный",
+        "А-00005 Скотч малярный",
+        "А-00006 Лента двухсторонняя",
+        "А-00007 Лента клейкая",
+        "А-00008 Лента клейкая декоративная",
+        "А-00009 Скотч черный",
+        "А-00010 Скотч упаковочный"
+      ],
+      negatives: [
+        "А-00011 Изолента",
+        "А-00350 Лента стеклоочистителя ХОРС",
+        "А-00012 Лента светодиодная",
+        "А-00013 Стропа"
+      ]
+    }
+  ] as const;
+
+  for (const rule of rules) {
+    for (const title of rule.positives) {
+      assertAutoReadyTarget(context, title, rule.target[0], rule.target[1], rule.name, rule.familyId);
+    }
+
+    for (const title of rule.negatives) {
+      assertNotAutoReadyTarget(context, title, rule.target[0], rule.target[1], rule.name, rule.familyId);
+    }
+  }
 });
 
 run("other-products fallback never overrides exact automotive context", () => {
@@ -916,6 +1239,39 @@ async function runAsync(name: string, test: () => Promise<void>) {
     console.error(`not ok - ${name}`);
     throw error;
   }
+}
+
+function assertAutoReadyTarget(
+  context: ReturnType<typeof buildDefaultCategorizationContext>,
+  title: string,
+  categorySlug: string,
+  subcategorySlug: string,
+  label: string,
+  familyId?: string
+) {
+  const result = categorizeProductName(title, context);
+  assert.equal(result.decisionStatus, "AUTO_READY", `${label}: ${title}`);
+  assert.equal(result.target?.categorySlug, categorySlug, `${label}: ${title}`);
+  assert.equal(result.target?.subcategorySlug, subcategorySlug, `${label}: ${title}`);
+  if (familyId) {
+    assert.equal(result.familyId, familyId, `${label}: ${title}`);
+  }
+}
+
+function assertNotAutoReadyTarget(
+  context: ReturnType<typeof buildDefaultCategorizationContext>,
+  title: string,
+  categorySlug: string,
+  subcategorySlug: string,
+  label: string,
+  familyId?: string
+) {
+  const result = categorizeProductName(title, context);
+  assert.notDeepEqual(
+    [result.decisionStatus, result.target?.categorySlug, result.target?.subcategorySlug, result.familyId],
+    ["AUTO_READY", categorySlug, subcategorySlug, familyId],
+    `${label}: ${title}`
+  );
 }
 
 async function runSearchIndexChecks() {

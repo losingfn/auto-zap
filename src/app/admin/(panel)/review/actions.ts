@@ -12,10 +12,17 @@ import {
   applySelectedReviewCorrections,
   normalizeAdminReviewParams,
   publishReviewWorkspace,
-  reapplyCategorizationRulesToReviewQueue,
   rollbackReviewAction,
   type AdminReviewActionFilters
 } from "@/features/admin/review";
+import {
+  cancelReviewReapplyRun,
+  createReviewReapplyApplyRun,
+  createReviewReapplyDryRun,
+  pauseReviewReapplyRun,
+  resumeReviewReapplyRun,
+  rollbackReviewReapplyApplyRun
+} from "@/features/admin/review-reapply";
 
 export async function resolveReviewItemAction(formData: FormData) {
   await assertSameOriginReviewAction();
@@ -138,32 +145,82 @@ export async function applySelectedReviewItemsAction(formData: FormData) {
   redirect(target);
 }
 
-export async function reapplyReviewRulesAction(formData: FormData) {
+export async function createReviewReapplyDryRunAction() {
   await assertSameOriginReviewAction();
   const session = await requireAdminSession();
-  const filters = readReviewActionFilters(formData);
-  let target = buildReviewRedirect(filters);
+  let target = "/admin/review";
 
   try {
-    const result = await reapplyCategorizationRulesToReviewQueue({
-      filters,
-      adminUserId: session.user.id,
-      confirmationCount: readConfirmationCount(formData)
-    });
+    const run = await createReviewReapplyDryRun({ adminUserId: session.user.id });
 
     revalidatePath("/admin/review");
     revalidatePath("/admin");
 
-    const params = buildReviewSearchParams(filters);
-    params.set("rulesBefore", String(result.before));
-    params.set("rulesResolved", String(result.resolved));
-    params.set("rulesAfter", String(result.remaining));
-    target = `/admin/review?${params.toString()}`;
-  } catch (error) {
-    target = buildReviewRedirect(filters, errorParamsForBulkFailure(error, "rules_failed"));
+    target = `/admin/review?reapplyRun=${encodeURIComponent(run?.id ?? "")}&reapply=created`;
+  } catch {
+    target = "/admin/review?error=reapply_failed";
   }
 
   redirect(target);
+}
+
+export async function createReviewReapplyApplyRunAction(formData: FormData) {
+  await assertSameOriginReviewAction();
+  const session = await requireAdminSession();
+  const dryRunId = readStringField(formData, "dryRunId");
+  let target = "/admin/review";
+
+  try {
+    if (!dryRunId) throw new Error("Dry-run не выбран.");
+    const run = await createReviewReapplyApplyRun({
+      dryRunId,
+      adminUserId: session.user.id
+    });
+
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
+    target = `/admin/review?reapplyRun=${encodeURIComponent(run?.id ?? "")}&reapply=apply_created`;
+  } catch {
+    target = "/admin/review?error=reapply_failed";
+  }
+
+  redirect(target);
+}
+
+export async function pauseReviewReapplyRunAction(formData: FormData) {
+  await assertSameOriginReviewAction();
+  await requireAdminSession();
+  await pauseReviewReapplyRun(readStringField(formData, "runId") ?? "");
+  revalidatePath("/admin/review");
+  redirect("/admin/review?reapply=paused");
+}
+
+export async function resumeReviewReapplyRunAction(formData: FormData) {
+  await assertSameOriginReviewAction();
+  await requireAdminSession();
+  await resumeReviewReapplyRun(readStringField(formData, "runId") ?? "");
+  revalidatePath("/admin/review");
+  redirect("/admin/review?reapply=resumed");
+}
+
+export async function cancelReviewReapplyRunAction(formData: FormData) {
+  await assertSameOriginReviewAction();
+  await requireAdminSession();
+  await cancelReviewReapplyRun(readStringField(formData, "runId") ?? "");
+  revalidatePath("/admin/review");
+  redirect("/admin/review?reapply=cancelled");
+}
+
+export async function rollbackReviewReapplyRunAction(formData: FormData) {
+  await assertSameOriginReviewAction();
+  const session = await requireAdminSession();
+  await rollbackReviewReapplyApplyRun({
+    runId: readStringField(formData, "runId") ?? "",
+    adminUserId: session.user.id
+  });
+  revalidatePath("/admin/review");
+  revalidatePath("/admin");
+  redirect("/admin/review?reapply=rolled_back");
 }
 
 export async function undoLastReviewWorkspaceAction() {

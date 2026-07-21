@@ -10,6 +10,7 @@ import {
   categorizationRules,
   products,
   reviewQueue,
+  reviewReapplyRuns,
   reviewWorkspaceActions,
   reviewWorkspaceItems,
   reviewWorkspaces,
@@ -789,8 +790,10 @@ export async function publishReviewWorkspace(input: { adminUserId: string }) {
     throw new AdminReviewBulkSafetyError(
       "empty_workspace",
       "Нет рабочей сессии с подготовленными изменениями."
-    );
+      );
   }
+
+  await assertNoUnfinishedReviewReapplyApplyRun(workspace.id);
 
   const pendingRows = await getPendingWorkspaceItems(workspace.id);
   if (pendingRows.length === 0) {
@@ -2160,6 +2163,26 @@ function emptyWorkspace(sourceCatalogVersionId: string | null): ReviewWorkspaceS
     actionCount: 0,
     lastActionId: null
   };
+}
+
+async function assertNoUnfinishedReviewReapplyApplyRun(workspaceId: string) {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(reviewReapplyRuns)
+    .where(
+      and(
+        eq(reviewReapplyRuns.workspaceId, workspaceId),
+        eq(reviewReapplyRuns.mode, "apply"),
+        inArray(reviewReapplyRuns.status, ["pending", "running", "paused"])
+      )
+    );
+
+  if (Number(row?.count ?? 0) > 0) {
+    throw new AdminReviewBulkSafetyError(
+      "preview_stale",
+      "Нельзя публиковать workspace, пока apply run повторной обработки не завершён или не отменён."
+    );
+  }
 }
 
 function chooseGroupSuggestion(rows: EnrichedReviewRow[]) {

@@ -9,16 +9,25 @@ import {
   type AdminReviewItem,
   type AdminReviewParams
 } from "@/features/admin/review";
+import {
+  getReviewReapplyPanelData,
+  type ReviewReapplyPanelData
+} from "@/features/admin/review-reapply";
 import { requireAdminSession } from "@/features/admin/auth";
 import {
+  cancelReviewReapplyRunAction,
+  createReviewReapplyApplyRunAction,
+  createReviewReapplyDryRunAction,
+  pauseReviewReapplyRunAction,
   publishReviewWorkspaceAction,
   resolveReviewItemAction,
+  resumeReviewReapplyRunAction,
+  rollbackReviewReapplyRunAction,
   undoLastReviewWorkspaceAction
 } from "./actions";
 import {
   ReviewBulkSelectionForm,
-  ReviewGroupActionForm,
-  ReviewReapplyRulesForm
+  ReviewGroupActionForm
 } from "./review-client-controls";
 
 export const metadata: Metadata = {
@@ -39,6 +48,13 @@ const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
   day: "2-digit",
   month: "2-digit",
   year: "numeric"
+});
+const dateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit"
 });
 
 const versionStatusLabels: Record<string, string> = {
@@ -74,10 +90,20 @@ const errorLabels: Record<string, string> = {
   rules_failed: "Не удалось повторно применить правила к очереди.",
   undo_failed: "Не удалось отменить последнее неопубликованное действие.",
   publish_failed: "Не удалось опубликовать рабочую сессию. Активный каталог и поиск не изменены.",
+  reapply_failed: "Не удалось создать или обновить run повторной обработки.",
   bulk_scope_forbidden: "Массовые действия разрешены только в рабочей сессии.",
   bulk_confirmation_required: "Для массового действия больше 100 товаров нужно ввести точное количество.",
   bulk_preview_stale: "Состав группы изменился. Обновите preview и повторите действие.",
   bulk_rule_blocked: "Правило не создано: шаблон слишком широкий или опасный. Массовое действие не выполнено."
+};
+
+const reapplyNoticeLabels: Record<string, string> = {
+  created: "Dry-run создан. Запустите CLI processor, чтобы обработать очередь batch-ами.",
+  apply_created: "Apply run создан. Запустите CLI processor, чтобы подготовить AUTO_READY в workspace.",
+  paused: "Run поставлен на паузу. Текущий batch, если он уже стартовал, завершится безопасно.",
+  resumed: "Run готов к продолжению. Запустите CLI processor повторно.",
+  cancelled: "Run отменён.",
+  rolled_back: "Артефакты apply run отменены до публикации."
 };
 
 export default async function AdminReviewPage({ searchParams }: ReviewPageProps) {
@@ -87,11 +113,15 @@ export default async function AdminReviewPage({ searchParams }: ReviewPageProps)
     adminUserId: session.user.id,
     createWorkspaceIfNeeded: true
   });
+  const reapplyData = await getReviewReapplyPanelData({
+    workspaceId: data.workspace.id,
+    sourceCatalogVersionId: data.versionContext.activeVersion?.id ?? null
+  });
   const filters = toActionFilters(data.params);
 
   return (
     <div>
-      <div className="mb-8 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+      <div className="mb-8">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#9DBDFB]">
             Проверка товаров
@@ -102,7 +132,6 @@ export default async function AdminReviewPage({ searchParams }: ReviewPageProps)
             попадут на сайт только после финальной публикации рабочей сессии.
           </p>
         </div>
-        <ReviewReapplyRulesForm filters={filters} count={data.filteredCount} />
       </div>
 
       <Notices params={params} />
@@ -119,6 +148,7 @@ export default async function AdminReviewPage({ searchParams }: ReviewPageProps)
       </section>
 
       <WorkspacePanel data={data} />
+      <ReviewReapplyPanel data={reapplyData} />
       <FilterPanel data={data} />
 
       <section className="mt-6">
@@ -320,6 +350,224 @@ function WorkspacePanel({ data }: { data: Awaited<ReturnType<typeof getAdminRevi
   );
 }
 
+function ReviewReapplyPanel({ data }: { data: ReviewReapplyPanelData }) {
+  const activeRun = data.activeRun;
+  const latestDryRun = data.latestDryRun;
+  const latestApplyRun = data.latestApplyRun;
+  const canCreateDryRun = !activeRun;
+  const canCreateApply = Boolean(
+    !activeRun &&
+      latestDryRun &&
+      latestDryRun.status === "completed" &&
+      latestDryRun.pipelineVersion === data.pipelineVersion
+  );
+  const canPause = activeRun?.status === "pending" || activeRun?.status === "running";
+  const canResume = activeRun?.status === "paused";
+  const canCancel = Boolean(activeRun);
+  const canRollback = Boolean(
+    !activeRun &&
+      latestApplyRun &&
+      (latestApplyRun.status === "completed" || latestApplyRun.status === "completed_with_errors") &&
+      latestApplyRun.preparedRows > 0
+  );
+  const commandRun = activeRun ?? latestDryRun ?? latestApplyRun;
+
+  return (
+    <section className="mt-5 rounded-card border border-[#243249] bg-[#101827] p-5">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+        <div>
+          <h2 className="text-lg font-semibold">Повторная обработка старой очереди</h2>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-[#8FA1B8]">
+            Применение правил только подготовит решения. Товары не будут опубликованы, а строки
+            очереди не будут закрыты до отдельной публикации workspace.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Badge>Open rows: {numberFormatter.format(data.openReviewRows)}</Badge>
+            <Badge>Pipeline: {data.pipelineVersion}</Badge>
+            {activeRun ? <Badge>Run: {runStatusLabel(activeRun.status)}</Badge> : <Badge>Run: нет активного</Badge>}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3 xl:justify-end">
+          <form action={createReviewReapplyDryRunAction}>
+            <button
+              type="submit"
+              disabled={!canCreateDryRun}
+              className="inline-flex h-11 items-center justify-center rounded-card border border-[#4169A8] px-5 text-sm font-semibold text-white transition hover:border-[#73A0F5] hover:bg-[#1A2740] disabled:cursor-not-allowed disabled:border-[#243249] disabled:text-[#536174]"
+            >
+              Запустить dry-run
+            </button>
+          </form>
+          <form action={createReviewReapplyApplyRunAction}>
+            <input type="hidden" name="dryRunId" value={latestDryRun?.id ?? ""} />
+            <button
+              type="submit"
+              disabled={!canCreateApply}
+              className="inline-flex h-11 items-center justify-center rounded-card bg-[#73A0F5] px-5 text-sm font-semibold text-[#07101F] transition hover:bg-[#9DBDFB] disabled:cursor-not-allowed disabled:bg-[#31415F] disabled:text-[#8FA1B8]"
+            >
+              Применить результат
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-2">
+        <RunCard title="Последний dry-run" run={latestDryRun} />
+        <RunCard title="Последний apply" run={latestApplyRun} />
+      </div>
+
+      {activeRun ? (
+        <div className="mt-5 rounded-card border border-[#243249] bg-[#0B1220] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-[#C8D1DF]">Активный run</p>
+              <p className="mt-1 text-sm text-[#8FA1B8]">
+                {activeRun.mode === "dry_run" ? "Dry-run" : "Apply"} · {runStatusLabel(activeRun.status)}
+                {activeRun.isStale ? " · heartbeat устарел" : ""}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <RunStateForm action={pauseReviewReapplyRunAction} runId={activeRun.id} label="Пауза" disabled={!canPause} />
+              <RunStateForm action={resumeReviewReapplyRunAction} runId={activeRun.id} label="Продолжить" disabled={!canResume} />
+              <RunStateForm action={cancelReviewReapplyRunAction} runId={activeRun.id} label="Отменить" disabled={!canCancel} />
+            </div>
+          </div>
+          <ProgressBar processed={activeRun.processedRows} total={activeRun.totalRows} />
+        </div>
+      ) : null}
+
+      {commandRun ? (
+        <div className="mt-5 rounded-card border border-[#243249] bg-[#0B1220] p-4">
+          <p className="text-sm font-semibold text-[#C8D1DF]">CLI processor</p>
+          <code className="mt-2 block overflow-x-auto rounded-card bg-[#050914] px-3 py-2 text-sm text-[#C8D1DF]">
+            pnpm review:reapply process {commandRun.id}
+          </code>
+        </div>
+      ) : null}
+
+      {canRollback && latestApplyRun ? (
+        <div className="mt-5 rounded-card border border-[#523333] bg-[#1C1114] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-[#FCA5A5]">
+              Apply run можно отменить до публикации. Будут затронуты только pending items/actions этого run.
+            </p>
+            <RunStateForm action={rollbackReviewReapplyRunAction} runId={latestApplyRun.id} label="Откатить apply run" disabled={false} />
+          </div>
+        </div>
+      ) : null}
+
+      {data.groups.length > 0 ? (
+        <div className="mt-5 border-t border-[#243249] pt-4">
+          <p className="text-sm font-semibold text-[#C8D1DF]">Группы последнего dry-run</p>
+          <div className="mt-3 grid gap-3 xl:grid-cols-2">
+            {data.groups.slice(0, 8).map((group) => (
+              <div key={group.id} className="rounded-card border border-[#243249] bg-[#0B1220] p-4 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold text-[#C8D1DF]">{decisionStatusLabel(group.decisionStatus)}</span>
+                  <Badge>{numberFormatter.format(group.productCount)} строк</Badge>
+                </div>
+                <p className="mt-2 text-[#8FA1B8]">{group.groupKey}</p>
+                <p className="mt-2 text-[#8FA1B8]">
+                  {formatTarget(group.categoryName, group.subcategoryName)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function RunCard({
+  title,
+  run
+}: {
+  title: string;
+  run: ReviewReapplyPanelData["latestDryRun"];
+}) {
+  if (!run) {
+    return (
+      <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4 text-sm text-[#8FA1B8]">
+        {title}: нет данных.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-[#C8D1DF]">{title}</p>
+        <Badge>{runStatusLabel(run.status)}</Badge>
+      </div>
+      <ProgressBar processed={run.processedRows} total={run.totalRows} />
+      <dl className="mt-4 grid gap-2 text-sm text-[#8FA1B8] sm:grid-cols-2">
+        <Metric label="AUTO_READY" value={run.autoReadyRows} />
+        <Metric label="Potential pending" value={run.preparedRows} />
+        <Metric label="Already pending" value={run.alreadyPendingRows} />
+        <Metric label="GROUP_REVIEW" value={run.groupReviewRows} />
+        <Metric label="MANUAL_REVIEW" value={run.manualRows} />
+        <Metric label="BLOCKED" value={run.blockedRows} />
+        <Metric label="DO_NOT_PUBLISH" value={run.doNotPublishRows} />
+        <Metric label="Errors" value={run.errorRows} />
+      </dl>
+      <p className="mt-3 text-xs text-[#8FA1B8]">
+        Создан: {formatDateTime(run.createdAt)}
+        {run.lastHeartbeatAt ? ` · heartbeat: ${formatDateTime(run.lastHeartbeatAt)}` : ""}
+        {run.finishedAt ? ` · завершён: ${formatDateTime(run.finishedAt)}` : ""}
+      </p>
+    </div>
+  );
+}
+
+function RunStateForm({
+  action,
+  runId,
+  label,
+  disabled
+}: {
+  action: (formData: FormData) => void | Promise<void>;
+  runId: string;
+  label: string;
+  disabled: boolean;
+}) {
+  return (
+    <form action={action}>
+      <input type="hidden" name="runId" value={runId} />
+      <button
+        type="submit"
+        disabled={disabled}
+        className="inline-flex h-10 items-center justify-center rounded-card border border-[#4169A8] px-4 text-sm font-semibold text-white transition hover:border-[#73A0F5] hover:bg-[#1A2740] disabled:cursor-not-allowed disabled:border-[#243249] disabled:text-[#536174]"
+      >
+        {label}
+      </button>
+    </form>
+  );
+}
+
+function ProgressBar({ processed, total }: { processed: number; total: number }) {
+  const percent = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between text-xs text-[#8FA1B8]">
+        <span>{numberFormatter.format(processed)} / {numberFormatter.format(total)}</span>
+        <span>{percent}%</span>
+      </div>
+      <div className="mt-2 h-2 rounded-full bg-[#1A2740]">
+        <div className="h-2 rounded-full bg-[#73A0F5]" style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <dt>{label}</dt>
+      <dd className="font-semibold text-[#C8D1DF]">{numberFormatter.format(value)}</dd>
+    </div>
+  );
+}
+
 function Notices({ params }: { params: Record<string, string | string[] | undefined> }) {
   const resolved = readParam(params.resolved);
   const rule = readParam(params.rule);
@@ -331,6 +579,7 @@ function Notices({ params }: { params: Record<string, string | string[] | undefi
   const rulesBefore = readParam(params.rulesBefore);
   const rulesResolved = readParam(params.rulesResolved);
   const rulesAfter = readParam(params.rulesAfter);
+  const reapply = readParam(params.reapply);
   const undoCount = readParam(params.undoCount);
   const publishedCount = readParam(params.publishedCount);
 
@@ -355,6 +604,7 @@ function Notices({ params }: { params: Record<string, string | string[] | undefi
           Осталось: {rulesAfter || "0"}.
         </Notice>
       ) : null}
+      {reapply ? <Notice>{reapplyNoticeLabels[reapply] ?? "Статус повторной обработки обновлён."}</Notice> : null}
       {undoCount ? <Notice>Отменено последнее неопубликованное действие: {undoCount} товаров.</Notice> : null}
       {publishedCount ? <Notice>Рабочая сессия опубликована: {publishedCount} товаров переведены в active.</Notice> : null}
       {error ? <Notice tone="danger">{errorLabels[error] ?? "Не удалось выполнить действие."}</Notice> : null}
@@ -774,6 +1024,35 @@ function reviewHref(params: AdminReviewParams, overrides: Partial<AdminReviewPar
 
 function readParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function runStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    pending: "Ожидает CLI",
+    running: "Выполняется",
+    paused: "Пауза",
+    completed: "Завершён",
+    completed_with_errors: "Завершён с ошибками",
+    failed: "Ошибка",
+    cancelled: "Отменён"
+  };
+  return labels[status] ?? status;
+}
+
+function decisionStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    AUTO_READY: "AUTO_READY",
+    GROUP_REVIEW: "GROUP_REVIEW",
+    MANUAL_REVIEW: "MANUAL_REVIEW",
+    BLOCKED_CONFLICT: "BLOCKED_CONFLICT",
+    DO_NOT_PUBLISH: "DO_NOT_PUBLISH",
+    INVALID_INPUT: "INVALID_INPUT"
+  };
+  return labels[status] ?? status;
+}
+
+function formatDateTime(value: Date | string) {
+  return dateTimeFormatter.format(typeof value === "string" ? new Date(value) : value);
 }
 
 function formatTarget(categoryName: string | null | undefined, subcategoryName: string | null | undefined) {

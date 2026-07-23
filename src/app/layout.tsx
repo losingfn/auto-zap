@@ -24,6 +24,9 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     description: metadataDescription,
     manifest: "/site-v2.webmanifest",
+    verification: {
+      yandex: "612ef6dabd30c864"
+    },
     openGraph: {
       title: metadataTitle,
       description: metadataDescription,

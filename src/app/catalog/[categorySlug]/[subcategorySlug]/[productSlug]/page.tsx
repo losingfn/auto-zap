@@ -10,7 +10,12 @@ import {
 } from "@/config/public-taxonomy";
 import { JsonLd } from "@/components/seo/json-ld";
 import { getProductDetails } from "@/features/catalog/data";
-import { buildBreadcrumbList, publicAbsoluteUrl } from "@/features/seo/structured-data";
+import {
+  buildProductSeoDescription,
+  buildProductSeoTitle,
+  buildPublicPageMetadata
+} from "@/features/seo/metadata";
+import { buildBreadcrumbList } from "@/features/seo/structured-data";
 
 export const dynamic = "force-dynamic";
 
@@ -26,20 +31,13 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     return {};
   }
 
-  const displayLabel = formatPublicTargetLabel(product);
   const url = getPublicProductPath(product);
-  const productUrl = publicAbsoluteUrl(url);
-  return {
-    title: product.name,
-    description: `${product.name}. Цена: ${product.price.toLocaleString("ru-RU")} ₽.`,
-    ...(productUrl ? { alternates: { canonical: productUrl } } : {}),
-    openGraph: {
-      title: product.name,
-      description: `${displayLabel}. Цена: ${product.price.toLocaleString("ru-RU")} ₽.`,
-      ...(productUrl ? { url: productUrl } : {}),
-      type: "website"
-    }
-  };
+
+  return buildPublicPageMetadata({
+    title: buildProductSeoTitle(product.name),
+    description: buildProductSeoDescription(product.name, product.price),
+    path: url
+  });
 }
 
 export default async function ProductPage({

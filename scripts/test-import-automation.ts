@@ -56,6 +56,13 @@ import {
 import { buildSearchDocument } from "../src/features/search/documents";
 import { documentMatchesQuery, rankSearchHits } from "../src/features/search/ranking";
 import {
+  buildProductSeoDescription,
+  buildProductSeoTitle,
+  buildPublicPageMetadata,
+  formatSeoPrice,
+  normalizeSeoText
+} from "../src/features/seo/metadata";
+import {
   buildCategorySuggestion,
   getReviewDiagnosticFromRows
 } from "../src/features/admin/review";
@@ -469,6 +476,99 @@ run("all assortment exposes only aggregate subcategory publicly", () => {
     }),
     true
   );
+});
+
+run("public SEO metadata uses absolute title canonical and Open Graph fields", () => {
+  const metadata = buildPublicPageMetadata({
+    title: "  Каталог   автозапчастей в Талдоме | Автозапчасти  ",
+    description: "  Каталог   автозапчастей  в Талдоме.  ",
+    path: "/catalog"
+  });
+
+  assert.deepEqual(metadata.title, {
+    absolute: "Каталог автозапчастей в Талдоме | Автозапчасти"
+  });
+  assert.equal(metadata.description, "Каталог автозапчастей в Талдоме.");
+  assert.equal(metadata.alternates?.canonical, "https://autozapchast-taldom.ru/catalog");
+  assert.equal(metadata.openGraph?.title, "Каталог автозапчастей в Талдоме | Автозапчасти");
+  assert.equal(metadata.openGraph?.description, "Каталог автозапчастей в Талдоме.");
+  assert.equal(metadata.openGraph?.url, "https://autozapchast-taldom.ru/catalog");
+  assert.equal(metadata.openGraph?.siteName, "Автозапчасти на Салтыкова-Щедрина");
+  assert.equal(metadata.openGraph?.locale, "ru_RU");
+  assert.ok(metadata.openGraph && "type" in metadata.openGraph);
+  assert.equal(metadata.openGraph.type, "website");
+});
+
+run("product SEO helpers trim title by word and keep valid price only", () => {
+  const title = buildProductSeoTitle(
+    "Амортизатор передний усиленный газомасляный для внедорожника ВАЗ Нива комплект"
+  );
+
+  assert.equal(title.endsWith(" — купить в Талдоме | Автозапчасти"), true);
+  assert.equal(title.length <= 70, true);
+  assert.equal(title.includes(" undefined "), false);
+  assert.equal(formatSeoPrice(12500), "12\u00A0500");
+  assert.equal(formatSeoPrice(0), null);
+  assert.equal(formatSeoPrice(Number.NaN), null);
+  assert.match(
+    buildProductSeoDescription("Амортизатор   передний", 12500),
+    /Амортизатор передний по цене 12\s500 ₽/
+  );
+  assert.match(
+    buildProductSeoDescription("Амортизатор передний", 0),
+    /Уточните актуальную цену/
+  );
+  assert.equal(normalizeSeoText(undefined, "Каталог"), "Каталог");
+  assert.equal(normalizeSeoText(Number.NaN, "Каталог"), "Каталог");
+  assert.equal(normalizeSeoText(" undefined ", "Каталог"), "Каталог");
+});
+
+run("product SEO title trims one long token without breaking unicode", () => {
+  const suffix = " — купить в Талдоме | Автозапчасти";
+  const longTokenTitle = buildProductSeoTitle("АККУМУЛЯТОРАВТОЗАПЧАСТЬ".repeat(10));
+  const longFirstTokenTitle = buildProductSeoTitle(
+    `${"АККУМУЛЯТОРАВТОЗАПЧАСТЬ".repeat(10)} левый HS-00113`
+  );
+  const emojiTitle = buildProductSeoTitle("🔋".repeat(80));
+  const longTokenName = longTokenTitle.replace(suffix, "");
+  const longFirstTokenName = longFirstTokenTitle.replace(suffix, "");
+  const emojiName = emojiTitle.replace(suffix, "");
+
+  assert.equal(longTokenTitle.endsWith(suffix), true);
+  assert.equal(longFirstTokenTitle.endsWith(suffix), true);
+  assert.equal(emojiTitle.endsWith(suffix), true);
+  assert.equal(longTokenTitle.length <= 70, true);
+  assert.equal(longFirstTokenTitle.length <= 70, true);
+  assert.equal(emojiTitle.length <= 70, true);
+  assert.equal(longTokenName.length > 0, true);
+  assert.equal(longFirstTokenName.length > 0, true);
+  assert.equal(emojiName.length > 0, true);
+  assert.equal(Array.from(emojiName).every((char) => char === "🔋"), true);
+});
+
+run("product SEO description keeps very long names bounded", () => {
+  const description = buildProductSeoDescription(`${"Амортизатор ".repeat(40)}HS-00113`, 12500);
+
+  assert.equal(description.length < 260, true);
+  assert.match(description, /^Амортизатор/);
+  assert.match(description, /по цене 12\s500 ₽/);
+});
+
+run("long product SEO titles preserve distinguishing tail tokens", () => {
+  const leftTitle = buildProductSeoTitle(
+    "Амортизатор передний усиленный газомасляный для внедорожника ВАЗ Нива левый HS-00113"
+  );
+  const rightTitle = buildProductSeoTitle(
+    "Амортизатор передний усиленный газомасляный для внедорожника ВАЗ Нива правый HS-00114"
+  );
+
+  assert.notEqual(leftTitle, rightTitle);
+  assert.equal(leftTitle.length <= 70, true);
+  assert.equal(rightTitle.length <= 70, true);
+  assert.equal(leftTitle.includes("Амортизатор"), true);
+  assert.equal(rightTitle.includes("Амортизатор"), true);
+  assert.equal(leftTitle.includes("HS-00113"), true);
+  assert.equal(rightTitle.includes("HS-00114"), true);
 });
 
 run("universal fasteners fall back to hidden other-products target", () => {

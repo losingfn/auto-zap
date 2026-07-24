@@ -1,10 +1,18 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { SearchPageForm } from "@/components/search/search-page-form";
 import { PublicFooter } from "@/components/site/public-footer";
 import { formatPublicTargetLabel } from "@/config/public-taxonomy";
 import { searchProducts } from "@/features/search/service";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: true
+  }
+};
 
 export default async function SearchPage({
   searchParams

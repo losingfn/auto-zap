@@ -523,6 +523,37 @@ run("product SEO helpers trim title by word and keep valid price only", () => {
   assert.equal(normalizeSeoText(" undefined ", "Каталог"), "Каталог");
 });
 
+run("product SEO title trims one long token without breaking unicode", () => {
+  const suffix = " — купить в Талдоме | Автозапчасти";
+  const longTokenTitle = buildProductSeoTitle("АККУМУЛЯТОРАВТОЗАПЧАСТЬ".repeat(10));
+  const longFirstTokenTitle = buildProductSeoTitle(
+    `${"АККУМУЛЯТОРАВТОЗАПЧАСТЬ".repeat(10)} левый HS-00113`
+  );
+  const emojiTitle = buildProductSeoTitle("🔋".repeat(80));
+  const longTokenName = longTokenTitle.replace(suffix, "");
+  const longFirstTokenName = longFirstTokenTitle.replace(suffix, "");
+  const emojiName = emojiTitle.replace(suffix, "");
+
+  assert.equal(longTokenTitle.endsWith(suffix), true);
+  assert.equal(longFirstTokenTitle.endsWith(suffix), true);
+  assert.equal(emojiTitle.endsWith(suffix), true);
+  assert.equal(longTokenTitle.length <= 70, true);
+  assert.equal(longFirstTokenTitle.length <= 70, true);
+  assert.equal(emojiTitle.length <= 70, true);
+  assert.equal(longTokenName.length > 0, true);
+  assert.equal(longFirstTokenName.length > 0, true);
+  assert.equal(emojiName.length > 0, true);
+  assert.equal(Array.from(emojiName).every((char) => char === "🔋"), true);
+});
+
+run("product SEO description keeps very long names bounded", () => {
+  const description = buildProductSeoDescription(`${"Амортизатор ".repeat(40)}HS-00113`, 12500);
+
+  assert.equal(description.length < 260, true);
+  assert.match(description, /^Амортизатор/);
+  assert.match(description, /по цене 12\s500 ₽/);
+});
+
 run("long product SEO titles preserve distinguishing tail tokens", () => {
   const leftTitle = buildProductSeoTitle(
     "Амортизатор передний усиленный газомасляный для внедорожника ВАЗ Нива левый HS-00113"

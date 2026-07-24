@@ -7,6 +7,7 @@ const defaultOgImagePath = "/og-image-v3.png";
 const defaultOgImageAlt = "Автозапчасти на Салтыкова-Щедрина";
 const productTitleSuffix = " — купить в Талдоме | Автозапчасти";
 const productTitleMaxLength = 70;
+const productDescriptionNameMaxLength = 110;
 
 type PublicPageMetadataInput = {
   title: string;
@@ -65,11 +66,18 @@ export function buildProductSeoTitle(productName: unknown) {
     return fullTitle;
   }
 
-  return `${trimProductNameForTitle(normalizedName)}${productTitleSuffix}`;
+  const nameBudget = productTitleMaxLength - productTitleSuffix.length;
+  const trimmedName = limitSeoTextLength(trimProductNameForTitle(normalizedName), nameBudget, "Товар");
+
+  return `${trimmedName}${productTitleSuffix}`;
 }
 
 export function buildProductSeoDescription(productName: unknown, price: unknown) {
-  const normalizedName = normalizeSeoText(productName, "Товар");
+  const normalizedName = limitSeoTextLength(
+    normalizeSeoText(productName, "Товар"),
+    productDescriptionNameMaxLength,
+    "Товар"
+  );
   const formattedPrice = formatSeoPrice(price);
 
   if (!formattedPrice) {
@@ -96,15 +104,15 @@ function trimProductNameForTitle(productName: string) {
   const words = productName.split(" ").filter(Boolean);
 
   if (nameBudget <= 0 || words.length === 0) {
-    return productName;
+    return "Товар";
   }
 
   if (words.length === 1) {
-    return words[0] || productName;
+    return limitSeoTextLength(words[0] || productName, nameBudget, "Товар");
   }
 
   if ((words[0]?.length ?? 0) >= nameBudget - 1) {
-    return words[0] || productName;
+    return limitSeoTextLength(words[0] || productName, nameBudget, "Товар");
   }
 
   const tailBudget = nameBudget - (words[0]?.length ?? 0) - 1;
@@ -121,7 +129,11 @@ function trimProductNameForTitle(productName: string) {
     prefix = next;
   }
 
-  return prefix ? `${prefix} ${tailText}` : tailText || words[0] || productName;
+  return limitSeoTextLength(
+    prefix ? `${prefix} ${tailText}` : tailText || words[0],
+    nameBudget,
+    "Товар"
+  );
 }
 
 function collectTailWords(words: string[], nameBudget: number) {
@@ -153,4 +165,46 @@ function stringifySeoValue(value: unknown) {
 function collapseWhitespace(value: string) {
   const normalized = value.replace(/\s+/g, " ").trim();
   return ["undefined", "null", "nan"].includes(normalized.toLowerCase()) ? "" : normalized;
+}
+
+function limitSeoTextLength(value: string, maxLength: number, fallback: string) {
+  const normalized = collapseWhitespace(value);
+
+  if (!normalized || maxLength <= 0) {
+    return fallback;
+  }
+
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  const words = normalized.split(" ").filter(Boolean);
+  let result = "";
+
+  for (const word of words) {
+    const next = result ? `${result} ${word}` : word;
+    if (next.length > maxLength) {
+      break;
+    }
+    result = next;
+  }
+
+  return (
+    result ||
+    truncateByCodeUnitBudget(words[0] || normalized, maxLength) ||
+    fallback
+  );
+}
+
+function truncateByCodeUnitBudget(value: string, maxLength: number) {
+  let result = "";
+
+  for (const char of Array.from(value)) {
+    if ((result + char).length > maxLength) {
+      break;
+    }
+    result += char;
+  }
+
+  return result;
 }

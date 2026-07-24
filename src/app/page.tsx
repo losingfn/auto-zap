@@ -18,16 +18,21 @@ import {
 import { JsonLd } from "@/components/seo/json-ld";
 import { PublicFooter } from "@/components/site/public-footer";
 import { getPublicHomeContent, getStoreWorkStatusFromHours } from "@/features/content/public-home";
-import { buildLocalBusinessJsonLd, publicAbsoluteUrl } from "@/features/seo/structured-data";
+import { buildPublicPageMetadata } from "@/features/seo/metadata";
+import { buildLocalBusinessJsonLd } from "@/features/seo/structured-data";
 import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
-const homeUrl = publicAbsoluteUrl("/");
+const homeTitle = "Магазин автозапчастей в Талдоме | Автозапчасти на Салтыкова-Щедрина";
+const homeDescription =
+  "Магазин автозапчастей в Талдоме. Более 30 000 товаров для легковых и коммерческих автомобилей, помощь в подборе запчастей и актуальные цены.";
 
-export const metadata: Metadata = {
-  ...(homeUrl ? { alternates: { canonical: homeUrl } } : {})
-};
+export const metadata: Metadata = buildPublicPageMetadata({
+  title: homeTitle,
+  description: homeDescription,
+  path: "/"
+});
 
 const aboutFacts = [
   { value: "30 000+", label: "товаров на складе" },

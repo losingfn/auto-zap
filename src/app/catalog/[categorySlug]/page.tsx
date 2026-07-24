@@ -4,7 +4,8 @@ import { CatalogPageShell } from "@/components/catalog/page-shell";
 import { SubcategoryGrid } from "@/components/catalog/subcategory-grid";
 import { JsonLd } from "@/components/seo/json-ld";
 import { getStaticPublicCategories, getSubcategoriesForCategory } from "@/features/catalog/data";
-import { buildBreadcrumbList, publicAbsoluteUrl } from "@/features/seo/structured-data";
+import { buildPublicPageMetadata, normalizeSeoText } from "@/features/seo/metadata";
+import { buildBreadcrumbList } from "@/features/seo/structured-data";
 
 export const dynamic = "force-dynamic";
 
@@ -20,19 +21,13 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
     return {};
   }
 
-  const categoryUrl = publicAbsoluteUrl(`/catalog/${category.slug}`);
+  const categoryName = normalizeSeoText(category.name);
 
-  return {
-    title: `${category.name} — каталог`,
-    description: `Раздел ${category.name} в каталоге автозапчастей магазина в Талдоме.`,
-    ...(categoryUrl ? { alternates: { canonical: categoryUrl } } : {}),
-    openGraph: {
-      title: `${category.name} — каталог автозапчастей`,
-      description: `Подкатегории раздела ${category.name}.`,
-      ...(categoryUrl ? { url: categoryUrl } : {}),
-      type: "website"
-    }
-  };
+  return buildPublicPageMetadata({
+    title: `${categoryName} в Талдоме | Автозапчасти`,
+    description: `${categoryName}: автозапчасти в Талдоме для легковых и коммерческих автомобилей. Выберите нужную подкатегорию и посмотрите актуальные цены.`,
+    path: `/catalog/${category.slug}`
+  });
 }
 
 export default async function CategoryPage({

@@ -67,8 +67,8 @@ pnpm dev                         # локальный dev-сервер
 pnpm lint                        # ESLint
 pnpm typecheck                   # проверка TypeScript
 pnpm build                       # production build
-pnpm start                       # next start
-pnpm start:prod                  # next start на 127.0.0.1:3000
+pnpm start                       # standalone Next.js server
+pnpm start:prod                  # standalone server на 127.0.0.1:3000
 pnpm db:migrate                  # применить SQL-миграции
 pnpm db:seed                     # заполнить категории, правила и синонимы
 pnpm admin:create -- --email ... # создать или обновить администратора
@@ -207,13 +207,19 @@ deploy/scripts/backup-postgres.sh
 
 ## Обновление сайта
 
+Не выполняйте `pnpm build` при работающем PM2 в том же каталоге: build очищает
+`.next`, а standalone временно теряет CSS, JS и `public`-ресурсы. Полный порядок,
+проверки и ограничения rollback описаны в `docs/deployment.md`.
+
 ```bash
 cd /var/www/autozap
-git pull
+git pull --ff-only
 pnpm install --frozen-lockfile
-pnpm db:migrate
+pnpm lint
+pnpm typecheck
+pm2 stop autozap
 pnpm build
-pm2 restart autozap
+pm2 restart autozap --update-env
 pm2 status
 ```
 

@@ -3,14 +3,20 @@ import { defaultCategorizationRules } from "@/config/catalog-taxonomy";
 import { isPublicCategorySlug, isPublicTaxonomyTarget } from "@/config/public-taxonomy";
 import { db } from "@/db/client";
 import { categories, categorizationRules, subcategories } from "@/db/schema";
+import type { AdminReviewPerfLogger } from "@/lib/server/admin-review-perf";
+import { familyDefinitions } from "./domain-config";
 import type {
   CategorizationContext,
   CategorizationRuleRecord,
   CategorizationTarget
 } from "./types";
 
-export async function getCategorizationContext(): Promise<CategorizationContext> {
-  const rows = await db
+export async function getCategorizationContext(
+  perf?: AdminReviewPerfLogger
+): Promise<CategorizationContext> {
+  const timer = perf?.start();
+  const rulesTimer = perf?.start();
+  const rulesQuery = db
     .select({
       id: categorizationRules.id,
       pattern: categorizationRules.pattern,
@@ -35,6 +41,9 @@ export async function getCategorizationContext(): Promise<CategorizationContext>
       )
     )
     .orderBy(asc(categorizationRules.priority));
+  const rows = perf
+    ? await perf.observe("categorization_rules_sql", rulesTimer, rulesQuery, (result) => ({ rows: result.length }))
+    : await rulesQuery;
 
   const rules: CategorizationRuleRecord[] = rows
     .filter((row) => isPublicTaxonomyTarget(row.categorySlug, row.subcategorySlug))
@@ -51,6 +60,7 @@ export async function getCategorizationContext(): Promise<CategorizationContext>
       subcategoryName: row.subcategoryName,
       createdBy: row.createdBy
     }));
+  const databaseRuleCount = rules.length;
 
   const fallbackRows = await db
     .select({
@@ -96,6 +106,7 @@ export async function getCategorizationContext(): Promise<CategorizationContext>
       [rule.pattern, rule.matchType, rule.categorySlug, rule.subcategorySlug].join("|")
     )
   );
+  let defaultRuleCount = 0;
   for (const rule of defaultCategorizationRules) {
     if (!isPublicTaxonomyTarget(rule.categorySlug, rule.subcategorySlug)) {
       continue;
@@ -119,8 +130,17 @@ export async function getCategorizationContext(): Promise<CategorizationContext>
       subcategoryName: target.subcategoryName
     });
     ruleKeys.add(key);
+    defaultRuleCount += 1;
   }
   rules.sort((a, b) => a.priority - b.priority || b.pattern.length - a.pattern.length);
+
+  perf?.log("categorization_context", {
+    duration_ms: perf.elapsed(timer),
+    rules: databaseRuleCount,
+    default_rules: defaultRuleCount,
+    families: familyDefinitions.length,
+    total_rules: rules.length
+  });
 
   return {
     rules,

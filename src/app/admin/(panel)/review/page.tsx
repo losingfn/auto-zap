@@ -14,6 +14,7 @@ import {
   type ReviewReapplyPanelData
 } from "@/features/admin/review-reapply";
 import { requireAdminSession } from "@/features/admin/auth";
+import { createAdminReviewPerfLogger } from "@/lib/server/admin-review-perf";
 import {
   cancelReviewReapplyRunAction,
   createReviewReapplyApplyRunAction,
@@ -107,19 +108,30 @@ const reapplyNoticeLabels: Record<string, string> = {
 };
 
 export default async function AdminReviewPage({ searchParams }: ReviewPageProps) {
-  const session = await requireAdminSession();
+  const perf = createAdminReviewPerfLogger();
+  const requestTimer = perf?.start();
+  let requestError = 1;
+  try {
+  const pageTimer = perf?.start();
+  const session = perf
+    ? await perf.measure("page_admin_session", requireAdminSession)
+    : await requireAdminSession();
   const params = await searchParams;
   const data = await getAdminReviewPageData(params, {
     adminUserId: session.user.id,
-    createWorkspaceIfNeeded: true
+    createWorkspaceIfNeeded: true,
+    perf
   });
-  const reapplyData = await getReviewReapplyPanelData({
+  const reapplyInput = {
     workspaceId: data.workspace.id,
     sourceCatalogVersionId: data.versionContext.activeVersion?.id ?? null
-  });
+  };
+  const reapplyData = perf
+    ? await perf.measure("reapply_panel", () => getReviewReapplyPanelData(reapplyInput))
+    : await getReviewReapplyPanelData(reapplyInput);
   const filters = toActionFilters(data.params);
 
-  return (
+  const content = (
     <div>
       <div className="mb-8">
         <div>
@@ -283,6 +295,25 @@ export default async function AdminReviewPage({ searchParams }: ReviewPageProps)
       </section>
     </div>
   );
+
+  if (perf) {
+    perf.log("page_component_prepare", {
+      duration_ms: perf.elapsed(pageTimer),
+      rows: data.items.length,
+      total: data.summary.total
+    });
+  }
+
+  requestError = 0;
+  return content;
+  } finally {
+    if (perf) {
+      perf.log("request_total", {
+        duration_ms: perf.elapsed(requestTimer),
+        error: requestError
+      });
+    }
+  }
 }
 
 function WorkspacePanel({ data }: { data: Awaited<ReturnType<typeof getAdminReviewPageData>> }) {

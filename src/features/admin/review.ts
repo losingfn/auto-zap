@@ -37,9 +37,16 @@ import {
 } from "@/features/search/indexing";
 import { getSearchSynonyms } from "@/features/search/synonyms";
 import { getAdminSessionSecret } from "@/features/admin/session-cookie";
+import type { AdminReviewPerfLogger } from "@/lib/server/admin-review-perf";
 
 export const REVIEW_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 const REVIEWABLE_PRODUCT_STATUSES = ["needs_review", "invalid"] as const;
+
+type ClassificationStats = {
+  calls: number;
+  totalDurationMs: number;
+  maxDurationMs: number;
+};
 
 export type AdminReviewVersionScope = "workspace" | "active" | "all";
 export type AdminReviewIssueFilter =
@@ -416,20 +423,31 @@ export function normalizeAdminReviewParams(input: Partial<Record<string, string 
 
 export async function getAdminReviewPageData(
   rawParams: Partial<Record<string, string | string[] | undefined>> = {},
-  options: { adminUserId?: string; createWorkspaceIfNeeded?: boolean } = {}
+  options: {
+    adminUserId?: string;
+    createWorkspaceIfNeeded?: boolean;
+    perf?: AdminReviewPerfLogger;
+  } = {}
 ) {
+  const perf = options.perf;
+  const timer = perf?.start();
+  const classificationStats = perf
+    ? { calls: 0, totalDurationMs: 0, maxDurationMs: 0 }
+    : undefined;
   const params = normalizeAdminReviewParams(rawParams);
   const [versionContext, categoryRows, subcategoryRows, categorizationContext] = await Promise.all([
-    getReviewVersionContext(),
-    getActiveCategories(),
-    getActiveSubcategories(),
-    getCategorizationContext()
+    getReviewVersionContext(perf),
+    getActiveCategories(perf),
+    getActiveSubcategories(perf),
+    getCategorizationContext(perf)
   ]);
   const categoryOptions = buildCategoryOptions(categoryRows, subcategoryRows);
   const targetBySlug = buildTargetBySlug(categoryRows, subcategoryRows);
-  let workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null);
+  let workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null, perf);
   let rows = await getWorkspaceReviewRows(versionContext, workspace.id, {
-    limit: REVIEW_PAGE_GROUPING_ROWS
+    limit: REVIEW_PAGE_GROUPING_ROWS,
+    perf,
+    stage: "review_rows_sql"
   });
 
   if (
@@ -438,55 +456,116 @@ export async function getAdminReviewPageData(
     !workspace.id &&
     rows.length > 0
   ) {
-    await ensureReviewWorkspace(versionContext.activeVersion?.id ?? null, options.adminUserId);
-    workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null);
+    if (perf) {
+      await perf.measure("workspace_create", () =>
+        ensureReviewWorkspace(versionContext.activeVersion?.id ?? null, options.adminUserId!)
+      );
+    } else {
+      await ensureReviewWorkspace(versionContext.activeVersion?.id ?? null, options.adminUserId);
+    }
+    workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null, perf);
     rows = await getWorkspaceReviewRows(versionContext, workspace.id, {
-      limit: REVIEW_PAGE_GROUPING_ROWS
+      limit: REVIEW_PAGE_GROUPING_ROWS,
+      perf,
+      stage: "review_rows_sql"
     });
   }
 
-  const queueStats = await getReviewQueueStats(versionContext, workspace.id);
-  const enrichedRows = rows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug));
-  const groups = buildReviewGroups(enrichedRows, categoryRows, subcategoryRows, workspace.id, {
-    scope: "workspace",
-    issue: "all",
-    query: "",
-    reason: "",
-    group: ""
-  });
+  const queueStats = await getReviewQueueStats(versionContext, workspace.id, perf);
+  const enrichedRows = perf
+    ? perf.measureSync(
+        "review_rows_enrichment",
+        () => rows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug, classificationStats)),
+        (result) => ({ rows: result.length })
+      )
+    : rows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug));
+  const groups = perf
+    ? perf.measureSync(
+        "review_groups",
+        () =>
+          buildReviewGroups(enrichedRows, categoryRows, subcategoryRows, workspace.id, {
+            scope: "workspace",
+            issue: "all",
+            query: "",
+            reason: "",
+            group: ""
+          }),
+        (result) => ({ rows: result.length })
+      )
+    : buildReviewGroups(enrichedRows, categoryRows, subcategoryRows, workspace.id, {
+        scope: "workspace",
+        issue: "all",
+        query: "",
+        reason: "",
+        group: ""
+      });
   const selectedGroup = params.group
-    ? buildReviewGroups(
-        filterReviewRows(enrichedRows, params),
-        categoryRows,
-        subcategoryRows,
-        workspace.id,
-        {
-          scope: params.scope,
-          issue: params.issue,
-          query: params.query,
-          reason: params.reason,
-          group: params.group
-        }
-      ).find((group) => group.key === params.group) ?? null
+    ? (perf
+        ? perf.measureSync(
+            "selected_group",
+            () =>
+              buildReviewGroups(
+                filterReviewRows(enrichedRows, params),
+                categoryRows,
+                subcategoryRows,
+                workspace.id,
+                {
+                  scope: params.scope,
+                  issue: params.issue,
+                  query: params.query,
+                  reason: params.reason,
+                  group: params.group
+                }
+              ).find((group) => group.key === params.group) ?? null
+          )
+        : buildReviewGroups(
+            filterReviewRows(enrichedRows, params),
+            categoryRows,
+            subcategoryRows,
+            workspace.id,
+            {
+              scope: params.scope,
+              issue: params.issue,
+              query: params.query,
+              reason: params.reason,
+              group: params.group
+            }
+          ).find((group) => group.key === params.group) ?? null)
     : null;
-  const filteredRows = filterReviewRows(enrichedRows, params);
+  const filteredRows = perf
+    ? perf.measureSync("filter_review_rows", () => filterReviewRows(enrichedRows, params), (result) => ({ rows: result.length }))
+    : filterReviewRows(enrichedRows, params);
   const offset = (params.page - 1) * params.pageSize;
   const directPageRows = canUseDirectReviewPageRows(params)
     ? await getWorkspaceReviewRows(versionContext, workspace.id, {
         limit: params.pageSize,
-        offset
+        offset,
+        perf,
+        stage: "page_review_rows_sql"
       })
     : null;
   const pageRows = directPageRows
-    ? directPageRows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug))
-    : filteredRows.slice(offset, offset + params.pageSize);
-  const changes = workspace.id ? await getReviewWorkspaceChanges(workspace.id) : [];
+    ? perf
+      ? perf.measureSync(
+          "page_rows_enrichment",
+          () => directPageRows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug, classificationStats)),
+          (result) => ({ rows: result.length })
+        )
+      : directPageRows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug))
+    : perf
+      ? perf.measureSync(
+          "pagination_slice",
+          () => filteredRows.slice(offset, offset + params.pageSize),
+          (result) => ({ rows: result.length, total: filteredRows.length })
+        )
+      : filteredRows.slice(offset, offset + params.pageSize);
+  const changes = workspace.id ? await getReviewWorkspaceChanges(workspace.id, perf) : [];
   const summary = buildReviewQueueSummary(enrichedRows, groups, workspace, versionContext, queueStats);
   const reasonOptions = buildReasonOptions(enrichedRows);
   const categoryById = new Map(categoryRows.map((category) => [category.id, category]));
   const subcategoryById = new Map(subcategoryRows.map((subcategory) => [subcategory.id, subcategory]));
 
-  return {
+  const result = {
     params,
     issueLabels: ISSUE_LABELS,
     versionContext,
@@ -510,14 +589,36 @@ export async function getAdminReviewPageData(
     },
     items: pageRows.map((row) => mapReviewItem(row, categoryById, subcategoryById))
   };
+
+  if (classificationStats) {
+    perf?.log("classification_aggregate", {
+      duration_ms: classificationStats.totalDurationMs,
+      calls: classificationStats.calls,
+      rows: classificationStats.calls,
+      avg_ms: classificationStats.calls > 0 ? classificationStats.totalDurationMs / classificationStats.calls : 0,
+      max_ms: classificationStats.maxDurationMs,
+      total_rules: categorizationContext.rules.length
+    });
+  }
+  perf?.log("get_admin_review_page_data", {
+    duration_ms: perf.elapsed(timer),
+    rows: rows.length,
+    total: queueStats.total
+  });
+
+  return result;
 }
 
-export async function getReviewWorkspace(sourceCatalogVersionId: string | null): Promise<ReviewWorkspaceSummary> {
+export async function getReviewWorkspace(
+  sourceCatalogVersionId: string | null,
+  perf?: AdminReviewPerfLogger
+): Promise<ReviewWorkspaceSummary> {
   if (!sourceCatalogVersionId) {
     return emptyWorkspace(null);
   }
 
-  const [workspace] = await db
+  const workspaceTimer = perf?.start();
+  const workspaceQuery = db
     .select({
       id: reviewWorkspaces.id,
       sourceCatalogVersionId: reviewWorkspaces.sourceCatalogVersionId,
@@ -536,17 +637,26 @@ export async function getReviewWorkspace(sourceCatalogVersionId: string | null):
     )
     .orderBy(desc(reviewWorkspaces.createdAt))
     .limit(1);
+  const [workspace] = perf
+    ? await perf.observe("workspace_lookup", workspaceTimer, workspaceQuery, (result) => ({ rows: result.length }))
+    : await workspaceQuery;
 
   if (!workspace) {
     return emptyWorkspace(sourceCatalogVersionId);
   }
 
+  const countersTimer = perf?.start();
   const [preparedProductCount, excludedProductCount, actionCount, latestAction] = await Promise.all([
     countWorkspaceItems(workspace.id, "pending"),
     countWorkspaceItems(workspace.id, "excluded"),
     countWorkspaceActions(workspace.id),
     getLatestWorkspaceAction(workspace.id)
   ]);
+  perf?.log("workspace_counters", {
+    duration_ms: perf.elapsed(countersTimer),
+    rows: preparedProductCount + excludedProductCount,
+    total: actionCount
+  });
 
   return {
     id: workspace.id,
@@ -1077,8 +1187,12 @@ export async function publishReviewWorkspace(input: { adminUserId: string }) {
   };
 }
 
-export async function getReviewWorkspaceChanges(workspaceId: string): Promise<ReviewWorkspaceChange[]> {
-  return db
+export async function getReviewWorkspaceChanges(
+  workspaceId: string,
+  perf?: AdminReviewPerfLogger
+): Promise<ReviewWorkspaceChange[]> {
+  const changesTimer = perf?.start();
+  const changesQuery = db
     .select({
       id: reviewWorkspaceActions.id,
       actionType: reviewWorkspaceActions.actionType,
@@ -1099,6 +1213,10 @@ export async function getReviewWorkspaceChanges(workspaceId: string): Promise<Re
     .where(eq(reviewWorkspaceActions.workspaceId, workspaceId))
     .orderBy(desc(reviewWorkspaceActions.createdAt))
     .limit(20);
+
+  return perf
+    ? perf.observe("workspace_actions", changesTimer, changesQuery, (result) => ({ rows: result.length }))
+    : changesQuery;
 }
 
 async function applyReviewRuleToWorkspace(input: {
@@ -1374,8 +1492,9 @@ async function applyReviewRuleToWorkspace(input: {
   };
 }
 
-async function getReviewVersionContext(): Promise<VersionContext> {
-  const [latestDraft, latestActive] = await Promise.all([
+async function getReviewVersionContext(perf?: AdminReviewPerfLogger): Promise<VersionContext> {
+  const versionsTimer = perf?.start();
+  const versionsQuery = Promise.all([
     db
       .select({
         id: catalogVersions.id,
@@ -1398,6 +1517,11 @@ async function getReviewVersionContext(): Promise<VersionContext> {
       .orderBy(desc(catalogVersions.publishedAt), desc(catalogVersions.createdAt))
       .limit(1)
   ]);
+  const [latestDraft, latestActive] = perf
+    ? await perf.observe("catalog_versions", versionsTimer, versionsQuery, ([draft, active]) => ({
+        rows: draft.length + active.length
+      }))
+    : await versionsQuery;
 
   return {
     latestDraft: latestDraft[0] ?? null,
@@ -1408,15 +1532,22 @@ async function getReviewVersionContext(): Promise<VersionContext> {
 async function getWorkspaceReviewRows(
   versionContext: VersionContext,
   workspaceId: string | null,
-  options: { limit?: number; offset?: number } = {}
+  options: {
+    limit?: number;
+    offset?: number;
+    perf?: AdminReviewPerfLogger;
+    stage?: string;
+  } = {}
 ) {
   if (!versionContext.activeVersion) {
     return [];
   }
 
+  const activeVersionId = versionContext.activeVersion.id;
   const limit = Math.max(1, Math.min(options.limit ?? MAX_ACTION_REVIEW_ROWS, MAX_ACTION_REVIEW_ROWS));
   const offset = Math.max(0, options.offset ?? 0);
-  const rows = await db
+  const rowsTimer = options.perf?.start();
+  const rowsQuery = db
     .select({
       reviewId: reviewQueue.id,
       reason: reviewQueue.reason,
@@ -1453,20 +1584,23 @@ async function getWorkspaceReviewRows(
     .where(
       and(
         eq(reviewQueue.status, "open"),
-        eq(reviewQueue.catalogVersionId, versionContext.activeVersion.id),
+        eq(reviewQueue.catalogVersionId, activeVersionId),
         inArray(products.status, REVIEWABLE_PRODUCT_STATUSES)
       )
     )
     .orderBy(asc(reviewQueue.createdAt))
     .limit(limit)
-    .offset(offset);
+    .offset(offset) as Promise<ReviewRow[]>;
 
-  return rows as ReviewRow[];
+  return options.perf
+    ? options.perf.observe(options.stage ?? "review_rows_sql", rowsTimer, rowsQuery, (result) => ({ rows: result.length }))
+    : rowsQuery;
 }
 
 async function getReviewQueueStats(
   versionContext: VersionContext,
-  workspaceId: string | null
+  workspaceId: string | null,
+  perf?: AdminReviewPerfLogger
 ): Promise<ReviewQueueStats> {
   if (!versionContext.activeVersion) {
     return {
@@ -1477,7 +1611,9 @@ async function getReviewQueueStats(
     };
   }
 
-  const [row] = await db
+  const activeVersionId = versionContext.activeVersion.id;
+  const statsTimer = perf?.start();
+  const statsQuery = db
     .select({
       total: sql<number>`count(*)::int`,
       missingCategory: sql<number>`count(*) filter (where ${products.categoryId} is null)::int`,
@@ -1501,11 +1637,17 @@ async function getReviewQueueStats(
     .where(
       and(
         eq(reviewQueue.status, "open"),
-        eq(reviewQueue.catalogVersionId, versionContext.activeVersion.id),
+        eq(reviewQueue.catalogVersionId, activeVersionId),
         inArray(products.status, REVIEWABLE_PRODUCT_STATUSES),
         sql`${reviewWorkspaceItems.id} is null`
       )
     );
+  const [row] = perf
+    ? await perf.observe("review_queue_stats", statsTimer, statsQuery, (result) => ({
+        rows: result.length,
+        total: Number(result[0]?.total ?? 0)
+      }))
+    : await statsQuery;
 
   return {
     total: Number(row?.total ?? 0),
@@ -1600,9 +1742,17 @@ async function getRowsByReviewIds(reviewQueueIds: string[], workspaceId: string 
 function enrichReviewRow(
   row: ReviewRow,
   context: CategorizationContext,
-  targetBySlug: Map<string, CategorizationTarget>
+  targetBySlug: Map<string, CategorizationTarget>,
+  classificationStats?: ClassificationStats
 ): EnrichedReviewRow {
+  const classificationStartedAt = classificationStats ? performance.now() : 0;
   const suggestion = buildCategorySuggestion(row, context, targetBySlug);
+  if (classificationStats) {
+    const durationMs = Math.max(0, performance.now() - classificationStartedAt);
+    classificationStats.calls += 1;
+    classificationStats.totalDurationMs += durationMs;
+    classificationStats.maxDurationMs = Math.max(classificationStats.maxDurationMs, durationMs);
+  }
   const groupKey = buildGroupKey(row, suggestion);
   const groupLabel = buildGroupLabel(groupKey, row, suggestion);
 
@@ -1905,8 +2055,9 @@ function buildCategoryOptions(
   }));
 }
 
-function getActiveCategories() {
-  return db
+function getActiveCategories(perf?: AdminReviewPerfLogger) {
+  const categoriesTimer = perf?.start();
+  const categoriesQuery = db
     .select({
       id: categories.id,
       slug: categories.slug,
@@ -1916,10 +2067,15 @@ function getActiveCategories() {
     .from(categories)
     .where(eq(categories.isActive, true))
     .orderBy(asc(categories.sortOrder), asc(categories.name));
+
+  return perf
+    ? perf.observe("categories", categoriesTimer, categoriesQuery, (result) => ({ rows: result.length }))
+    : categoriesQuery;
 }
 
-function getActiveSubcategories() {
-  return db
+function getActiveSubcategories(perf?: AdminReviewPerfLogger) {
+  const subcategoriesTimer = perf?.start();
+  const subcategoriesQuery = db
     .select({
       id: subcategories.id,
       categoryId: subcategories.categoryId,
@@ -1930,6 +2086,10 @@ function getActiveSubcategories() {
     .from(subcategories)
     .where(eq(subcategories.isActive, true))
     .orderBy(asc(subcategories.sortOrder), asc(subcategories.name));
+
+  return perf
+    ? perf.observe("subcategories", subcategoriesTimer, subcategoriesQuery, (result) => ({ rows: result.length }))
+    : subcategoriesQuery;
 }
 
 function buildTargetBySlug(

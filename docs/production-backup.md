@@ -70,13 +70,17 @@ gunzip -c /var/backups/autozap/postgres/autozap-YYYYMMDD-HHMMSS.dump.gz > /tmp/a
 pg_restore --dbname="postgresql://autozap_user:CHANGE_ME@localhost:5432/autozap" --clean --if-exists --no-owner --no-acl /tmp/autozap.dump
 ```
 
-Пересоберите поиск и запустите приложение:
+Пересоберите поиск и запустите приложение через актуальный PM2 ecosystem:
 
 ```bash
 cd /var/www/autozap
 pnpm search:sync
-pm2 start autozap
+pm2 start ecosystem.config.cjs
 ```
+
+После запуска проверьте, что PM2 использует `/var/www/autozap/.next/standalone/server.js`,
+и выполните health checks из `docs/deployment.md`. Не выполняйте `pm2 save`, пока
+проверки не прошли успешно.
 
 ## Backup проекта
 

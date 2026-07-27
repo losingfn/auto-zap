@@ -13,6 +13,9 @@ type AdminReviewPerfMetrics = {
   calls?: number;
   avg_ms?: number;
   max_ms?: number;
+  page_rows_reused?: number;
+  page_rows_classified?: number;
+  page_rows_cache_miss?: number;
 };
 
 type AdminReviewPerfTimer = {
@@ -53,7 +56,10 @@ const metricOrder = [
   "total",
   "calls",
   "avg_ms",
-  "max_ms"
+  "max_ms",
+  "page_rows_reused",
+  "page_rows_classified",
+  "page_rows_cache_miss"
 ] as const;
 
 export function createAdminReviewPerfLogger(): AdminReviewPerfLogger | undefined {

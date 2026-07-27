@@ -1,36 +1,27 @@
 import { isOtherProductsTarget, isPublicTaxonomyTarget } from "@/config/public-taxonomy";
 import {
-  CONFIDENCE_MODEL_VERSION,
-  DOMAIN_DICTIONARY_VERSION,
-  DOMAIN_RULES_VERSION,
   dangerousBroadTokens,
   familyDefinitions,
   weakGeneralTokens,
   type ProductFamilyDefinition
-} from "./domain-config";
+} from "@/features/categorization/domain-config";
 import {
+  containsPhrase,
+  hasAnyToken,
   normalizeProductName,
-  normalizeProductText,
   normalizeTechnicalToken,
-  PRODUCT_NORMALIZER_VERSION,
   type NormalizedProductName
-} from "./normalization";
-import {
-  AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD,
-  type CategorizationCandidate,
-  type CategorizationContext,
-  type CategorizationResult,
-  type CategorizationSignal,
-  type CategorizationSource,
-  type CategorizationTarget
-} from "./types";
-
-export const CATEGORIZATION_PIPELINE_VERSION = [
-  PRODUCT_NORMALIZER_VERSION,
-  DOMAIN_DICTIONARY_VERSION,
-  DOMAIN_RULES_VERSION,
-  CONFIDENCE_MODEL_VERSION
-].join("+");
+} from "@/features/categorization/normalization";
+import { CATEGORIZATION_PIPELINE_VERSION } from "@/features/categorization/pipeline";
+import { AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD } from "@/features/categorization/types";
+import type {
+  CategorizationCandidate,
+  CategorizationContext,
+  CategorizationResult,
+  CategorizationSignal,
+  CategorizationSource,
+  CategorizationTarget
+} from "@/features/categorization/types";
 
 interface FamilyCandidate {
   family: ProductFamilyDefinition;
@@ -41,45 +32,27 @@ interface FamilyCandidate {
   source: CategorizationSource;
 }
 
-type CompiledTokenMatcher = {
-  value: string;
-  normalized: string;
-  technical: string;
+export type PipelineReferenceMetrics = {
+  familyEvaluations: number;
+  familyCandidates: number;
+  productNormalizations: number;
+  staticFamilyNormalizations: number;
 };
 
-type CompiledPhraseMatcher = {
-  value: string;
-  pattern: RegExp | null;
-};
+export function createPipelineReferenceMetrics(): PipelineReferenceMetrics {
+  return {
+    familyEvaluations: 0,
+    familyCandidates: 0,
+    productNormalizations: 0,
+    staticFamilyNormalizations: 0
+  };
+}
 
-type CompiledTechnicalMatcher = {
-  value: string;
-  normalized: string;
-};
-
-type CompiledNegativeMatcher =
-  | { kind: "phrase"; matcher: CompiledPhraseMatcher }
-  | { kind: "token"; matcher: CompiledTokenMatcher };
-
-type CompiledFamilyDefinition = {
-  original: ProductFamilyDefinition;
-  requiredAny: readonly CompiledTokenMatcher[];
-  requiredAll?: readonly CompiledTokenMatcher[];
-  contextAny?: readonly CompiledTokenMatcher[];
-  strongPhrases: readonly CompiledPhraseMatcher[];
-  technicalAny?: readonly CompiledTechnicalMatcher[];
-  optional?: readonly CompiledTokenMatcher[];
-  negative: readonly CompiledNegativeMatcher[];
-};
-
-const compiledFamilyDefinitions: readonly CompiledFamilyDefinition[] = Object.freeze(
-  familyDefinitions.map(compileFamilyDefinition)
-);
-
-export function classifyWithDomainPipeline(
+export function classifyWithDomainPipelineReference(
   productName: string,
   context: CategorizationContext,
-  legacyResult: CategorizationResult
+  legacyResult: CategorizationResult,
+  metrics?: PipelineReferenceMetrics
 ): CategorizationResult {
   if (legacyResult.source === "existing_product_category") {
     return {
@@ -90,6 +63,7 @@ export function classifyWithDomainPipeline(
     };
   }
 
+  metrics && (metrics.productNormalizations += 1);
   const features = normalizeProductName(productName);
   if (!features.normalized) {
     return {
@@ -107,8 +81,8 @@ export function classifyWithDomainPipeline(
     };
   }
 
-  const familyCandidates = compiledFamilyDefinitions
-    .map((family) => evaluateFamilyCandidate(family, features, context, legacyResult))
+  const familyCandidates = familyDefinitions
+    .map((family) => evaluateFamilyCandidateReference(family, features, context, legacyResult, metrics))
     .filter((candidate): candidate is FamilyCandidate => candidate !== null);
   const legacyCandidate = legacyResult.target
     ? toLegacyCandidate(legacyResult, features)
@@ -129,7 +103,7 @@ export function classifyWithDomainPipeline(
         kind: "validation",
         value: "Нет семейства, правила или безопасного похожего target."
       }
-    ]);
+    ], metrics);
   }
 
   const conflictGap = second ? best.score - second.score : 1;
@@ -213,34 +187,30 @@ export function classifyWithDomainPipeline(
   };
 }
 
-function evaluateFamilyCandidate(
-  compiledFamily: CompiledFamilyDefinition,
+function evaluateFamilyCandidateReference(
+  family: ProductFamilyDefinition,
   features: NormalizedProductName,
   context: CategorizationContext,
-  legacyResult: CategorizationResult
+  legacyResult: CategorizationResult,
+  metrics?: PipelineReferenceMetrics
 ): FamilyCandidate | null {
-  const family = compiledFamily.original;
-  const strongPhrases = compiledFamily.strongPhrases
-    .filter((phrase) => matchesCompiledPhrase(features, phrase))
-    .map((phrase) => phrase.value);
-  const requiredAnyMatched = compiledFamily.requiredAny
-    .filter((token) => matchesCompiledToken(features, token))
-    .map((token) => token.value);
-  const requiredAllMatched = compiledFamily.requiredAll
-    ?.filter((token) => matchesCompiledToken(features, token))
-    .map((token) => token.value) ?? [];
+  if (metrics) metrics.familyEvaluations += 1;
+  const strongPhrases = (family.strongPhrases ?? []).filter((phrase) => {
+    if (metrics) metrics.staticFamilyNormalizations += 1;
+    return containsPhrase(features, phrase);
+  });
+  const requiredAnyMatched = family.requiredAny.filter((token) => matchesReferenceToken(features, token, metrics));
+  const requiredAllMatched = family.requiredAll?.filter((token) => matchesReferenceToken(features, token, metrics)) ?? [];
   const requiredAllOk =
-    !compiledFamily.requiredAll || requiredAllMatched.length === compiledFamily.requiredAll.length;
-  const contextMatched = compiledFamily.contextAny
-    ?.filter((token) => matchesCompiledToken(features, token))
-    .map((token) => token.value) ?? [];
-  const contextOk = !compiledFamily.contextAny || contextMatched.length > 0;
-  const technicalMatched = compiledFamily.technicalAny
-    ?.filter((token) => features.technicalTokens.includes(token.normalized))
-    .map((token) => token.value) ?? [];
-  const optionalMatched = compiledFamily.optional
-    ?.filter((token) => matchesCompiledToken(features, token))
-    .map((token) => token.value) ?? [];
+    !family.requiredAll || requiredAllMatched.length === family.requiredAll.length;
+  const contextMatched = family.contextAny?.filter((token) => matchesReferenceToken(features, token, metrics)) ?? [];
+  const contextOk = !family.contextAny || contextMatched.length > 0;
+  const technicalMatched =
+    family.technicalAny?.filter((token) => {
+      if (metrics) metrics.staticFamilyNormalizations += 1;
+      return features.technicalTokens.includes(normalizeTechnicalToken(token));
+    }) ?? [];
+  const optionalMatched = family.optional?.filter((token) => matchesReferenceToken(features, token, metrics)) ?? [];
   const hasRequiredAny = requiredAnyMatched.length > 0;
   const phraseCanOpen = strongPhrases.length > 0;
 
@@ -253,13 +223,10 @@ function evaluateFamilyCandidate(
     return null;
   }
 
-  const negativeEvidence = compiledFamily.negative
-    .filter((matcher) =>
-      matcher.kind === "phrase"
-        ? matchesCompiledPhrase(features, matcher.matcher)
-        : matchesCompiledToken(features, matcher.matcher)
-    )
-    .map((matcher) => matcher.matcher.value);
+  const negativeEvidence = (family.negative ?? []).filter((token) => {
+    if (metrics) metrics.staticFamilyNormalizations += 1;
+    return token.includes(" ") ? containsPhrase(features, token) : hasAnyToken(features, [token]);
+  });
   const legacyAgrees = sameTarget(legacyResult.target, target);
   const evidence = [
     ...requiredAnyMatched.map((token) => `term:${token}`),
@@ -288,6 +255,7 @@ function evaluateFamilyCandidate(
   score -= features.usefulTokenCount <= 1 ? 0.04 : 0;
   score -= features.digitRatio > 0.75 ? 0.08 : 0;
 
+  if (metrics) metrics.familyCandidates += 1;
   return {
     family,
     target,
@@ -302,76 +270,13 @@ function evaluateFamilyCandidate(
   };
 }
 
-function compileFamilyDefinition(family: ProductFamilyDefinition): CompiledFamilyDefinition {
-  return Object.freeze({
-    original: family,
-    requiredAny: compileTokenMatchers(family.requiredAny),
-    requiredAll: family.requiredAll ? compileTokenMatchers(family.requiredAll) : undefined,
-    contextAny: family.contextAny ? compileTokenMatchers(family.contextAny) : undefined,
-    strongPhrases: compilePhraseMatchers(family.strongPhrases ?? []),
-    technicalAny: family.technicalAny ? compileTechnicalMatchers(family.technicalAny) : undefined,
-    optional: family.optional ? compileTokenMatchers(family.optional) : undefined,
-    negative: compileNegativeMatchers(family.negative ?? [])
-  });
-}
-
-function compileTokenMatchers(values: string[]): readonly CompiledTokenMatcher[] {
-  return Object.freeze(values.map(compileTokenMatcher));
-}
-
-function compileTokenMatcher(value: string): CompiledTokenMatcher {
-  const normalized = normalizeProductText(value);
-  return Object.freeze({ value, normalized, technical: normalizeTechnicalToken(normalized) });
-}
-
-function compilePhraseMatchers(values: string[]): readonly CompiledPhraseMatcher[] {
-  return Object.freeze(values.map(compilePhraseMatcher));
-}
-
-function compilePhraseMatcher(value: string): CompiledPhraseMatcher {
-  const normalized = normalizeProductText(value);
-  const pattern = normalized
-    ? new RegExp(
-        `(^|\\s)${normalized.split(/\\s+/).map(escapeRegExp).join("\\s+")}(\\s|$)`,
-        "iu"
-      )
-    : null;
-
-  return Object.freeze({ value, pattern });
-}
-
-function compileTechnicalMatchers(values: string[]): readonly CompiledTechnicalMatcher[] {
-  return Object.freeze(
-    values.map((value) => Object.freeze({ value, normalized: normalizeTechnicalToken(value) }))
-  );
-}
-
-function compileNegativeMatchers(values: string[]): readonly CompiledNegativeMatcher[] {
-  return Object.freeze(
-    values.map((value) =>
-      value.includes(" ")
-        ? Object.freeze({ kind: "phrase" as const, matcher: compilePhraseMatcher(value) })
-        : Object.freeze({ kind: "token" as const, matcher: compileTokenMatcher(value) })
-    )
-  );
-}
-
-function matchesCompiledToken(features: NormalizedProductName, matcher: CompiledTokenMatcher) {
-  if (matcher.technical) {
-    return features.technicalTokens.includes(matcher.technical);
-  }
-
-  return features.tokens.some(
-    (current) => current === matcher.normalized || current.startsWith(matcher.normalized)
-  );
-}
-
-function matchesCompiledPhrase(features: NormalizedProductName, matcher: CompiledPhraseMatcher) {
-  return matcher.pattern?.test(features.normalized) ?? false;
-}
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function matchesReferenceToken(
+  features: NormalizedProductName,
+  token: string,
+  metrics?: PipelineReferenceMetrics
+) {
+  if (metrics) metrics.staticFamilyNormalizations += 1;
+  return hasAnyToken(features, [token]);
 }
 
 function toLegacyCandidate(
@@ -430,9 +335,10 @@ function buildManualResult(
   legacyResult: CategorizationResult,
   features: NormalizedProductName,
   reviewReasonCode: string,
-  signals: CategorizationSignal[]
+  signals: CategorizationSignal[],
+  metrics?: PipelineReferenceMetrics
 ): CategorizationResult {
-  const doNotPublishReasonCode = getDoNotPublishReasonCode(features, reviewReasonCode);
+  const doNotPublishReasonCode = getDoNotPublishReasonCode(features, reviewReasonCode, metrics);
 
   if (doNotPublishReasonCode) {
     return {
@@ -500,50 +406,28 @@ function resolveTarget(
     return fallback;
   }
 
-  return {
-    categorySlug,
-    subcategorySlug
-  };
+  return { categorySlug, subcategorySlug };
 }
 
-function getDoNotPublishReasonCode(features: NormalizedProductName, reviewReasonCode: string) {
-  const semanticTokens = features.significantTokens.filter(
-    (token) => !features.codeTokens.includes(token) && !isNonSemanticToken(token)
-  );
+function getDoNotPublishReasonCode(
+  features: NormalizedProductName,
+  reviewReasonCode: string,
+  metrics?: PipelineReferenceMetrics
+) {
+  const semanticTokens = features.significantTokens.filter((token) => {
+    if (features.codeTokens.includes(token)) return false;
+    if (metrics) metrics.productNormalizations += 1;
+    return !isNonSemanticToken(token);
+  });
   const weakSemanticTokens = semanticTokens.filter((token) => weakGeneralTokens.has(token));
   const strongSemanticTokens = semanticTokens.filter((token) => !weakGeneralTokens.has(token));
 
-  if (semanticTokens.length === 0 && features.measurements.length > 0) {
-    return "SIZE_ONLY";
-  }
-
-  if (
-    semanticTokens.length === 0 &&
-    (features.codeTokens.length > 0 || features.technicalTokens.length > 0)
-  ) {
-    return "CODE_ONLY";
-  }
-
-  if (semanticTokens.length > 0 && strongSemanticTokens.length === 0 && weakSemanticTokens.length > 0) {
-    return "GENERIC_NAME_ONLY";
-  }
-
-  if (features.digitRatio > 0.8 && strongSemanticTokens.length === 0) {
-    return "CORRUPTED_NAME";
-  }
-
-  if (features.usefulTokenCount === 0 && semanticTokens.length === 0) {
-    return "INSUFFICIENT_SEMANTIC_DATA";
-  }
-
-  if (
-    reviewReasonCode === "no_candidate" &&
-    strongSemanticTokens.length === 1 &&
-    !dangerousBroadTokens.has(strongSemanticTokens[0]!)
-  ) {
-    return "UNKNOWN_PRODUCT_TYPE";
-  }
-
+  if (semanticTokens.length === 0 && features.measurements.length > 0) return "SIZE_ONLY";
+  if (semanticTokens.length === 0 && (features.codeTokens.length > 0 || features.technicalTokens.length > 0)) return "CODE_ONLY";
+  if (semanticTokens.length > 0 && strongSemanticTokens.length === 0 && weakSemanticTokens.length > 0) return "GENERIC_NAME_ONLY";
+  if (features.digitRatio > 0.8 && strongSemanticTokens.length === 0) return "CORRUPTED_NAME";
+  if (features.usefulTokenCount === 0 && semanticTokens.length === 0) return "INSUFFICIENT_SEMANTIC_DATA";
+  if (reviewReasonCode === "no_candidate" && strongSemanticTokens.length === 1 && !dangerousBroadTokens.has(strongSemanticTokens[0]!)) return "UNKNOWN_PRODUCT_TYPE";
   return null;
 }
 
@@ -551,8 +435,8 @@ function isNonSemanticToken(token: string) {
   const normalized = normalizeProductName(token).normalized;
   return (
     /^[a-zа-я]?\d+[a-zа-я]?(?:[.*-]\d+)*(?:мм|см|м)?$/iu.test(normalized) ||
-    /^din\d+$/iu.test(normalized) ||
-    /^\d+$/iu.test(normalized)
+    /^din\d$/iu.test(normalized) ||
+    /^\d+$/.test(normalized)
   );
 }
 
@@ -604,25 +488,13 @@ function buildDecisionReason(
   decisionStatus: "AUTO_READY" | "GROUP_REVIEW" | "MANUAL_REVIEW"
 ) {
   const evidence = candidate.evidence.slice(0, 4).join(", ");
-  if (decisionStatus === "AUTO_READY") {
-    return `${candidate.family.description} Сигналы согласованы: ${evidence}.`;
-  }
-  if (decisionStatus === "GROUP_REVIEW") {
-    return `Предложена узкая группа "${candidate.family.label}" для быстрого подтверждения: ${evidence}.`;
-  }
+  if (decisionStatus === "AUTO_READY") return `${candidate.family.description} Сигналы согласованы: ${evidence}.`;
+  if (decisionStatus === "GROUP_REVIEW") return `Предложена узкая группа "${candidate.family.label}" для быстрого подтверждения: ${evidence}.`;
   return `Кандидат "${candidate.family.label}" слабый: ${evidence}.`;
 }
 
-function sameTarget(
-  left: CategorizationTarget | null | undefined,
-  right: CategorizationTarget | null | undefined
-) {
-  return Boolean(
-    left &&
-      right &&
-      left.categorySlug === right.categorySlug &&
-      left.subcategorySlug === right.subcategorySlug
-  );
+function sameTarget(left: CategorizationTarget | null | undefined, right: CategorizationTarget | null | undefined) {
+  return Boolean(left && right && left.categorySlug === right.categorySlug && left.subcategorySlug === right.subcategorySlug);
 }
 
 function clamp(value: number) {

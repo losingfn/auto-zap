@@ -26,6 +26,10 @@ import {
   validateRulePattern
 } from "@/features/categorization/learning";
 import { getCategorizationContext } from "@/features/categorization/repository";
+import {
+  reuseEnrichedPageRows,
+  type PageRowsReuseMetrics
+} from "@/features/admin/review-page-enrichment";
 import type {
   CategorizationContext,
   CategorizationTarget
@@ -545,13 +549,28 @@ export async function getAdminReviewPageData(
       })
     : null;
   const pageRows = directPageRows
-    ? perf
-      ? perf.measureSync(
-          "page_rows_enrichment",
-          () => directPageRows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug, classificationStats)),
-          (result) => ({ rows: result.length })
-        )
-      : directPageRows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug))
+    ? (() => {
+        const enrichedByReviewId = new Map(enrichedRows.map((row) => [row.reviewId, row]));
+        const pageRowsReuseMetrics: PageRowsReuseMetrics | undefined = perf
+          ? { pageRowsReused: 0, pageRowsClassified: 0, pageRowsCacheMiss: 0 }
+          : undefined;
+        const enrichPageRows = () =>
+          reuseEnrichedPageRows(
+            directPageRows,
+            enrichedByReviewId,
+            (row) => enrichReviewRow(row, categorizationContext, targetBySlug, classificationStats),
+            pageRowsReuseMetrics
+          );
+
+        return perf
+          ? perf.measureSync("page_rows_enrichment", enrichPageRows, (result) => ({
+              rows: result.length,
+              page_rows_reused: pageRowsReuseMetrics?.pageRowsReused ?? 0,
+              page_rows_classified: pageRowsReuseMetrics?.pageRowsClassified ?? 0,
+              page_rows_cache_miss: pageRowsReuseMetrics?.pageRowsCacheMiss ?? 0
+            }))
+          : enrichPageRows();
+      })()
     : perf
       ? perf.measureSync(
           "pagination_slice",

@@ -40,16 +40,13 @@ pnpm dev
 
 Минимум для production:
 
-```env
-APP_URL=https://example.ru
-NODE_ENV=production
-DATABASE_URL=postgresql://autozap_user:CHANGE_ME@localhost:5432/autozap
-MEILI_HOST=http://localhost:7700
-MEILI_MASTER_KEY=CHANGE_ME_LONG_RANDOM_MEILI_MASTER_KEY
-MEILI_SEARCH_KEY=
-SESSION_SECRET=CHANGE_ME_LONG_RANDOM_SESSION_SECRET_AT_LEAST_32_CHARS
-YANDEX_MAPS_API_KEY=
-```
+- `APP_URL=https://autozapchast-taldom.ru`;
+- `NODE_ENV=production`;
+- `DATABASE_URL` для PostgreSQL базы `autozap`;
+- `MEILI_HOST=http://127.0.0.1:7700` или фактический локальный адрес Meilisearch;
+- `MEILI_MASTER_KEY`;
+- `SESSION_SECRET`;
+- `YANDEX_MAPS_API_KEY`, если используется.
 
 Важное:
 
@@ -67,8 +64,8 @@ pnpm dev                         # локальный dev-сервер
 pnpm lint                        # ESLint
 pnpm typecheck                   # проверка TypeScript
 pnpm build                       # production build
-pnpm start                       # next start
-pnpm start:prod                  # next start на 127.0.0.1:3000
+pnpm start                       # standalone Next.js server
+pnpm start:prod                  # standalone server на 127.0.0.1:3000
 pnpm db:migrate                  # применить SQL-миграции
 pnpm db:seed                     # заполнить категории, правила и синонимы
 pnpm admin:create -- --email ... # создать или обновить администратора
@@ -76,51 +73,32 @@ pnpm import:check data/import-samples/catalog.xls
 pnpm search:sync                 # пересобрать Meilisearch индекс
 ```
 
+`pnpm start` и `pnpm start:prod` запускают standalone-сервер вручную и полезны для
+локальной проверки. Production не запускается вручную через `pnpm start`:
+production всегда работает через PM2 с `ecosystem.config.cjs`. Полный регламент
+находится в `docs/deployment.md`.
+
 Для автоматических серверных скриптов без TTY можно запускать команды как `CI=true pnpm build`.
 
-## Production build
+## Production
 
-Перед `pnpm build` на сервере должны быть готовы:
+Полная production-инструкция находится в `docs/deployment.md`.
 
-1. `.env`;
-2. PostgreSQL;
-3. Meilisearch;
-4. миграции БД;
-5. seed-данные;
-6. администратор.
-
-Базовый порядок:
+Критично: проект использует Next.js `output: "standalone"`. Production PM2 должен
+запускать только:
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm db:migrate
-pnpm db:seed
-pnpm admin:create -- --email admin@example.ru --password "CHANGE_ME_STRONG_PASSWORD" --name "Администратор" --role owner
-pnpm build
+/var/www/autozap/.next/standalone/server.js
 ```
 
-## Production start через PM2
+через `ecosystem.config.cjs`.
 
-Файл `ecosystem.config.cjs` запускает Next.js напрямую:
+`next start` в production запрещён. `pnpm build` нельзя запускать при работающем PM2
+в том же каталоге `/var/www/autozap`, потому что build меняет `.next` и может
+временно оставить пользователей без CSS, JS, изображений или с ошибкой
+`Failed to find Server Action`.
 
-```bash
-mkdir -p /var/www/autozap/logs/pm2
-pm2 start ecosystem.config.cjs
-pm2 save
-pm2 startup systemd
-```
-
-Полезные команды:
-
-```bash
-pm2 status
-pm2 logs autozap
-pm2 restart autozap
-pm2 stop autozap
-pm2 flush autozap
-```
-
-Логи пишутся в:
+Логи PM2:
 
 - `/var/www/autozap/logs/pm2/out.log`
 - `/var/www/autozap/logs/pm2/error.log`
@@ -129,7 +107,11 @@ pm2 flush autozap
 
 Шаблон находится в `deploy/nginx/autozap.conf`.
 
-Замените `example.ru` и `www.example.ru` на реальный домен, затем:
+В production Nginx должен использовать реальные домены
+`autozapchast-taldom.ru` и `www.autozapchast-taldom.ru`. Полная инструкция
+настройки находится в `docs/deployment.md`.
+
+Базовые проверки после правки server block:
 
 ```bash
 sudo cp deploy/nginx/autozap.conf /etc/nginx/sites-available/autozap
@@ -150,11 +132,9 @@ sudo systemctl reload nginx
 
 ```bash
 sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d example.ru -d www.example.ru
+sudo certbot --nginx -d autozapchast-taldom.ru -d www.autozapchast-taldom.ru
 sudo certbot renew --dry-run
 ```
-
-`example.ru` замените на реальный домен.
 
 ## PostgreSQL
 
@@ -166,15 +146,16 @@ sudo -u postgres psql
 ```
 
 ```sql
-CREATE USER autozap_user WITH PASSWORD 'CHANGE_ME';
+CREATE USER autozap_user;
+\password autozap_user
 CREATE DATABASE autozap OWNER autozap_user;
 \q
 ```
 
-Проверка:
+Проверка выполняется с `DATABASE_URL` из production `.env`:
 
 ```bash
-psql "postgresql://autozap_user:CHANGE_ME@localhost:5432/autozap" -c "select 1;"
+scripts/with-env.sh psql "$DATABASE_URL" -c "select 1;"
 ```
 
 ## Meilisearch
@@ -207,24 +188,11 @@ deploy/scripts/backup-postgres.sh
 
 ## Обновление сайта
 
-```bash
-cd /var/www/autozap
-git pull
-pnpm install --frozen-lockfile
-pnpm db:migrate
-pnpm build
-pm2 restart autozap
-pm2 status
-```
+Не используйте короткий deploy из нескольких команд. Для этого проекта безопасный
+регламент включает backup, проверку PM2 entrypoint, остановку PM2 до `pnpm build`,
+запуск через `ecosystem.config.cjs`, строгие health checks и только затем `pm2 save`.
 
-После обновления проверьте:
-
-- `/`
-- `/catalog`
-- `/search?q=масло`
-- `/admin`
-- `/robots.txt`
-- `/sitemap.xml`
+Полный порядок: `docs/deployment.md`.
 
 ## Документация
 

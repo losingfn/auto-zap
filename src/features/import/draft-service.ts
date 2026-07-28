@@ -1,5 +1,4 @@
 import { and, desc, eq } from "drizzle-orm";
-import { isPublicTaxonomyTarget } from "@/config/public-taxonomy";
 import { db } from "@/db/client";
 import {
   categories,
@@ -11,25 +10,25 @@ import {
   reviewQueue,
   subcategories
 } from "@/db/schema";
-import {
-  categorizeProductName,
-  getCategorizationConfidenceBucket,
-  normalizeForCategorization
-} from "@/features/categorization/engine";
+import { getCategorizationConfidenceBucket, normalizeForCategorization } from "@/features/categorization/engine";
 import { getCategorizationContext } from "@/features/categorization/repository";
 import {
   AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD,
-  type CategorizationContext,
   type CategorizationResult,
   type CategorizationSource,
-  type CategorizationTarget
 } from "@/features/categorization/types";
 import { buildProductSearchText } from "@/features/search/documents";
 import { getSearchSynonyms } from "@/features/search/synonyms";
 import type { SearchSynonymRecord } from "@/features/search/types";
 import { slugify } from "@/lib/slug";
+import type { ImportPerfLogger } from "@/lib/server/import-perf";
 import { analyzeImportFile } from "./analyze";
 import { needsProductReview, resolveDraftProductStatus, resolveImportProductName } from "./automation";
+import {
+  createDraftClassificationRun,
+  isImportProductCandidate,
+  type DraftClassificationRun
+} from "./draft-classification";
 import { evaluateImportSafety } from "./safety";
 import type {
   AnalyzedImportRow,
@@ -45,6 +44,7 @@ export interface CreateDraftImportInput {
   fileHash?: string;
   uploadedBy?: string;
   storagePath?: string;
+  perf?: ImportPerfLogger;
 }
 
 export interface CreateDraftImportResult {
@@ -56,24 +56,100 @@ export interface CreateDraftImportResult {
 export async function createDraftImport(
   input: CreateDraftImportInput
 ): Promise<CreateDraftImportResult> {
-  const existingProducts = await getActiveProducts();
-  const [categorizationContext, searchSynonyms] = await Promise.all([
-    getCategorizationContext(),
-    getSearchSynonyms()
-  ]);
-  const analysis = analyzeImportFile(input.filePath, {
-    existingProducts,
-    fileBuffer: input.fileBuffer,
-    fileName: input.sourceFileName
-  });
-  const report = withCategorizationReport(
-    analysis.report,
-    analysis.rows,
-    categorizationContext,
-    existingProducts
-  );
+  const perf = input.perf;
+  const prepared = perf
+    ? await perf.measure("prepare_input_data", async () => {
+        const existingProducts = await getActiveProducts();
+        const [categorizationContext, searchSynonyms] = await Promise.all([
+          getCategorizationContext(),
+          getSearchSynonyms()
+        ]);
+        return { existingProducts, categorizationContext, searchSynonyms };
+      })
+    : {
+        existingProducts: await getActiveProducts(),
+        ...(await Promise.all([getCategorizationContext(), getSearchSynonyms()]).then(
+          ([categorizationContext, searchSynonyms]) => ({ categorizationContext, searchSynonyms })
+        ))
+      };
+  const analysis = perf
+    ? await perf.measure(
+        "parse_excel",
+        () =>
+          analyzeImportFile(input.filePath, {
+            existingProducts: prepared.existingProducts,
+            fileBuffer: input.fileBuffer,
+            fileName: input.sourceFileName
+          }),
+        { rows: (value) => value.rows.length }
+      )
+    : analyzeImportFile(input.filePath, {
+        existingProducts: prepared.existingProducts,
+        fileBuffer: input.fileBuffer,
+        fileName: input.sourceFileName
+      });
+  const classificationRows = perf
+    ? analysis.rows.filter(isImportProductCandidate).length
+    : undefined;
+  const classificationObserver = perf?.createClassificationObserver();
+  let classificationRun: DraftClassificationRun;
 
-  return db.transaction(async (tx) => {
+  try {
+    classificationRun = perf
+      ? await perf.measure(
+          "classification",
+          () =>
+            createDraftClassificationRun({
+              rows: analysis.rows,
+              categorizationContext: prepared.categorizationContext,
+              existingProducts: prepared.existingProducts,
+              observer: classificationObserver
+            }),
+          { rows: classificationRows }
+        )
+      : createDraftClassificationRun({
+          rows: analysis.rows,
+          categorizationContext: prepared.categorizationContext,
+          existingProducts: prepared.existingProducts
+        });
+    await classificationObserver?.log("success");
+  } catch (error) {
+    await classificationObserver?.log("error");
+    throw error;
+  }
+
+  const reportMeasurement = perf?.start();
+  let reportStatus: "success" | "error" = "success";
+  let report: ReturnType<typeof analyzeImportFile>["report"];
+
+  try {
+    const categorizationSummary = buildCategorizationSummary(analysis.rows, classificationRun);
+    const autoCategorizationPreview = perf
+      ? await perf.measure(
+          "create_preview",
+          () => buildAutoCategorizationPreview(analysis.rows, classificationRun),
+          { rows: classificationRows }
+        )
+      : buildAutoCategorizationPreview(analysis.rows, classificationRun);
+    report = withCategorizationReport(
+      analysis.report,
+      categorizationSummary,
+      autoCategorizationPreview,
+      prepared.existingProducts
+    );
+  } catch (error) {
+    reportStatus = "error";
+    throw error;
+  } finally {
+    if (perf && reportMeasurement) {
+      await perf.finish("create_report", reportMeasurement, {
+        rows: classificationRows,
+        status: reportStatus
+      });
+    }
+  }
+
+  const createDraft = () => db.transaction(async (tx) => {
     const [version] = await tx
       .insert(catalogVersions)
       .values({
@@ -105,15 +181,16 @@ export async function createDraftImport(
       })
       .returning({ id: importBatches.id });
 
-    await insertImportRows(tx, batch.id, analysis.rows);
+    await insertImportRows(tx, batch.id, analysis.rows, perf);
     await insertImportErrors(tx, batch.id, analysis.rows);
     await insertDraftProducts(
       tx,
       version.id,
       analysis.rows,
-      categorizationContext,
-      searchSynonyms,
-      existingProducts
+      classificationRun,
+      prepared.searchSynonyms,
+      prepared.existingProducts,
+      perf
     );
 
     return {
@@ -122,6 +199,10 @@ export async function createDraftImport(
       report
     };
   });
+
+  return perf
+    ? perf.measure("draft_transaction", createDraft, { rows: analysis.rows.length })
+    : createDraft();
 }
 
 async function getActiveProducts(): Promise<ExistingProductSnapshot[]> {
@@ -171,7 +252,8 @@ async function getActiveProducts(): Promise<ExistingProductSnapshot[]> {
 async function insertImportRows(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   importBatchId: string,
-  rows: AnalyzedImportRow[]
+  rows: AnalyzedImportRow[],
+  perf?: ImportPerfLogger
 ) {
   const values = rows
     .filter((row) => row.status !== "skipped")
@@ -188,11 +270,17 @@ async function insertImportRows(
       errorMessages: row.issues
     }));
 
-  for (const chunk of chunked(values, 1000)) {
-    if (chunk.length > 0) {
-      await tx.insert(importRows).values(chunk);
+  const insertRows = async () => {
+    for (const chunk of chunked(values, 1000)) {
+      if (chunk.length > 0) {
+        await tx.insert(importRows).values(chunk);
+      }
     }
-  }
+  };
+
+  return perf
+    ? perf.measure("insert_import_rows", insertRows, { rows: values.length })
+    : insertRows();
 }
 
 async function insertImportErrors(
@@ -223,9 +311,10 @@ async function insertDraftProducts(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   catalogVersionId: string,
   rows: AnalyzedImportRow[],
-  categorizationContext: CategorizationContext,
+  classificationRun: DraftClassificationRun,
   searchSynonyms: SearchSynonymRecord[],
-  existingProducts: ExistingProductSnapshot[]
+  existingProducts: ExistingProductSnapshot[],
+  perf?: ImportPerfLogger
 ) {
   const existingByCode = buildExistingByCode(existingProducts);
   const productRows = rows.filter(
@@ -235,94 +324,103 @@ async function insertDraftProducts(
       (row.status === "valid" || row.status === "needs_review")
   );
 
-  for (const chunk of chunked(productRows, 1000)) {
-    if (chunk.length === 0) {
-      continue;
-    }
+  const insertProducts = async () => {
+    for (const chunk of chunked(productRows, 1000)) {
+      if (chunk.length === 0) {
+        continue;
+      }
 
-    const categorizedChunk = chunk.map((row) => ({
-      row,
-      categorization: categorizeImportRow(row, categorizationContext, existingByCode)
-    }));
+      const categorizedChunk = chunk.map((row) => ({
+        row,
+        categorization: classificationRun.categorizationFor(row)!
+      }));
 
-    const inserted = await tx
-      .insert(products)
-      .values(
-        categorizedChunk.map(({ row, categorization }) => {
-          const status = resolveDraftProductStatus(row, categorization);
-          const productName = resolveImportProductName(
-            row,
-            existingByCode.get(row.shopCode!)
-          );
-          const reviewReason =
-            status === "needs_review" || status === "invalid"
-              ? buildReviewReason(row, categorization)
-              : null;
+      const inserted = await tx
+        .insert(products)
+        .values(
+          categorizedChunk.map(({ row, categorization }) => {
+            const status = resolveDraftProductStatus(row, categorization);
+            const productName = resolveImportProductName(
+              row,
+              existingByCode.get(row.shopCode!)
+            );
+            const reviewReason =
+              status === "needs_review" || status === "invalid"
+                ? buildReviewReason(row, categorization)
+                : null;
 
-          return {
-            catalogVersionId,
-            shopCode: row.shopCode!,
-            rawName: row.rawName,
-            name: productName,
-            slug: slugify(`${row.shopCode}-${productName}`),
-            price: toNumericString(row.price)!,
-            stockQuantity: toNumericString(row.stockQuantity),
-            stockSum: toNumericString(row.stockSum),
-            categoryId: categorization.target?.categoryId,
-            subcategoryId: categorization.target?.subcategoryId,
-            status,
-            reviewReason,
-            searchText: buildProductSearchText({
+            return {
+              catalogVersionId,
               shopCode: row.shopCode!,
-              name: productName,
               rawName: row.rawName,
-              categoryName: categorization.target?.categoryName,
-              subcategoryName: categorization.target?.subcategoryName,
-              synonyms: searchSynonyms
-            })
-          };
-        })
-      )
-      .returning({
-        id: products.id,
-        shopCode: products.shopCode
-      });
+              name: productName,
+              slug: slugify(`${row.shopCode}-${productName}`),
+              price: toNumericString(row.price)!,
+              stockQuantity: toNumericString(row.stockQuantity),
+              stockSum: toNumericString(row.stockSum),
+              categoryId: categorization.target?.categoryId,
+              subcategoryId: categorization.target?.subcategoryId,
+              status,
+              reviewReason,
+              searchText: buildProductSearchText({
+                shopCode: row.shopCode!,
+                name: productName,
+                rawName: row.rawName,
+                categoryName: categorization.target?.categoryName,
+                subcategoryName: categorization.target?.subcategoryName,
+                synonyms: searchSynonyms
+              })
+            };
+          })
+        )
+        .returning({
+          id: products.id,
+          shopCode: products.shopCode
+        });
 
-    const insertedByCode = new Map(inserted.map((row) => [row.shopCode, row.id]));
-    const reviewValues = categorizedChunk
-      .filter(({ row, categorization }) => needsProductReview(row, categorization))
-      .map(({ row, categorization }) => ({
-        catalogVersionId,
-        productId: insertedByCode.get(row.shopCode!),
-        reason: buildReviewReason(row, categorization) || "Товар требует проверки.",
-        suggestedCategoryId: categorization.target?.categoryId,
-        suggestedSubcategoryId: categorization.target?.subcategoryId
-      }))
-      .filter(
-        (
-          row
-        ): row is {
-          catalogVersionId: string;
-          productId: string;
-          reason: string;
-          suggestedCategoryId: string | undefined;
-          suggestedSubcategoryId: string | undefined;
-        } => Boolean(row.productId)
-      );
+      const insertedByCode = new Map(inserted.map((row) => [row.shopCode, row.id]));
+      const reviewValues = categorizedChunk
+        .filter(({ row, categorization }) => needsProductReview(row, categorization))
+        .map(({ row, categorization }) => ({
+          catalogVersionId,
+          productId: insertedByCode.get(row.shopCode!),
+          reason: buildReviewReason(row, categorization) || "Товар требует проверки.",
+          suggestedCategoryId: categorization.target?.categoryId,
+          suggestedSubcategoryId: categorization.target?.subcategoryId
+        }))
+        .filter(
+          (
+            row
+          ): row is {
+            catalogVersionId: string;
+            productId: string;
+            reason: string;
+            suggestedCategoryId: string | undefined;
+            suggestedSubcategoryId: string | undefined;
+          } => Boolean(row.productId)
+        );
 
-    if (reviewValues.length > 0) {
-      await tx.insert(reviewQueue).values(reviewValues);
+      if (reviewValues.length > 0) {
+        if (perf) {
+          await perf.measure("insert_review_queue", () => tx.insert(reviewQueue).values(reviewValues), {
+            rows: reviewValues.length
+          });
+        } else {
+          await tx.insert(reviewQueue).values(reviewValues);
+        }
+      }
     }
-  }
+  };
+
+  return perf
+    ? perf.measure("insert_products", insertProducts, { rows: productRows.length })
+    : insertProducts();
 }
 
-function withCategorizationReport(
-  report: ReturnType<typeof analyzeImportFile>["report"],
+function buildCategorizationSummary(
   rows: AnalyzedImportRow[],
-  categorizationContext: CategorizationContext,
-  existingProducts: ExistingProductSnapshot[]
+  classificationRun: DraftClassificationRun
 ) {
-  const existingByCode = buildExistingByCode(existingProducts);
   let matchedRows = 0;
   let unmatchedRows = 0;
   let combinedReviewRows = 0;
@@ -332,7 +430,7 @@ function withCategorizationReport(
       continue;
     }
 
-    const categorization = categorizeImportRow(row, categorizationContext, existingByCode);
+    const categorization = classificationRun.categorizationFor(row)!;
     if (categorization.target) {
       matchedRows += 1;
     } else {
@@ -344,16 +442,25 @@ function withCategorizationReport(
     }
   }
 
-  const autoCategorizationPreview = buildAutoCategorizationPreview(
-    rows,
-    categorizationContext,
-    existingProducts
-  );
+  return {
+    matchedRows,
+    unmatchedRows,
+    combinedReviewRows,
+    ruleCount: classificationRun.ruleCount
+  };
+}
+
+function withCategorizationReport(
+  report: ReturnType<typeof analyzeImportFile>["report"],
+  categorizationSummary: ReturnType<typeof buildCategorizationSummary>,
+  autoCategorizationPreview: ReturnType<typeof buildAutoCategorizationPreview>,
+  existingProducts: ExistingProductSnapshot[]
+) {
   const activeProductCount = existingProducts.filter((product) => product.status === "active").length;
   const safety = evaluateImportSafety({
     report: {
       ...report,
-      reviewRows: combinedReviewRows,
+      reviewRows: categorizationSummary.combinedReviewRows,
       autoCategorizationPreview
     },
     activeProductCount,
@@ -365,11 +472,11 @@ function withCategorizationReport(
 
   return {
     ...report,
-    reviewRows: combinedReviewRows,
+    reviewRows: categorizationSummary.combinedReviewRows,
     categorization: {
-      matchedRows,
-      unmatchedRows,
-      activeRules: categorizationContext.rules.length
+      matchedRows: categorizationSummary.matchedRows,
+      unmatchedRows: categorizationSummary.unmatchedRows,
+      activeRules: categorizationSummary.ruleCount
     },
     autoCategorizationPreview,
     safety
@@ -378,10 +485,8 @@ function withCategorizationReport(
 
 function buildAutoCategorizationPreview(
   rows: AnalyzedImportRow[],
-  categorizationContext: CategorizationContext,
-  existingProducts: ExistingProductSnapshot[]
+  classificationRun: DraftClassificationRun
 ) {
-  const existingByCode = buildExistingByCode(existingProducts);
   const sourceCounts = new Map<CategorizationSource, number>();
   const unresolvedGroups = new Map<string, AutoCategorizationGroupPreview>();
   const dangerousGroups = new Map<string, AutoCategorizationGroupPreview>();
@@ -405,7 +510,7 @@ function buildAutoCategorizationPreview(
       continue;
     }
 
-    const categorization = categorizeImportRow(row, categorizationContext, existingByCode);
+    const categorization = classificationRun.categorizationFor(row)!;
     const decision = toDecisionPreview(row, categorization);
     totalProducts += 1;
     confidenceSum += categorization.confidence;
@@ -477,192 +582,8 @@ function buildAutoCategorizationPreview(
   };
 }
 
-function categorizeImportRow(
-  row: AnalyzedImportRow,
-  categorizationContext: CategorizationContext,
-  existingByCode: Map<string, ExistingProductSnapshot>
-) {
-  const existingProduct = row.shopCode ? existingByCode.get(row.shopCode) : null;
-  const initialResult = categorizeProductName(buildCategorizationTitle(row), categorizationContext, {
-    existingProduct
-  });
-
-  if (
-    initialResult.source === "existing_product_category" ||
-    (initialResult.target &&
-      initialResult.confidence >= AUTO_CATEGORIZATION_CONFIDENCE_THRESHOLD)
-  ) {
-    return initialResult;
-  }
-
-  return findSimilarExistingProductTarget(row, [...existingByCode.values()]) ?? initialResult;
-}
-
 function buildExistingByCode(existingProducts: ExistingProductSnapshot[]) {
   return new Map(existingProducts.map((product) => [product.shopCode, product]));
-}
-
-const similarityStopTokens = new Set([
-  "для",
-  "без",
-  "под",
-  "над",
-  "при",
-  "авто",
-  "ваз",
-  "газ",
-  "уаз",
-  "шт",
-  "комплект",
-  "деталь"
-]);
-
-function findSimilarExistingProductTarget(
-  row: AnalyzedImportRow,
-  existingProducts: ExistingProductSnapshot[]
-): CategorizationResult | null {
-  const rowTokens = tokenizeForSimilarity(buildCategorizationTitle(row));
-  if (rowTokens.length < 2) {
-    return null;
-  }
-
-  const candidates = existingProducts
-    .map((product) => {
-      const target = existingProductToPublicTarget(product);
-      if (!target) {
-        return null;
-      }
-
-      const productTokens = tokenizeForSimilarity(`${product.shopCode} ${product.name}`);
-      const sharedTokens = rowTokens.filter((token) => productTokens.includes(token));
-      const score =
-        sharedTokens.length / Math.max(new Set([...rowTokens, ...productTokens]).size, 1);
-
-      if (sharedTokens.length < 2 || score < 0.28) {
-        return null;
-      }
-
-      return { target, score, sharedTokens };
-    })
-    .filter((candidate) => candidate !== null);
-
-  if (candidates.length < 3) {
-    return null;
-  }
-
-  const groups = new Map<
-    string,
-    {
-      target: CategorizationTarget;
-      count: number;
-      scoreSum: number;
-      signals: Set<string>;
-    }
-  >();
-
-  for (const candidate of candidates) {
-    const key = `${candidate.target.categorySlug}/${candidate.target.subcategorySlug}`;
-    const group =
-      groups.get(key) ??
-      {
-        target: candidate.target,
-        count: 0,
-        scoreSum: 0,
-        signals: new Set<string>()
-      };
-    group.count += 1;
-    group.scoreSum += candidate.score;
-    for (const signal of candidate.sharedTokens.slice(0, 3)) {
-      group.signals.add(signal);
-    }
-    groups.set(key, group);
-  }
-
-  const [best, second] = [...groups.values()].sort(
-    (a, b) => b.count - a.count || b.scoreSum / b.count - a.scoreSum / a.count
-  );
-  if (!best) {
-    return null;
-  }
-
-  const agreement = best.count / candidates.length;
-  if (best.count < 3 || agreement < 0.75 || (second && second.count >= best.count * 0.4)) {
-    return null;
-  }
-
-  const averageScore = best.scoreSum / best.count;
-  return {
-    target: best.target,
-    matchedRule: null,
-    confidence: Math.min(0.94, 0.92 + averageScore * 0.04),
-    source: "similarity",
-    reason: "Категория определена по похожим товарам активного каталога.",
-    matchedSignals: [
-      {
-        kind: "token",
-        value: [...best.signals].slice(0, 5).join(" ")
-      },
-      {
-        kind: "validation",
-        value: `similarity:${best.count}/${candidates.length}`
-      }
-    ],
-    needsReview: false,
-    reviewReason: null
-  };
-}
-
-function existingProductToPublicTarget(
-  product: ExistingProductSnapshot
-): CategorizationTarget | null {
-  if (
-    product.status !== "active" ||
-    !product.categoryId ||
-    !product.subcategoryId ||
-    !product.categorySlug ||
-    !product.subcategorySlug ||
-    !isPublicTaxonomyTarget(product.categorySlug, product.subcategorySlug)
-  ) {
-    return null;
-  }
-
-  return {
-    categoryId: product.categoryId,
-    categorySlug: product.categorySlug,
-    categoryName: product.categoryName ?? undefined,
-    subcategoryId: product.subcategoryId,
-    subcategorySlug: product.subcategorySlug,
-    subcategoryName: product.subcategoryName ?? undefined
-  };
-}
-
-function tokenizeForSimilarity(value: string) {
-  return [
-    ...new Set(
-      normalizeForCategorization(value)
-        .split(/\s+/)
-        .map((token) => token.replace(/^\d+|\d+$/g, ""))
-        .filter(
-          (token) =>
-            token.length >= 3 &&
-            !/^\d+$/.test(token) &&
-            !similarityStopTokens.has(token)
-        )
-    )
-  ];
-}
-
-function isImportProductCandidate(row: AnalyzedImportRow) {
-  return Boolean(
-    row.shopCode &&
-      row.price !== null &&
-      row.status !== "error" &&
-      row.status !== "skipped"
-  );
-}
-
-function buildCategorizationTitle(row: AnalyzedImportRow) {
-  return `${row.shopCode ?? ""} ${row.name || row.rawName}`.trim();
 }
 
 function toDecisionPreview(

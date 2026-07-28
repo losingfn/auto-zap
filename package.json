@@ -10,7 +10,7 @@
     "start:prod": "HOSTNAME=127.0.0.1 PORT=3000 node .next/standalone/server.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx scripts/test-import-automation.ts && node --import tsx scripts/test-review-reapply.ts",
+    "test": "node --import tsx scripts/test-import-automation.ts && node --import tsx scripts/test-import-draft-classification-reuse.ts && node --import tsx scripts/test-import-perf.ts && node --import tsx scripts/test-review-reapply.ts",
     "test:review-reapply": "node --import tsx scripts/test-review-reapply.ts",
     "smoke:admin:prod": "scripts/with-env.sh node --import tsx scripts/smoke-admin-production.ts",
     "assets:prepare": "python3 scripts/prepare-assets.py",

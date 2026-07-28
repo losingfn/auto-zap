@@ -4,23 +4,29 @@ import { db } from "@/db/client";
 import { catalogVersions, categories, importBatches, products, subcategories } from "@/db/schema";
 import { isBlockingImportDraft } from "@/features/import/import-state";
 import { assertImportSafety, evaluateImportSafety } from "@/features/import/safety";
+import type { ImportPerfLogger } from "@/lib/server/import-perf";
 import type { ImportPreviewReport, ImportSafetyReport } from "@/features/import/types";
 import { syncSearchIndexForCatalogVersion } from "@/features/search/indexing";
 
 export interface PublishCatalogVersionInput {
   catalogVersionId: string;
   report: ImportPreviewReport;
+  perf?: ImportPerfLogger;
 }
 
-export async function publishCatalogVersion({ catalogVersionId, report }: PublishCatalogVersionInput) {
+export async function publishCatalogVersion({
+  catalogVersionId,
+  report,
+  perf
+}: PublishCatalogVersionInput) {
   const safety = await getPublishSafetyReport({ catalogVersionId, report });
   assertImportSafety(safety);
 
   const previousActiveVersionId = await getActiveCatalogVersionId(catalogVersionId);
-  const searchResult = await syncSearchIndexForCatalogVersion(catalogVersionId);
+  const searchResult = await syncSearchIndexForCatalogVersion(catalogVersionId, perf);
 
   try {
-    await db.transaction(async (tx) => {
+    const switchActiveCatalogVersion = () => db.transaction(async (tx) => {
       const now = new Date();
 
       await tx
@@ -51,9 +57,15 @@ export async function publishCatalogVersion({ catalogVersionId, report }: Publis
         })
         .where(eq(importBatches.catalogVersionId, catalogVersionId));
     });
+
+    if (perf) {
+      await perf.measure("switch_active_catalog_version", switchActiveCatalogVersion);
+    } else {
+      await switchActiveCatalogVersion();
+    }
   } catch (error) {
     if (previousActiveVersionId) {
-      await syncSearchIndexForCatalogVersion(previousActiveVersionId).catch((restoreError) => {
+      await syncSearchIndexForCatalogVersion(previousActiveVersionId, perf).catch((restoreError) => {
         console.error("[import/publish] failed to restore previous search index", {
           previousActiveVersionId,
           error: restoreError instanceof Error ? restoreError.message : String(restoreError)

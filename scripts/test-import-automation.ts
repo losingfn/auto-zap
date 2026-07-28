@@ -1281,7 +1281,7 @@ run("publish prepares search index before active DB transaction", () => {
     new URL("../src/features/import/publish-service.ts", import.meta.url),
     "utf8"
   );
-  const searchSyncIndex = source.indexOf("syncSearchIndexForCatalogVersion(catalogVersionId)");
+  const searchSyncIndex = source.indexOf("syncSearchIndexForCatalogVersion(catalogVersionId, perf)");
   const transactionIndex = source.indexOf("db.transaction");
 
   assert.ok(searchSyncIndex > -1);

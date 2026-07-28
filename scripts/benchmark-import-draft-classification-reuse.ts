@@ -39,8 +39,8 @@ async function main() {
         legacy_three_passes: summarize(baseline),
         reused_single_pass: summarize(reused),
         expected_computation_counts: {
-          legacy_classification_calls: candidateRows.length * 3,
-          reused_classification_calls: candidateRows.length,
+          legacy_classification_calls: baseline[0]!.value.classificationCalls,
+          reused_classification_calls: reused[0]!.value.classificationCalls,
           legacy_similarity_fallback_calls: baseline[0]!.value.similarityFallbacks,
           reused_similarity_fallback_calls: reused[0]!.value.similarityFallbacks
         },
@@ -65,6 +65,7 @@ function runLegacyThreePasses() {
   const second = createTrackedLegacyPass();
   const third = createTrackedLegacyPass();
   return {
+    classificationCalls: first.classificationCalls + second.classificationCalls + third.classificationCalls,
     similarityFallbacks: first.similarityFallbacks + second.similarityFallbacks + third.similarityFallbacks,
     entities: third.entities
   };
@@ -75,41 +76,51 @@ function runReusedSinglePass() {
 }
 
 function createTrackedLegacyPass() {
+  let classificationCalls = 0;
   let similarityFallbacks = 0;
   const run = createLegacyDraftClassificationPass({
     rows: parsed.rows,
     categorizationContext: fixture.categorizationContext,
     existingProducts: fixture.existingProducts,
+    onCategorizeProductName() {
+      classificationCalls += 1;
+    },
     onSimilarityFallback() {
       similarityFallbacks += 1;
     }
   });
-  return buildTrackedResult(run, similarityFallbacks);
+  return buildTrackedResult(run, classificationCalls, similarityFallbacks);
 }
 
 function createTrackedReusedRun() {
+  let classificationCalls = 0;
   let similarityFallbacks = 0;
   const run = createDraftClassificationRun({
     rows: parsed.rows,
     categorizationContext: fixture.categorizationContext,
     existingProducts: fixture.existingProducts,
     observer: {
+      onCategorizeProductName() {
+        classificationCalls += 1;
+      },
       measureSimilarityFallback<T>(operation: () => T) {
         similarityFallbacks += 1;
         return operation();
       }
     }
   });
-  return buildTrackedResult(run, similarityFallbacks);
+  return buildTrackedResult(run, classificationCalls, similarityFallbacks);
 }
 
 function buildTrackedResult(
   run: ClassificationPass,
+  classificationCalls: number,
   similarityFallbacks: number
 ) {
   const decisions = candidateRows.map((row) => run.categorizationFor(row)!);
 
   return {
+    classificationCalls,
     similarityFallbacks,
     entities: {
       draft_products: parsed.rows.filter(

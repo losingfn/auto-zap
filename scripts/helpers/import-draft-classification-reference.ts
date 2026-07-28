@@ -19,11 +19,13 @@ export function createLegacyDraftClassificationPass({
   rows,
   categorizationContext,
   existingProducts,
+  onCategorizeProductName,
   onSimilarityFallback
 }: {
   rows: AnalyzedImportRow[];
   categorizationContext: CategorizationContext;
   existingProducts: ExistingProductSnapshot[];
+  onCategorizeProductName?: () => void;
   onSimilarityFallback?: () => void;
 }) {
   const existingByCode = new Map(existingProducts.map((product) => [product.shopCode, product]));
@@ -35,6 +37,7 @@ export function createLegacyDraftClassificationPass({
     }
 
     const existingProduct = row.shopCode ? existingByCode.get(row.shopCode) : null;
+    onCategorizeProductName?.();
     const initialResult = categorizeProductName(buildCategorizationTitle(row), categorizationContext, {
       existingProduct
     });

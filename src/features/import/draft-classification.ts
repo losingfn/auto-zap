@@ -12,6 +12,8 @@ import type {
 import type { AnalyzedImportRow, ExistingProductSnapshot } from "./types";
 
 export type DraftClassificationObserver = {
+  /** Test-only hook at the exact CategorizationResult computation boundary. */
+  onCategorizeProductName?: () => void;
   measureSimilarityFallback: <T>(operation: () => T) => T;
 };
 
@@ -71,6 +73,7 @@ function categorizeImportRow(
   observer?: DraftClassificationObserver
 ) {
   const existingProduct = row.shopCode ? existingByCode.get(row.shopCode) : null;
+  observer?.onCategorizeProductName?.();
   const initialResult = categorizeProductName(buildCategorizationTitle(row), categorizationContext, {
     existingProduct
   });

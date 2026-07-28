@@ -14,6 +14,8 @@ run("one import run preserves old three-pass results and removes repeated classi
   const oldProductsPass = createLegacyTrackedPass(fixture);
   const reusedPass = createReusedTrackedRun(fixture);
   const candidates = fixture.rows.filter(isImportProductCandidate);
+  const classificationCallsBeforeRepeatedReads = reusedPass.classificationCalls;
+  const similarityFallbacksBeforeRepeatedReads = reusedPass.similarityFallbacks;
 
   for (const row of fixture.rows) {
     assert.deepEqual(
@@ -51,9 +53,12 @@ run("one import run preserves old three-pass results and removes repeated classi
     );
   }
 
-  assert.equal(reusedPass.classifications, candidates.length);
+  assert.equal(reusedPass.classificationCalls, candidates.length);
+  assert.equal(oldReportPass.classificationCalls, candidates.length);
+  assert.equal(oldPreviewPass.classificationCalls, candidates.length);
+  assert.equal(oldProductsPass.classificationCalls, candidates.length);
   assert.equal(
-    oldReportPass.classifications + oldPreviewPass.classifications + oldProductsPass.classifications,
+    oldReportPass.classificationCalls + oldPreviewPass.classificationCalls + oldProductsPass.classificationCalls,
     candidates.length * 3
   );
   assert.equal(
@@ -61,6 +66,8 @@ run("one import run preserves old three-pass results and removes repeated classi
     reusedPass.similarityFallbacks * 3
   );
   assert.ok(reusedPass.similarityFallbacks > 0, "fixture must exercise similarity fallback");
+  assert.equal(reusedPass.classificationCalls, classificationCallsBeforeRepeatedReads);
+  assert.equal(reusedPass.similarityFallbacks, similarityFallbacksBeforeRepeatedReads);
 });
 
 run("repeated import runs are independent and deterministic", () => {
@@ -108,9 +115,13 @@ run("draft creation uses the local run for every categorization consumer", () =>
 });
 
 function createLegacyTrackedPass(fixture: ReturnType<typeof createImportDraftClassificationFixture>) {
+  let classificationCalls = 0;
   let similarityFallbacks = 0;
   const run = createLegacyDraftClassificationPass({
     ...fixture,
+    onCategorizeProductName() {
+      classificationCalls += 1;
+    },
     onSimilarityFallback() {
       similarityFallbacks += 1;
     }
@@ -118,16 +129,20 @@ function createLegacyTrackedPass(fixture: ReturnType<typeof createImportDraftCla
 
   return {
     run,
-    classifications: fixture.rows.filter(isImportProductCandidate).length,
+    classificationCalls,
     similarityFallbacks
   };
 }
 
 function createReusedTrackedRun(fixture: ReturnType<typeof createImportDraftClassificationFixture>) {
+  let classificationCalls = 0;
   let similarityFallbacks = 0;
   const run = createDraftClassificationRun({
     ...fixture,
     observer: {
+      onCategorizeProductName() {
+        classificationCalls += 1;
+      },
       measureSimilarityFallback<T>(operation: () => T) {
         similarityFallbacks += 1;
         return operation();
@@ -137,7 +152,7 @@ function createReusedTrackedRun(fixture: ReturnType<typeof createImportDraftClas
 
   return {
     run,
-    classifications: fixture.rows.filter(isImportProductCandidate).length,
+    classificationCalls,
     similarityFallbacks
   };
 }

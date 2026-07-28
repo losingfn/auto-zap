@@ -1,5 +1,6 @@
 import { MeiliSearch } from "meilisearch";
 import { env } from "@/lib/env";
+import type { ImportPerfLogger } from "@/lib/server/import-perf";
 import { buildMeiliSynonyms } from "./synonyms";
 import type { SearchProductDocument, SearchSynonymRecord } from "./types";
 
@@ -46,6 +47,7 @@ export interface ReplaceSearchIndexOptions {
   expectedDocumentCount?: number;
   stagingIndexUid?: string;
   targetIndexUid?: string;
+  perf?: ImportPerfLogger;
 }
 
 export interface PreparedSearchIndex {
@@ -104,7 +106,7 @@ export async function replaceSearchIndexDocumentsWithClient(
     synonyms,
     options
   );
-  await swapPreparedSearchIndexWithClient(client, prepared);
+  await swapPreparedSearchIndexWithClient(client, prepared, options.perf);
 
   return {
     indexUid: prepared.targetIndexUid,
@@ -133,20 +135,26 @@ export async function prepareSearchIndexDocumentsWithClient(
   options: ReplaceSearchIndexOptions = {}
 ): Promise<PreparedSearchIndex> {
   const targetIndexUid = options.targetIndexUid ?? SEARCH_INDEX_UID;
+  const perf = options.perf;
   const stagingIndexUid =
     options.stagingIndexUid ?? `${targetIndexUid}__staging__manual`;
   const expectedDocumentCount = options.expectedDocumentCount ?? documents.length;
 
-  await ensureSearchIndexExists(client, targetIndexUid);
-  const stagingIndex = await prepareFreshSearchIndex(client, stagingIndexUid, synonyms);
+  await ensureSearchIndexExists(client, targetIndexUid, perf);
+  const stagingIndex = await prepareFreshSearchIndex(client, stagingIndexUid, synonyms, perf);
 
-  await stagingIndex.deleteAllDocuments().then((task) => client.tasks.waitForTask(task));
+  await waitForSearchTask(client, await stagingIndex.deleteAllDocuments(), perf);
 
   for (let indexStart = 0; indexStart < documents.length; indexStart += 1000) {
     const chunk = documents.slice(indexStart, indexStart + 1000);
-    await stagingIndex.addDocuments(chunk, { primaryKey: "id" }).then((task) =>
-      client.tasks.waitForTask(task)
-    );
+    const task = perf
+      ? await perf.measure(
+          "upload_meilisearch_batch",
+          () => stagingIndex.addDocuments(chunk, { primaryKey: "id" }),
+          { rows: chunk.length }
+        )
+      : await stagingIndex.addDocuments(chunk, { primaryKey: "id" });
+    await waitForSearchTask(client, task, perf);
   }
 
   const stats = await stagingIndex.getStats();
@@ -163,17 +171,24 @@ export async function prepareSearchIndexDocumentsWithClient(
   };
 }
 
-export async function swapPreparedSearchIndex(prepared: PreparedSearchIndex) {
-  return swapPreparedSearchIndexWithClient(getMeiliClient() as SearchIndexClient, prepared);
+export async function swapPreparedSearchIndex(
+  prepared: PreparedSearchIndex,
+  perf?: ImportPerfLogger
+) {
+  return swapPreparedSearchIndexWithClient(getMeiliClient() as SearchIndexClient, prepared, perf);
 }
 
 export async function swapPreparedSearchIndexWithClient(
   client: SearchIndexClient,
-  prepared: PreparedSearchIndex
+  prepared: PreparedSearchIndex,
+  perf?: ImportPerfLogger
 ) {
-  await client
-    .swapIndexes([{ indexes: [prepared.targetIndexUid, prepared.stagingIndexUid] }])
-    .then((task) => client.tasks.waitForTask(task));
+  const task = perf
+    ? await perf.measure("swap_meilisearch_index", () =>
+        client.swapIndexes([{ indexes: [prepared.targetIndexUid, prepared.stagingIndexUid] }])
+      )
+    : await client.swapIndexes([{ indexes: [prepared.targetIndexUid, prepared.stagingIndexUid] }]);
+  await waitForSearchTask(client, task, perf);
 
   return {
     indexUid: prepared.targetIndexUid,
@@ -182,36 +197,55 @@ export async function swapPreparedSearchIndexWithClient(
   };
 }
 
-async function ensureSearchIndexExists(client: SearchIndexClient, indexUid: string) {
+async function ensureSearchIndexExists(
+  client: SearchIndexClient,
+  indexUid: string,
+  perf?: ImportPerfLogger
+) {
   try {
     await client.getRawIndex(indexUid);
   } catch {
-    await client.tasks.waitForTask(await client.createIndex(indexUid, { primaryKey: "id" }));
+    await waitForSearchTask(client, await client.createIndex(indexUid, { primaryKey: "id" }), perf);
   }
 }
 
 async function prepareFreshSearchIndex(
   client: SearchIndexClient,
   indexUid: string,
-  synonyms: SearchSynonymRecord[]
+  synonyms: SearchSynonymRecord[],
+  perf?: ImportPerfLogger
 ) {
-  await deleteIndexIfExists(client, indexUid);
-  await client.tasks.waitForTask(await client.createIndex(indexUid, { primaryKey: "id" }));
+  await deleteIndexIfExists(client, indexUid, perf);
+  await waitForSearchTask(client, await client.createIndex(indexUid, { primaryKey: "id" }), perf);
 
   const index = client.index<SearchProductDocument>(indexUid);
-  await client.tasks.waitForTask(await index.updateSettings(buildSearchIndexSettings(synonyms)));
+  await waitForSearchTask(client, await index.updateSettings(buildSearchIndexSettings(synonyms)), perf);
 
   return index;
 }
 
-async function deleteIndexIfExists(client: SearchIndexClient, indexUid: string) {
+async function deleteIndexIfExists(
+  client: SearchIndexClient,
+  indexUid: string,
+  perf?: ImportPerfLogger
+) {
   try {
-    await client.tasks.waitForTask(await client.deleteIndex(indexUid));
+    await waitForSearchTask(client, await client.deleteIndex(indexUid), perf);
   } catch (error) {
     if (!isIndexNotFoundError(error)) {
       throw error;
     }
   }
+}
+
+async function waitForSearchTask(
+  client: SearchIndexClient,
+  task: SearchIndexTask,
+  perf?: ImportPerfLogger
+) {
+  return perf
+    ? perf.measure("wait_meilisearch_task", () => client.tasks.waitForTask(task))
+    : client.tasks.waitForTask(task);
 }
 
 function buildSearchIndexSettings(synonyms: SearchSynonymRecord[]) {

@@ -9,47 +9,62 @@ import {
   createAdminDraftImportFromUpload,
   publishAdminImportBatch
 } from "@/features/admin/imports";
+import { createImportPerfLogger } from "@/lib/server/import-perf";
 
 export async function uploadImportAction(formData: FormData) {
+  const perf = createImportPerfLogger();
+  const actionMeasurement = perf?.start();
   const session = await requireAdminSession();
   const file = formData.get("file");
   let target = "/admin/import";
   let importBatchId: string | null = null;
+  let actionStatus: "success" | "error" = "success";
 
   try {
     const result = await createAdminDraftImportFromUpload({
       file: file instanceof File ? file : null,
-      adminUserId: session.user.id
+      adminUserId: session.user.id,
+      perf
     });
     importBatchId = result.importBatchId;
+    perf?.setImportBatchId(importBatchId);
 
     await publishAdminImportBatch({
       importBatchId: result.importBatchId,
-      adminUserId: session.user.id
+      adminUserId: session.user.id,
+      perf
     });
 
     revalidatePath("/admin");
     revalidatePath("/admin/import");
     target = `/admin/import?batch=${encodeURIComponent(result.importBatchId)}&published=1`;
   } catch (error) {
+    actionStatus = "error";
     const errorCode = getErrorCode(error, importBatchId ? "publish_failed" : "analysis_failed");
     const batchId = importBatchId ?? getErrorBatchId(error);
     const batchParam = batchId ? `batch=${encodeURIComponent(batchId)}&` : "";
     target = `/admin/import?${batchParam}error=${errorCode}`;
+  } finally {
+    if (perf && actionMeasurement) {
+      await perf.finish("upload_action", actionMeasurement, { status: actionStatus });
+    }
   }
 
   redirect(target);
 }
 
 export async function publishImportAction(formData: FormData) {
+  const perf = createImportPerfLogger();
   const session = await requireAdminSession();
   const importBatchId = String(formData.get("batchId") ?? "");
+  perf?.setImportBatchId(importBatchId);
   let target = `/admin/import?batch=${encodeURIComponent(importBatchId)}`;
 
   try {
     await publishAdminImportBatch({
       importBatchId,
-      adminUserId: session.user.id
+      adminUserId: session.user.id,
+      perf
     });
 
     revalidatePath("/admin/import");

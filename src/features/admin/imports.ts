@@ -26,6 +26,7 @@ import {
 } from "@/features/import/import-state";
 import { publishCatalogVersion } from "@/features/import/publish-service";
 import { ImportSafetyError } from "@/features/import/safety";
+import type { ImportPerfLogger } from "@/lib/server/import-perf";
 import type { ImportPreviewReport, ImportSafetyCheckStatus } from "@/features/import/types";
 
 export {
@@ -134,12 +135,16 @@ type ImportBatchRecord = {
 
 export async function createAdminDraftImportFromUpload({
   file,
-  adminUserId
+  adminUserId,
+  perf
 }: {
   file: File | null;
   adminUserId: string;
+  perf?: ImportPerfLogger;
 }) {
-  const storedFile = await saveUploadedImportFile(file);
+  const storedFile = perf
+    ? await perf.measure("save_uploaded_file", () => saveUploadedImportFile(file))
+    : await saveUploadedImportFile(file);
   await assertImportCanStart(storedFile.fileHash);
 
   try {
@@ -149,7 +154,8 @@ export async function createAdminDraftImportFromUpload({
       sourceFileName: storedFile.originalName,
       fileHash: storedFile.fileHash,
       uploadedBy: adminUserId,
-      storagePath: storedFile.storagePath
+      storagePath: storedFile.storagePath,
+      perf
     });
 
     await db.insert(auditLogs).values({
@@ -257,75 +263,84 @@ export async function getAdminImportPageData(selectedBatchId?: string) {
 
 export async function publishAdminImportBatch({
   importBatchId,
-  adminUserId
+  adminUserId,
+  perf
 }: {
   importBatchId: string;
   adminUserId: string;
+  perf?: ImportPerfLogger;
 }) {
-  const batch = await getImportBatchForAction(importBatchId);
+  const publish = async () => {
+    const batch = await getImportBatchForAction(importBatchId);
 
-  if (!batch.report) {
-    throw new AdminImportError("not_ready", "Перед публикацией нужен предварительный отчёт.");
-  }
+    if (!batch.report) {
+      throw new AdminImportError("not_ready", "Перед публикацией нужен предварительный отчёт.");
+    }
 
-  if (
-    !batch.catalogVersionId ||
-    batch.status !== "analyzed" ||
-    batch.versionStatus !== "draft" ||
-    batch.report.safety?.canPublish !== true
-  ) {
-    throw new AdminImportError("already_finalized", "Этот импорт уже нельзя опубликовать.");
-  }
+    if (
+      !batch.catalogVersionId ||
+      batch.status !== "analyzed" ||
+      batch.versionStatus !== "draft" ||
+      batch.report.safety?.canPublish !== true
+    ) {
+      throw new AdminImportError("already_finalized", "Этот импорт уже нельзя опубликовать.");
+    }
 
-  let publishResult: Awaited<ReturnType<typeof publishCatalogVersion>>;
+    let publishResult: Awaited<ReturnType<typeof publishCatalogVersion>>;
 
-  try {
-    publishResult = await publishCatalogVersion({
-      catalogVersionId: batch.catalogVersionId,
-      report: batch.report
-    });
-  } catch (error) {
+    try {
+      publishResult = await publishCatalogVersion({
+        catalogVersionId: batch.catalogVersionId,
+        report: batch.report,
+        perf
+      });
+    } catch (error) {
+      await db.insert(auditLogs).values({
+        adminUserId,
+        action: "import.publish_failed",
+        entityType: "catalog_version",
+        entityId: batch.catalogVersionId,
+        metadata: {
+          importBatchId: batch.id,
+          sourceFileName: batch.sourceFileName,
+          error: error instanceof Error ? error.message : String(error),
+          safety: error instanceof ImportSafetyError ? error.report : null
+        }
+      });
+
+      if (error instanceof ImportSafetyError) {
+        throw new AdminImportError("safety_blocked", error.message);
+      }
+
+      throw new AdminImportError(
+        "publish_failed",
+        error instanceof Error ? error.message : "Не удалось опубликовать импорт."
+      );
+    }
+
     await db.insert(auditLogs).values({
       adminUserId,
-      action: "import.publish_failed",
+      action: "import.publish",
       entityType: "catalog_version",
       entityId: batch.catalogVersionId,
       metadata: {
         importBatchId: batch.id,
         sourceFileName: batch.sourceFileName,
-        error: error instanceof Error ? error.message : String(error),
-        safety: error instanceof ImportSafetyError ? error.report : null
+        searchIndex: {
+          status: "synced",
+          indexUid: publishResult.indexUid,
+          indexedCount: publishResult.indexedCount
+        },
+        previousActiveVersionId: publishResult.previousActiveVersionId,
+        safety: publishResult.safety,
+        report: toAuditReportSummary(batch.report)
       }
     });
+  };
 
-    if (error instanceof ImportSafetyError) {
-      throw new AdminImportError("safety_blocked", error.message);
-    }
-
-    throw new AdminImportError(
-      "publish_failed",
-      error instanceof Error ? error.message : "Не удалось опубликовать импорт."
-    );
-  }
-
-  await db.insert(auditLogs).values({
-    adminUserId,
-    action: "import.publish",
-    entityType: "catalog_version",
-    entityId: batch.catalogVersionId,
-    metadata: {
-      importBatchId: batch.id,
-      sourceFileName: batch.sourceFileName,
-      searchIndex: {
-        status: "synced",
-        indexUid: publishResult.indexUid,
-        indexedCount: publishResult.indexedCount
-      },
-      previousActiveVersionId: publishResult.previousActiveVersionId,
-      safety: publishResult.safety,
-      report: toAuditReportSummary(batch.report)
-    }
-  });
+  return perf
+    ? perf.measure("publish_action", publish)
+    : publish();
 }
 
 export async function cancelAdminImportBatch({

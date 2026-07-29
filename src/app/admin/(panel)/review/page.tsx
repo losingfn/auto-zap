@@ -28,7 +28,8 @@ import {
 } from "./actions";
 import {
   ReviewBulkSelectionForm,
-  ReviewGroupActionForm
+  ReviewGroupActionForm,
+  ReviewGroupApplyNavigationRestore
 } from "./review-client-controls";
 
 export const metadata: Metadata = {
@@ -133,6 +134,7 @@ export default async function AdminReviewPage({ searchParams }: ReviewPageProps)
 
   const content = (
     <div>
+      <ReviewGroupApplyNavigationRestore />
       <div className="mb-8">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#9DBDFB]">

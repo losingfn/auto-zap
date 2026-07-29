@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireAdminSession } from "@/features/admin/auth";
 import { env } from "@/lib/env";
+import { createGroupApplyPerfLogger } from "@/lib/server/group-apply-perf";
 import {
   AdminReviewBulkSafetyError,
   applyManualReviewCorrection,
@@ -67,43 +68,105 @@ export async function resolveReviewItemAction(formData: FormData) {
 }
 
 export async function applyReviewGroupAction(formData: FormData) {
-  await assertSameOriginReviewAction();
-  const session = await requireAdminSession();
-  const filters = readReviewActionFilters(formData);
+  const perf = createGroupApplyPerfLogger();
+  const groupId = String(formData.get("group") ?? "").trim();
+  perf?.setGroupId(groupId);
+  perf?.measureSync("request_received", { category: "other" }, () => undefined);
+  if (perf) {
+    await perf.measure("request_origin_validation", { category: "other" }, assertSameOriginReviewAction);
+  } else {
+    await assertSameOriginReviewAction();
+  }
+  const session = perf
+    ? await perf.measure("auth_session_validation", { category: "other" }, requireAdminSession)
+    : await requireAdminSession();
+  const input = perf
+    ? perf.measureSync("input_validation", { category: "other" }, () => readGroupApplyInput(formData))
+    : readGroupApplyInput(formData);
+  const filters = input.filters;
   let target = buildReviewRedirect(filters);
 
   try {
     const result = await applyReviewGroupCorrection({
       filters,
-      categoryId: String(formData.get("categoryId") ?? ""),
-      subcategoryId: String(formData.get("subcategoryId") ?? ""),
+      categoryId: input.categoryId,
+      subcategoryId: input.subcategoryId,
       adminUserId: session.user.id,
-      learnRule: formData.get("learnRule") === "1",
-      rulePattern: String(formData.get("rulePattern") ?? "").trim(),
-      confirmationCount: readConfirmationCount(formData),
-      expectedCount: readNumberField(formData, "expectedCount"),
-      previewToken: readStringField(formData, "previewToken"),
-      excludedProductIds: formData.getAll("excludedProductId").map((value) => String(value))
+      learnRule: input.learnRule,
+      rulePattern: input.rulePattern,
+      confirmationCount: input.confirmationCount,
+      expectedCount: input.expectedCount,
+      previewToken: input.previewToken,
+      excludedProductIds: input.excludedProductIds,
+      groupApplyPerf: perf
     });
 
-    revalidatePath("/admin/review");
-    revalidatePath("/admin");
-
-    const params = buildReviewSearchParams(filters);
-    params.set("bulkProcessed", String(result.processed));
-    params.set("bulkRemaining", String(result.remaining));
-    params.set("bulkRule", result.learnedRuleId ? "yes" : "no");
-    if (result.learnedRuleId) {
-      params.set("rule", "1");
-    } else if (result.learnedRuleSkippedReason && result.learnedRuleSkippedReason !== "disabled") {
-      params.set("ruleSkipped", result.learnedRuleSkippedReason);
+    const revalidate = () => {
+      revalidatePath("/admin/review");
+      revalidatePath("/admin");
+    };
+    if (perf) {
+      perf.measureSync("revalidation", { category: "revalidation" }, revalidate);
+    } else {
+      revalidate();
     }
-    target = `/admin/review?${params.toString()}`;
+
+    target = perf
+      ? perf.measureSync("response_prepare", { category: "other", itemCount: result.processed }, () => buildGroupApplySuccessTarget(filters, result))
+      : buildGroupApplySuccessTarget(filters, result);
+    perf?.complete({ itemCount: result.processed, result: "success" });
   } catch (error) {
+    perf?.fail(groupApplyLogError(error));
     target = buildReviewRedirect(filters, errorParamsForBulkFailure(error, "bulk_failed"));
   }
 
   redirect(target);
+}
+
+function readGroupApplyInput(formData: FormData) {
+  return {
+    filters: readReviewActionFilters(formData),
+    categoryId: String(formData.get("categoryId") ?? ""),
+    subcategoryId: String(formData.get("subcategoryId") ?? ""),
+    learnRule: formData.get("learnRule") === "1",
+    rulePattern: String(formData.get("rulePattern") ?? "").trim(),
+    confirmationCount: readConfirmationCount(formData),
+    expectedCount: readNumberField(formData, "expectedCount"),
+    previewToken: readStringField(formData, "previewToken"),
+    excludedProductIds: formData.getAll("excludedProductId").map((value) => String(value))
+  };
+}
+
+function buildGroupApplySuccessTarget(
+  filters: AdminReviewActionFilters,
+  result: {
+    processed: number;
+    remaining: number;
+    learnedRuleId: string | null;
+    learnedRuleSkippedReason: string | null;
+  }
+) {
+  const params = buildReviewSearchParams(filters);
+  params.set("bulkProcessed", String(result.processed));
+  params.set("bulkRemaining", String(result.remaining));
+  params.set("bulkRule", result.learnedRuleId ? "yes" : "no");
+  if (result.learnedRuleId) {
+    params.set("rule", "1");
+  } else if (result.learnedRuleSkippedReason && result.learnedRuleSkippedReason !== "disabled") {
+    params.set("ruleSkipped", result.learnedRuleSkippedReason);
+  }
+  return `/admin/review?${params.toString()}`;
+}
+
+function groupApplyLogError(error: unknown) {
+  if (error instanceof AdminReviewBulkSafetyError) {
+    return { errorCode: error.code, safeMessage: error.message };
+  }
+
+  return {
+    errorCode: "group_apply_failed",
+    safeMessage: "Не удалось выполнить массовое действие."
+  };
 }
 
 export async function applySelectedReviewItemsAction(formData: FormData) {

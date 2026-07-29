@@ -1,5 +1,7 @@
 # Эксплуатация админ-панели
 
+Background job queue, worker lifecycle, feature flags, diagnostics and rollback are documented in [background-jobs.md](./background-jobs.md). The worker is not required for the web application. Deploy web only with `pm2 startOrReload ecosystem.config.cjs --only autozap`; worker startup is an explicit, separate `pm2 start ecosystem.worker.config.cjs --only autozap-worker` action performed as Linux user `autozap`.
+
 ## Вход администратора
 
 1. Откройте `/admin/login`.

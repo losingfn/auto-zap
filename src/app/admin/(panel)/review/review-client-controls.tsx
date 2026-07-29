@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AdminReviewActionFilters, AdminReviewCategoryOption, AdminReviewGroup } from "@/features/admin/review";
 import {
   applyReviewGroupAction,
@@ -27,6 +27,7 @@ const DRAFT_ONLY_MESSAGE =
 const NO_UNDO_MESSAGE =
   "Последнее неопубликованное действие можно отменить до финальной публикации.";
 const LARGE_ACTION_THRESHOLD = 100;
+const GROUP_APPLY_NAVIGATION_KEY = "autozap:review-group-apply-navigation";
 const DANGEROUS_RULE_WORDS = new Set([
   "болт",
   "гайка",
@@ -69,13 +70,36 @@ export function ReviewGroupActionForm({
   const [categoryLabel, setCategoryLabel] = useState("");
   const [subcategoryLabel, setSubcategoryLabel] = useState("");
   const [rulePattern, setRulePattern] = useState(group.rulePattern ?? "");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const countConfirmed = !requiresTypedConfirmation || confirmationCount.trim() === String(impactCount);
-  const actionDisabled = bulkDisabled || !countConfirmed || impactCount === 0 || !group.suggestedCategoryId || !group.suggestedSubcategoryId;
+  const actionDisabled =
+    isSubmitting ||
+    bulkDisabled ||
+    !countConfirmed ||
+    impactCount === 0 ||
+    !group.suggestedCategoryId ||
+    !group.suggestedSubcategoryId;
+  const formControlsDisabled = bulkDisabled || isSubmitting;
+
+  useEffect(() => {
+    const resetAfterPageShow = () => {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    };
+    window.addEventListener("pageshow", resetAfterPageShow);
+    return () => window.removeEventListener("pageshow", resetAfterPageShow);
+  }, []);
 
   return (
     <form
       action={applyReviewGroupAction}
       onSubmit={(event) => {
+        if (submittingRef.current) {
+          event.preventDefault();
+          return;
+        }
+
         const form = event.currentTarget;
         const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
         const category = selectedOptionLabel(form, "categoryId");
@@ -126,9 +150,15 @@ export function ReviewGroupActionForm({
 
         if (!window.confirm(lines.join("\n"))) {
           event.preventDefault();
+          return;
         }
+
+        submittingRef.current = true;
+        setIsSubmitting(true);
+        saveGroupApplyNavigationState(group.key);
       }}
       className="rounded-card border border-[#243249] bg-[#101827] p-5"
+      aria-busy={isSubmitting}
     >
       <HiddenReviewFilters filters={filters} />
       <input type="hidden" name="group" value={group.key} />
@@ -143,7 +173,7 @@ export function ReviewGroupActionForm({
             categories={categories}
             name="categoryId"
             defaultValue={group.suggestedCategoryId ?? ""}
-            disabled={bulkDisabled}
+            disabled={formControlsDisabled}
             onSelectionLabelChange={setCategoryLabel}
           />
         </label>
@@ -153,7 +183,7 @@ export function ReviewGroupActionForm({
             categories={categories}
             name="subcategoryId"
             defaultValue={group.suggestedSubcategoryId ?? ""}
-            disabled={bulkDisabled}
+            disabled={formControlsDisabled}
             onSelectionLabelChange={setSubcategoryLabel}
           />
         </label>
@@ -165,7 +195,7 @@ export function ReviewGroupActionForm({
           name="rulePattern"
           defaultValue={group.rulePattern ?? ""}
           placeholder="например: болт"
-          disabled={bulkDisabled}
+          disabled={formControlsDisabled}
           onChange={(event) => setRulePattern(event.currentTarget.value)}
           className={bulkDisabled ? disabledInputClassName : inputClassName}
         />
@@ -210,7 +240,7 @@ export function ReviewGroupActionForm({
         <TypedCountConfirmation
           count={impactCount}
           value={confirmationCount}
-          disabled={bulkDisabled}
+          disabled={formControlsDisabled}
           onChange={setConfirmationCount}
         />
       ) : null}
@@ -221,22 +251,83 @@ export function ReviewGroupActionForm({
           name="learnRule"
           value="0"
           disabled={actionDisabled}
-          className={primaryButtonClassName}
+          className={`${primaryButtonClassName} min-w-[220px]`}
         >
-          Применить к группе
+          {isSubmitting ? <PendingSpinner /> : null}
+          {isSubmitting ? "Применяется…" : "Применить к группе"}
         </button>
         <button
           type="submit"
           name="learnRule"
           value="1"
           disabled={actionDisabled || isDangerousRulePattern(rulePattern)}
-          className={secondaryButtonClassName}
+          className={`${secondaryButtonClassName} min-w-[270px]`}
         >
-          Применить и создать правило
+          {isSubmitting ? <PendingSpinner /> : null}
+          {isSubmitting ? "Применяется…" : "Применить и создать правило"}
         </button>
       </div>
+      {isSubmitting ? (
+        <p className="mt-3 text-sm text-[#C8D1DF]" role="status" aria-live="polite">
+          Применение выполняется. Не закрывайте страницу: повторная отправка заблокирована.
+          Если соединение прервалось, обновите страницу — серверная защита не создаст дубликаты.
+        </p>
+      ) : null}
     </form>
   );
+}
+
+export function ReviewGroupApplyNavigationRestore() {
+  useEffect(() => {
+    const raw = window.sessionStorage.getItem(GROUP_APPLY_NAVIGATION_KEY);
+    if (!raw) return;
+
+    window.sessionStorage.removeItem(GROUP_APPLY_NAVIGATION_KEY);
+    try {
+      const state = JSON.parse(raw) as {
+        groupId?: unknown;
+        startedAt?: unknown;
+        scrollY?: unknown;
+      };
+      if (typeof state.scrollY === "number" && Number.isFinite(state.scrollY)) {
+        window.scrollTo(0, Math.max(0, state.scrollY));
+      }
+      console.info(
+        "[group_apply_client_refresh]",
+        JSON.stringify({
+          groupId: typeof state.groupId === "string" ? state.groupId : null,
+          durationMs:
+            typeof state.startedAt === "number" && Number.isFinite(state.startedAt)
+              ? Math.max(0, Date.now() - state.startedAt)
+              : null
+        })
+      );
+    } catch {
+      // Client-side diagnostics and scroll restoration are best effort only.
+    }
+  }, []);
+
+  return null;
+}
+
+function PendingSpinner() {
+  return (
+    <span
+      aria-hidden="true"
+      className="mr-2 inline-block size-4 animate-spin rounded-full border-2 border-current border-r-transparent"
+    />
+  );
+}
+
+function saveGroupApplyNavigationState(groupId: string) {
+  try {
+    window.sessionStorage.setItem(
+      GROUP_APPLY_NAVIGATION_KEY,
+      JSON.stringify({ groupId, startedAt: Date.now(), scrollY: window.scrollY })
+    );
+  } catch {
+    // The mutation must continue even if browser storage is unavailable.
+  }
 }
 
 export function ReviewBulkSelectionForm({ categories, filters }: ReviewControlsProps) {

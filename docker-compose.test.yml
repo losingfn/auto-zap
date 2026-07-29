@@ -1,0 +1,20 @@
+services:
+  postgres-integration-test:
+    image: postgres:16-alpine
+    container_name: autozap-postgres-integration-test
+    environment:
+      POSTGRES_DB: autozap_integration_test
+      POSTGRES_USER: autozap_test
+      POSTGRES_PASSWORD: autozap_test_password
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - autozap_integration_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autozap_test -d autozap_integration_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  autozap_integration_test_data:

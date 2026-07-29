@@ -12,11 +12,12 @@ import type {
 } from "./types";
 
 export async function getCategorizationContext(
-  perf?: AdminReviewPerfLogger
+  perf?: AdminReviewPerfLogger,
+  database: Pick<typeof db, "select"> = db
 ): Promise<CategorizationContext> {
   const timer = perf?.start();
   const rulesTimer = perf?.start();
-  const rulesQuery = db
+  const rulesQuery = database
     .select({
       id: categorizationRules.id,
       pattern: categorizationRules.pattern,
@@ -62,7 +63,7 @@ export async function getCategorizationContext(
     }));
   const databaseRuleCount = rules.length;
 
-  const fallbackRows = await db
+  const fallbackRows = await database
     .select({
       categoryId: categories.id,
       categorySlug: categories.slug,

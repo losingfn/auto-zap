@@ -81,6 +81,14 @@ export const reviewReapplyRunItemStatus = pgEnum("review_reapply_run_item_status
   "skipped",
   "error"
 ]);
+export const backgroundJobStatus = pgEnum("background_job_status", [
+  "pending",
+  "running",
+  "succeeded",
+  "failed",
+  "retry_wait",
+  "cancelled"
+]);
 export const ruleMatchType = pgEnum("rule_match_type", [
   "contains",
   "starts_with",
@@ -670,6 +678,48 @@ export const reviewReapplyGroups = pgTable(
     runDecisionIdx: index("review_reapply_groups_run_decision_idx").on(
       table.runId,
       table.decisionStatus
+    )
+  })
+);
+
+export const backgroundJobs = pgTable(
+  "background_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    type: varchar("type", { length: 120 }).notNull(),
+    status: backgroundJobStatus("status").notNull().default("pending"),
+    payload: jsonb("payload").notNull().default(sql`'{}'::jsonb`),
+    payloadHash: varchar("payload_hash", { length: 64 }).notNull(),
+    progress: integer("progress").notNull().default(0),
+    result: jsonb("result"),
+    error: jsonb("error"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(3),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    lockedBy: varchar("locked_by", { length: 120 }),
+    leaseToken: uuid("lease_token"),
+    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
+    availableAt: timestamp("available_at", { withTimezone: true }).notNull().defaultNow(),
+    idempotencyKey: varchar("idempotency_key", { length: 180 }).notNull(),
+    requestedBy: uuid("requested_by").references(() => adminUsers.id, { onDelete: "set null" }),
+    correlationId: varchar("correlation_id", { length: 120 }),
+    ...timestamps
+  },
+  (table) => ({
+    claimIdx: index("background_jobs_claim_idx").on(
+      table.status,
+      table.availableAt,
+      table.createdAt
+    ),
+    runningLeaseIdx: index("background_jobs_running_lease_idx").on(
+      table.status,
+      table.heartbeatAt
+    ),
+    typeIdempotencyUnique: unique("background_jobs_type_idempotency_key_unique").on(
+      table.type,
+      table.idempotencyKey
     )
   })
 );

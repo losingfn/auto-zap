@@ -42,6 +42,7 @@ import {
 import { getSearchSynonyms } from "@/features/search/synonyms";
 import { getAdminSessionSecret } from "@/features/admin/session-cookie";
 import type { AdminReviewPerfLogger } from "@/lib/server/admin-review-perf";
+import type { GroupApplyPerfCategory, GroupApplyPerfLogger } from "@/lib/server/group-apply-perf";
 
 export const REVIEW_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 const REVIEWABLE_PRODUCT_STATUSES = ["needs_review", "invalid"] as const;
@@ -732,6 +733,7 @@ export async function applyReviewGroupCorrection(input: {
   expectedCount?: number | null;
   previewToken?: string | null;
   excludedProductIds?: string[];
+  groupApplyPerf?: GroupApplyPerfLogger;
 }) {
   if (!input.filters.group) {
     throw new Error("Группа не выбрана.");
@@ -1250,15 +1252,37 @@ async function applyReviewRuleToWorkspace(input: {
   expectedCount?: number | null;
   previewToken?: string | null;
   excludedProductIds?: string[];
+  groupApplyPerf?: GroupApplyPerfLogger;
   actionType: string;
   allowProductNounSingleWordRule: boolean;
 }) {
-  await validateCategoryTarget(input.categoryId, input.subcategoryId);
-  const versionContext = await getReviewVersionContext();
-  const workspace = await ensureReviewWorkspace(versionContext.activeVersion?.id ?? null, input.adminUserId);
+  const perf = input.groupApplyPerf;
+  await measureGroupApplyStage(
+    perf,
+    "validate_category_target",
+    { category: "database", sqlOperations: 1 },
+    () => validateCategoryTarget(input.categoryId, input.subcategoryId)
+  );
+  const versionContext = await measureGroupApplyStage(
+    perf,
+    "load_active_version_context",
+    { category: "database", sqlOperations: 2 },
+    () => getReviewVersionContext()
+  );
+  const workspace = await measureGroupApplyStage(
+    perf,
+    "load_or_create_workspace",
+    { category: "database", sqlOperations: 1 },
+    () => ensureReviewWorkspace(versionContext.activeVersion?.id ?? null, input.adminUserId)
+  );
 
   if (input.previewToken) {
-    const existingAction = await getWorkspaceActionByPreviewToken(workspace.id, input.previewToken);
+    const existingAction = await measureGroupApplyStage(
+      perf,
+      "check_duplicate_submission",
+      { category: "database", sqlOperations: 1 },
+      () => getWorkspaceActionByPreviewToken(workspace.id, input.previewToken!)
+    );
     if (existingAction?.status === "applied") {
       return {
         processed: existingAction.productCount,
@@ -1275,7 +1299,7 @@ async function applyReviewRuleToWorkspace(input: {
     }
   }
 
-  const rows = await getActionRows(input.filters, input.reviewQueueIds, workspace.id);
+  const rows = await getActionRows(input.filters, input.reviewQueueIds, workspace.id, perf);
   const excluded = new Set(input.excludedProductIds ?? []);
   const excludedRows = rows.filter((row) => excluded.has(row.productId));
   if (excluded.size !== excludedRows.length) {
@@ -1314,7 +1338,20 @@ async function applyReviewRuleToWorkspace(input: {
   let learnedRulePattern: string | null = null;
   let learnedRuleCreated = false;
   let learnedRuleSkippedReason: string | null = input.learnRule ? "no_safe_pattern" : "disabled";
-  const duplicateAction = await db.transaction(async (tx) => {
+  const databaseOperationCount =
+    2 +
+    Math.ceil(impactedRows.length / 1000) +
+    Math.ceil(excludedRows.length / 1000) +
+    (input.learnRule ? 2 : input.rulePattern ? 1 : 0);
+  const duplicateAction = await measureGroupApplyStage(
+    perf,
+    "apply_workspace_transaction",
+    {
+      category: "database",
+      itemCount: impactedRows.length,
+      sqlOperations: databaseOperationCount
+    },
+    () => db.transaction(async (tx) => {
     const [action] = await tx
       .insert(reviewWorkspaceActions)
       .values({
@@ -1479,8 +1516,9 @@ async function applyReviewRuleToWorkspace(input: {
       }
     });
 
-    return null;
-  });
+      return null;
+    })
+  );
 
   if (duplicateAction) {
     return {
@@ -1493,7 +1531,12 @@ async function applyReviewRuleToWorkspace(input: {
     };
   }
 
-  const postCount = await countWorkspaceItems(workspace.id, "pending");
+  const postCount = await measureGroupApplyStage(
+    perf,
+    "verify_workspace_post_condition",
+    { category: "database", itemCount: impactedRows.length, sqlOperations: 1 },
+    () => countWorkspaceItems(workspace.id, "pending")
+  );
   if (postCount < impactedRows.length) {
     throw new AdminReviewBulkSafetyError(
       "post_condition_failed",
@@ -1679,37 +1722,88 @@ async function getReviewQueueStats(
 async function getActionRows(
   filters: AdminReviewActionFilters,
   reviewQueueIds?: string[],
-  workspaceIdOverride?: string | null
+  workspaceIdOverride?: string | null,
+  groupApplyPerf?: GroupApplyPerfLogger
 ) {
   const [versionContext, categorizationContext, targetBySlug] = await Promise.all([
-    getReviewVersionContext(),
-    getCategorizationContext(),
-    getTargetBySlugFromDb()
+    measureGroupApplyStage(
+      groupApplyPerf,
+      "load_action_version_context",
+      { category: "database", sqlOperations: 2 },
+      () => getReviewVersionContext()
+    ),
+    measureGroupApplyStage(
+      groupApplyPerf,
+      "load_categorization_context",
+      { category: "database", sqlOperations: 2 },
+      () => getCategorizationContext()
+    ),
+    measureGroupApplyStage(
+      groupApplyPerf,
+      "load_taxonomy_targets",
+      { category: "database", sqlOperations: 2 },
+      () => getTargetBySlugFromDb()
+    )
   ]);
   const workspace = workspaceIdOverride === undefined
-    ? await getReviewWorkspace(versionContext.activeVersion?.id ?? null)
+    ? await measureGroupApplyStage(
+        groupApplyPerf,
+        "load_action_workspace",
+        { category: "database", sqlOperations: 1 },
+        () => getReviewWorkspace(versionContext.activeVersion?.id ?? null)
+      )
     : { id: workspaceIdOverride };
   const rows = reviewQueueIds
-    ? await getRowsByReviewIds(reviewQueueIds, workspace.id)
-    : await getWorkspaceReviewRows(versionContext, workspace.id);
+    ? await measureGroupApplyStage(
+        groupApplyPerf,
+        "load_selected_review_items",
+        { category: "database", sqlOperations: 1, itemCount: reviewQueueIds.length },
+        () => getRowsByReviewIds(reviewQueueIds, workspace.id)
+      )
+    : await measureGroupApplyStage(
+        groupApplyPerf,
+        "load_group_review_items",
+        { category: "database", sqlOperations: 1 },
+        () => getWorkspaceReviewRows(versionContext, workspace.id)
+      );
   const params: AdminReviewParams = {
     ...filters,
     page: 1,
     pageSize: DEFAULT_PAGE_SIZE
   };
-  let filteredRows = filterReviewRows(
-    rows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug)),
-    params
-  ).filter((row) => row.workspaceItemStatus !== "pending" && row.workspaceItemStatus !== "excluded");
+  return measureGroupApplyStage(
+    groupApplyPerf,
+    "classify_and_filter_group_items",
+    { category: "other", itemCount: rows.length },
+    () => {
+      let filteredRows = filterReviewRows(
+        rows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug)),
+        params
+      ).filter((row) => row.workspaceItemStatus !== "pending" && row.workspaceItemStatus !== "excluded");
 
-  if (!reviewQueueIds && filters.group) {
-    const bestSuggestion = chooseGroupSuggestion(filteredRows);
-    filteredRows = filteredRows.filter(
-      (row) => row.safeToApply && sameTarget(row.suggestion, bestSuggestion)
-    );
-  }
+      if (!reviewQueueIds && filters.group) {
+        const bestSuggestion = chooseGroupSuggestion(filteredRows);
+        filteredRows = filteredRows.filter(
+          (row) => row.safeToApply && sameTarget(row.suggestion, bestSuggestion)
+        );
+      }
 
-  return filteredRows;
+      return filteredRows;
+    }
+  );
+}
+
+async function measureGroupApplyStage<T>(
+  perf: GroupApplyPerfLogger | undefined,
+  name: string,
+  options: {
+    category: GroupApplyPerfCategory;
+    itemCount?: number;
+    sqlOperations?: number;
+  },
+  operation: () => T | Promise<T>
+) {
+  return perf ? perf.measure(name, options, operation) : operation();
 }
 
 async function getRowsByReviewIds(reviewQueueIds: string[], workspaceId: string | null) {

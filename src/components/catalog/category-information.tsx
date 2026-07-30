@@ -16,7 +16,7 @@ export function CategoryInformation({ categorySlug }: { categorySlug: string }) 
   return (
     <section
       aria-labelledby={`category-information-${categorySlug}`}
-      className="scroll-reveal mt-5 rounded-card border border-white/[0.06] bg-[#151C2A] px-4 py-5 shadow-[0_14px_40px_rgba(0,0,0,0.16)] sm:mt-6 sm:px-5 sm:py-6"
+      className="scroll-reveal mt-5 rounded-card bg-[#151C2A] bg-[radial-gradient(ellipse_at_18%_0%,rgba(71,85,105,0.07),transparent_62%)] px-4 py-5 sm:mt-6 sm:bg-[radial-gradient(ellipse_at_18%_0%,rgba(71,85,105,0.1),transparent_62%)] sm:px-5 sm:py-6"
     >
       <h2 id={`category-information-${categorySlug}`} className="text-lg font-medium leading-snug text-[#E5E7EB] sm:text-xl">
         {content.title}

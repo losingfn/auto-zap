@@ -16,13 +16,12 @@ export function CategoryInformation({ categorySlug }: { categorySlug: string }) 
   return (
     <section
       aria-labelledby={`category-information-${categorySlug}`}
-      className="scroll-reveal mt-5 rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.88),rgba(17,24,39,0.96))] px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.2)] sm:mt-6 sm:px-5 sm:py-4"
+      className="scroll-reveal mt-5 rounded-card border border-white/[0.06] bg-[#151C2A] px-4 py-5 shadow-[0_14px_40px_rgba(0,0,0,0.16)] sm:mt-6 sm:px-5 sm:py-6"
     >
-      <span className="mb-3 block h-1 w-8 rounded-full bg-[#2563EB] sm:w-10" />
-      <h2 id={`category-information-${categorySlug}`} className="text-lg font-semibold leading-snug text-white sm:text-xl">
+      <h2 id={`category-information-${categorySlug}`} className="text-lg font-medium leading-snug text-[#E5E7EB] sm:text-xl">
         {content.title}
       </h2>
-      <p className="mt-2 max-w-3xl text-sm leading-5 text-[#CBD5E1] sm:leading-6">
+      <p className="mt-2 max-w-[680px] text-sm leading-5 text-[#CBD5E1] sm:leading-6">
         {content.description}
       </p>
     </section>

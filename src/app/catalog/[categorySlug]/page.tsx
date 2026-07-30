@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { CategoryInformation } from "@/components/catalog/category-information";
 import { CatalogPageShell } from "@/components/catalog/page-shell";
 import { SubcategoryGrid } from "@/components/catalog/subcategory-grid";
 import { JsonLd } from "@/components/seo/json-ld";
@@ -53,6 +54,7 @@ export default async function CategoryPage({
         ])}
       />
       <SubcategoryGrid categorySlug={category.slug} subcategories={subcategories} />
+      <CategoryInformation categorySlug={category.slug} />
     </CatalogPageShell>
   );
 }

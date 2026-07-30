@@ -14,20 +14,17 @@ export function CategoryInformation({ categorySlug }: { categorySlug: string }) 
   }
 
   return (
-    <section
-      aria-labelledby={`category-information-${categorySlug}`}
-      className="scroll-reveal relative isolate mt-5 px-4 py-5 sm:mt-6 sm:px-5 sm:py-6"
-    >
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute -left-10 -top-10 z-0 h-[calc(100%+5rem)] w-[calc(100%+5rem)] bg-[radial-gradient(ellipse_at_42%_48%,rgba(71,85,105,0.12)_0%,rgba(40,52,72,0.075)_35%,rgba(15,23,42,0.02)_58%,transparent_76%)] sm:-left-16 sm:-top-12 sm:h-[calc(100%+6rem)] sm:w-[760px] sm:bg-[radial-gradient(ellipse_at_32%_46%,rgba(71,85,105,0.15)_0%,rgba(40,52,72,0.09)_34%,rgba(15,23,42,0.025)_58%,transparent_78%)]"
-      />
-      <h2 id={`category-information-${categorySlug}`} className="relative z-10 text-lg font-medium leading-snug text-[#E5E7EB] sm:text-xl">
-        {content.title}
-      </h2>
-      <p className="relative z-10 mt-2 max-w-[680px] text-sm leading-5 text-[#CBD5E1] sm:leading-6">
-        {content.description}
-      </p>
+    <section aria-labelledby={`category-information-${categorySlug}`} className="scroll-reveal mt-5 sm:mt-6">
+      <div className="rounded-[20px] bg-[linear-gradient(135deg,rgba(255,255,255,0.065)_0%,rgba(148,163,184,0.035)_32%,rgba(71,85,105,0.018)_64%,rgba(255,255,255,0.006)_100%)] p-px sm:rounded-[22px]">
+        <div className="overflow-hidden rounded-[19px] bg-[#111827]/[0.78] bg-[radial-gradient(ellipse_at_26%_0%,rgba(255,255,255,0.03),transparent_52%),linear-gradient(180deg,rgba(30,41,59,0.1)_0%,rgba(15,23,42,0.08)_100%)] px-[18px] py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03),inset_0_-1px_0_rgba(0,0,0,0.12)] sm:rounded-[21px] sm:bg-[radial-gradient(ellipse_at_22%_0%,rgba(255,255,255,0.045),transparent_52%),linear-gradient(180deg,rgba(30,41,59,0.13)_0%,rgba(15,23,42,0.1)_100%)] sm:px-5 sm:py-6">
+          <h2 id={`category-information-${categorySlug}`} className="text-lg font-medium leading-snug text-[#E5E7EB] sm:text-xl">
+            {content.title}
+          </h2>
+          <p className="mt-2 max-w-[680px] text-sm leading-5 text-[#CBD5E1] sm:leading-6">
+            {content.description}
+          </p>
+        </div>
+      </div>
     </section>
   );
 }

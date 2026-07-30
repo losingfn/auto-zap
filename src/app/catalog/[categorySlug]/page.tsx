@@ -44,7 +44,6 @@ export default async function CategoryPage({
   return (
     <CatalogPageShell
       title={category.name}
-      subtitle="Выберите подкатегорию. Товары отображаются только внутри подкатегории."
       backHref="/"
     >
       <JsonLd

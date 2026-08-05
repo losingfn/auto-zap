@@ -1,4 +1,5 @@
 import { siteConfig } from "@/config/site";
+import { publicBrandLogoSrc } from "@/config/public-brand";
 import type { PublicBusinessHour, PublicHomeContent } from "@/features/content/public-home";
 
 const baseUrl = siteConfig.url;
@@ -43,7 +44,7 @@ export function buildLocalBusinessJsonLd(content: PublicHomeContent) {
     name: content.brand.name,
     url: absoluteUrl("/"),
     image: absoluteUrl(content.brand.ogImageSrc),
-    logo: absoluteUrl(content.brand.logoSrc),
+    logo: absoluteUrl(publicBrandLogoSrc),
     telephone: content.contact.phone,
     email: content.contact.email,
     address: {

@@ -24,7 +24,6 @@ export default async function CatalogPage() {
   return (
     <CatalogPageShell
       title="Каталог"
-      subtitle="Выберите основной раздел. Товары открываются внутри подкатегорий."
       backHref="/"
     >
       <JsonLd

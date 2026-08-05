@@ -14,9 +14,10 @@ export async function PublicFooter({ content }: { content?: PublicHomeContent })
             <Image
               src={publicBrandLogoSrc}
               alt=""
-              width={44}
-              height={44}
-              className="aspect-square h-14 w-14 shrink-0 object-contain drop-shadow-[0_1px_3px_rgba(226,232,240,0.3)] sm:h-[60px] sm:w-[60px]"
+              width={120}
+              height={120}
+              unoptimized
+              className="aspect-square h-14 w-14 shrink-0 object-contain drop-shadow-[0_1px_1px_rgba(226,232,240,0.2)] sm:h-[60px] sm:w-[60px]"
             />
             <p className="max-w-sm text-sm font-semibold leading-5 text-white sm:text-base sm:leading-6">
               {data.brand.name}

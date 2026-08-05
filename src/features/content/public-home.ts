@@ -1,5 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { catalogCategories } from "@/config/categories";
+import { publicBrandLogoSrc } from "@/config/public-brand";
 import { isPublicCategorySlug } from "@/config/public-taxonomy";
 import { siteConfig } from "@/config/site";
 import { db } from "@/db/client";
@@ -271,7 +272,7 @@ async function loadPublicHomeContent(): Promise<PublicHomeContent> {
     return {
       brand: {
         name: contact?.name ?? siteConfig.name,
-        logoSrc: brandByKind.get("logo") ?? "/assets/brand/logo-mark.png",
+        logoSrc: brandByKind.get("logo") ?? publicBrandLogoSrc,
         faviconSrc: brandByKind.get("favicon") ?? "/favicon.ico",
         ogImageSrc: brandByKind.get("og_image") ?? "/og/store-front.webp"
       },
@@ -397,7 +398,7 @@ function getFallbackHomeContent(): PublicHomeContent {
   return {
     brand: {
       name: siteConfig.name,
-      logoSrc: "/assets/brand/logo-mark.png",
+      logoSrc: publicBrandLogoSrc,
       faviconSrc: "/favicon.ico",
       ogImageSrc: "/og/store-front.webp"
     },

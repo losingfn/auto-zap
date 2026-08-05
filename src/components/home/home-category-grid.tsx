@@ -23,10 +23,13 @@ export function HomeCategoryGrid({ categories }: { categories: PublicCategory[] 
               width={230}
               height={230}
               className={[
-                "w-full object-contain drop-shadow-[0_16px_24px_rgba(0,0,0,0.36)] transition duration-500 group-hover:scale-[1.055]",
+                "object-contain drop-shadow-[0_16px_24px_rgba(0,0,0,0.36)] transition duration-500 group-hover:scale-[1.055]",
                 category.slug === "kuzov-i-optika"
-                  ? "h-[216px] max-w-[140px] -translate-y-[50px] sm:h-36 sm:max-w-[172px] sm:translate-y-0 lg:h-52 lg:max-w-[248px]"
-                  : "h-[108px] max-w-[140px] sm:h-36 sm:max-w-[172px] lg:h-52 lg:max-w-[248px]"
+                  ? "h-[270px] w-[180px] max-w-none sm:h-36 sm:w-full sm:max-w-[172px] lg:h-52 lg:max-w-[248px]"
+                  : [
+                      "h-[108px] w-full max-w-[140px] sm:h-36 sm:max-w-[172px] lg:h-52 lg:max-w-[248px]",
+                      mobileCategoryIconScaleClassName(category.slug)
+                    ].join(" ")
               ].join(" ")}
             />
           </div>
@@ -41,5 +44,19 @@ export function HomeCategoryGrid({ categories }: { categories: PublicCategory[] 
         </Link>
       ))}
     </div>
+  );
+}
+
+function mobileCategoryIconScaleClassName(slug: string) {
+  return (
+    {
+      podveska: "scale-[1.05] sm:scale-100",
+      elektrika: "scale-[1.03] sm:scale-100",
+      "filtry-i-masla": "scale-[1.02] sm:scale-100",
+      "tormoznaya-sistema": "scale-[0.94] sm:scale-100",
+      "dvigatel-i-transmissiya": "scale-[0.96] sm:scale-100",
+      aksessuary: "scale-[1.06] sm:scale-100",
+      "ves-assortiment": "scale-[1.03] sm:scale-100"
+    }[slug] ?? "scale-100"
   );
 }

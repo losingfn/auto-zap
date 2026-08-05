@@ -26,7 +26,7 @@ export function SiteHeader({
               width={48}
               height={48}
               priority
-              className="aspect-square h-10 w-10 shrink-0 object-contain sm:h-11 sm:w-11"
+              className="aspect-square h-[52px] w-[52px] shrink-0 object-contain drop-shadow-[0_1px_3px_rgba(226,232,240,0.3)] sm:h-14 sm:w-14"
             />
             <span className="min-w-0 max-w-[218px] text-xs font-semibold leading-4 text-white sm:max-w-none sm:text-base sm:leading-5">
               {siteName}

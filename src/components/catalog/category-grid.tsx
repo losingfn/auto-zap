@@ -25,7 +25,7 @@ export function CategoryGrid({ categories }: { categories: PublicCategory[] }) {
               className={[
                 "object-contain drop-shadow-[0_16px_24px_rgba(0,0,0,0.36)] transition duration-500 group-hover:scale-[1.055]",
                 category.slug === "kuzov-i-optika"
-                  ? "h-[270px] w-[180px] max-w-none sm:h-36 sm:w-full sm:max-w-[172px] lg:h-[300px] lg:w-[200px] lg:max-w-none"
+                  ? "h-[270px] w-[180px] max-w-none sm:h-36 sm:w-full sm:max-w-[172px] lg:h-[555px] lg:w-[370px] lg:max-w-none"
                   : [
                       "h-[108px] w-full max-w-[140px] sm:h-36 sm:max-w-[172px] lg:h-52 lg:max-w-[248px]",
                       mobileCategoryIconScaleClassName(category.slug)

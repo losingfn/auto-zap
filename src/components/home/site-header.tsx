@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { publicBrandLogoSrc } from "@/config/public-brand";
 
 const navigationItems = [
   { href: "#catalog", label: "Каталог" },
@@ -10,11 +11,9 @@ const navigationItems = [
 ];
 
 export function SiteHeader({
-  siteName,
-  logoSrc
+  siteName
 }: {
   siteName: string;
-  logoSrc: string;
 }) {
   return (
     <header className="relative z-20 bg-[#111827] lg:absolute lg:left-0 lg:right-0 lg:top-0 lg:bg-transparent">
@@ -22,12 +21,13 @@ export function SiteHeader({
         <div className="flex items-center justify-between gap-4">
           <Link href="/" className="flex min-w-0 items-center gap-3">
             <Image
-              src={logoSrc}
+              src={publicBrandLogoSrc}
               alt=""
-              width={48}
-              height={48}
+              width={120}
+              height={120}
               priority
-              className="h-10 w-10 shrink-0 rounded-[4px] bg-white object-contain p-1 shadow-[0_14px_38px_rgba(0,0,0,0.28)] sm:h-11 sm:w-11"
+              unoptimized
+              className="aspect-square h-[52px] w-[52px] shrink-0 object-contain drop-shadow-[0_1px_1px_rgba(226,232,240,0.2)] sm:h-14 sm:w-14"
             />
             <span className="min-w-0 max-w-[218px] text-xs font-semibold leading-4 text-white sm:max-w-none sm:text-base sm:leading-5">
               {siteName}

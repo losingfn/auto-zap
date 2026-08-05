@@ -49,7 +49,7 @@ export default async function Home() {
   return (
     <main className="premium-page min-h-dvh bg-[#111827] text-white">
       <JsonLd data={buildLocalBusinessJsonLd(content)} />
-      <SiteHeader siteName={content.brand.name} logoSrc={content.brand.logoSrc} />
+      <SiteHeader siteName={content.brand.name} />
 
       <section className="relative isolate flex min-h-[62svh] items-end overflow-hidden sm:min-h-[94svh]">
         <picture className="pointer-events-none absolute inset-0">
@@ -111,7 +111,7 @@ export default async function Home() {
           <SectionIntro
             eyebrow={content.home.catalog.eyebrow}
             title={content.home.catalog.title}
-            text={content.home.catalog.text}
+            text=""
           />
           <HomeCategoryGrid categories={content.categories} />
         </div>
@@ -128,7 +128,7 @@ export default async function Home() {
             <div className="max-w-2xl text-base font-normal leading-7 text-[#D6DEE9] sm:text-lg sm:leading-8">
               <p>{content.home.about.intro}</p>
             </div>
-            <div className="mt-7 grid grid-cols-2 gap-3 min-[760px]:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-7 grid grid-cols-2 gap-3 min-[760px]:grid-cols-4 lg:mt-16 lg:grid-cols-2 xl:grid-cols-4">
               {aboutFacts.map((fact) => (
                 <div
                   key={fact.label}

@@ -23,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
       template: `%s | ${metadataTitle}`
     },
     description: metadataDescription,
-    manifest: "/site-v2.webmanifest",
+    manifest: "/site.webmanifest",
     verification: {
       yandex: "612ef6dabd30c864"
     },
@@ -51,14 +51,15 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     icons: {
       icon: [
-        { url: "/favicon-v2.ico" },
-        { url: "/favicon-v2.svg", type: "image/svg+xml" },
-        { url: "/favicon-v2-48x48.png", sizes: "48x48", type: "image/png" },
-        { url: "/favicon-v2-32x32.png", sizes: "32x32", type: "image/png" },
-        { url: "/favicon-v2-16x16.png", sizes: "16x16", type: "image/png" }
+        { url: "/favicon.svg", type: "image/svg+xml" },
+        { url: "/favicon.ico", sizes: "any" },
+        { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+        { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+        { url: "/favicon-48x48.png", sizes: "48x48", type: "image/png" },
+        { url: "/favicon-64x64.png", sizes: "64x64", type: "image/png" }
       ],
-      apple: [{ url: "/apple-touch-icon-v2.png", sizes: "180x180", type: "image/png" }],
-      shortcut: "/favicon-v2.ico"
+      apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+      shortcut: "/favicon.ico"
     },
     robots: {
       index: true,

@@ -16,13 +16,21 @@ export function HomeCategoryGrid({ categories }: { categories: PublicCategory[] 
           <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/[0.07]" />
           <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(37,99,235,0.09),transparent_43%)] opacity-70 transition duration-500 group-hover:opacity-100" />
           <span className="pointer-events-none absolute -inset-x-10 -top-16 h-36 bg-[#2563EB]/[0.045] blur-3xl transition duration-500 group-hover:bg-[#2563EB]/[0.085]" />
-          <div className="relative z-10 flex h-24 w-full items-center justify-center sm:h-40 lg:h-52">
+          <div className="relative z-10 flex h-[108px] w-full items-center justify-center sm:h-40 lg:h-52">
             <Image
               src={category.icon}
               alt=""
               width={230}
               height={230}
-              className="h-24 w-full max-w-[124px] object-contain drop-shadow-[0_16px_24px_rgba(0,0,0,0.36)] transition duration-500 group-hover:scale-[1.055] sm:h-36 sm:max-w-[172px] lg:h-52 lg:max-w-[248px]"
+              className={[
+                "object-contain drop-shadow-[0_16px_24px_rgba(0,0,0,0.36)] transition duration-500 group-hover:scale-[1.055]",
+                category.slug === "kuzov-i-optika"
+                  ? "h-[270px] w-[180px] max-w-none sm:h-36 sm:w-full sm:max-w-[172px] lg:h-[555px] lg:w-[370px] lg:max-w-none"
+                  : [
+                      "h-[108px] w-full max-w-[140px] sm:h-36 sm:max-w-[172px] lg:h-52 lg:max-w-[248px]",
+                      mobileCategoryIconScaleClassName(category.slug)
+                    ].join(" ")
+              ].join(" ")}
             />
           </div>
           <div className="relative z-10 mt-auto">
@@ -36,5 +44,19 @@ export function HomeCategoryGrid({ categories }: { categories: PublicCategory[] 
         </Link>
       ))}
     </div>
+  );
+}
+
+function mobileCategoryIconScaleClassName(slug: string) {
+  return (
+    {
+      podveska: "scale-[1.05] sm:scale-100",
+      elektrika: "scale-[1.03] sm:scale-100",
+      "filtry-i-masla": "scale-[1.02] sm:scale-100",
+      "tormoznaya-sistema": "scale-[0.94] sm:scale-100",
+      "dvigatel-i-transmissiya": "scale-[0.96] sm:scale-100",
+      aksessuary: "scale-[1.06] sm:scale-100",
+      "ves-assortiment": "scale-[1.03] sm:scale-100"
+    }[slug] ?? "scale-100"
   );
 }

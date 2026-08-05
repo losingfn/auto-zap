@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { publicBrandLogoSrc } from "@/config/public-brand";
 import { getPublicHomeContent, type PublicHomeContent } from "@/features/content/public-home";
 
 export async function PublicFooter({ content }: { content?: PublicHomeContent }) {
@@ -11,11 +12,11 @@ export async function PublicFooter({ content }: { content?: PublicHomeContent })
         <div>
           <div className="flex items-center gap-3">
             <Image
-              src={data.brand.logoSrc}
+              src={publicBrandLogoSrc}
               alt=""
               width={44}
               height={44}
-              className="h-10 w-10 rounded-[4px] bg-white object-contain p-1 sm:h-11 sm:w-11"
+              className="aspect-square h-10 w-10 shrink-0 object-contain sm:h-11 sm:w-11"
             />
             <p className="max-w-sm text-sm font-semibold leading-5 text-white sm:text-base sm:leading-6">
               {data.brand.name}

@@ -31,7 +31,7 @@ export const catalogCategories = [
   {
     slug: "kuzov-i-optika",
     name: "Кузов и оптика",
-    icon: categoryIcon("kuzov-i-optika"),
+    icon: "/assets/categories/body-optics.png",
     sortOrder: 50
   },
   {

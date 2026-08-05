@@ -93,7 +93,7 @@ export const DEFAULT_HOME_CONTENT = {
   catalog: {
     eyebrow: "Каталог",
     title: "Категории товаров",
-    text: "Выберите нужный раздел каталога."
+    text: ""
   },
   benefits: {
     eyebrow: "Преимущества",

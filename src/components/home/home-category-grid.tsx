@@ -16,13 +16,18 @@ export function HomeCategoryGrid({ categories }: { categories: PublicCategory[] 
           <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/[0.07]" />
           <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(37,99,235,0.09),transparent_43%)] opacity-70 transition duration-500 group-hover:opacity-100" />
           <span className="pointer-events-none absolute -inset-x-10 -top-16 h-36 bg-[#2563EB]/[0.045] blur-3xl transition duration-500 group-hover:bg-[#2563EB]/[0.085]" />
-          <div className="relative z-10 flex h-24 w-full items-center justify-center sm:h-40 lg:h-52">
+          <div className="relative z-10 flex h-[108px] w-full items-center justify-center sm:h-40 lg:h-52">
             <Image
               src={category.icon}
               alt=""
               width={230}
               height={230}
-              className="h-24 w-full max-w-[124px] object-contain drop-shadow-[0_16px_24px_rgba(0,0,0,0.36)] transition duration-500 group-hover:scale-[1.055] sm:h-36 sm:max-w-[172px] lg:h-52 lg:max-w-[248px]"
+              className={[
+                "w-full object-contain drop-shadow-[0_16px_24px_rgba(0,0,0,0.36)] transition duration-500 group-hover:scale-[1.055]",
+                category.slug === "kuzov-i-optika"
+                  ? "h-[216px] max-w-[140px] -translate-y-[50px] sm:h-36 sm:max-w-[172px] sm:translate-y-0 lg:h-52 lg:max-w-[248px]"
+                  : "h-[108px] max-w-[140px] sm:h-36 sm:max-w-[172px] lg:h-52 lg:max-w-[248px]"
+              ].join(" ")}
             />
           </div>
           <div className="relative z-10 mt-auto">

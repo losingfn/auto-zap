@@ -92,7 +92,7 @@ export function CustomerReviewsSection() {
             {reviews.map((review, index) => (
               <article
                 key={`${review.author}-${index}`}
-                className="scroll-reveal stagger-card w-[86vw] max-w-[352px] shrink-0 snap-start rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.94),rgba(17,24,39,0.98))] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.22)] lg:w-auto lg:max-w-none lg:min-w-0"
+                className="scroll-reveal stagger-card w-[86vw] max-w-[352px] shrink-0 snap-start rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.94),rgba(17,24,39,0.98))] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.22)] lg:flex lg:w-auto lg:max-w-none lg:min-w-0 lg:flex-col"
                 style={{ "--stagger": `${index * 70}ms` } as CSSProperties}
               >
                 <div className="flex gap-1 text-sm text-[#FBBF24]" aria-label={`${review.rating} из 5`}>
@@ -100,10 +100,10 @@ export function CustomerReviewsSection() {
                     <span key={`${star}-${starIndex}`}>{star}</span>
                   ))}
                 </div>
-                <p className="mt-4 text-sm leading-6 text-[#E5E7EB] sm:text-base sm:leading-7">
+                <p className="mt-4 text-sm leading-6 text-[#E5E7EB] sm:text-base sm:leading-7 lg:flex-1">
                   {review.text}
                 </p>
-                <div className="mt-5 border-t border-white/10 pt-4">
+                <div className="mt-5 border-t border-white/10 pt-4 lg:mt-auto">
                   <p className="font-semibold text-white">{review.author}</p>
                 </div>
               </article>

@@ -17,6 +17,7 @@
     "test:purchase-list-storage": "node --import tsx scripts/test-purchase-list-storage.ts",
     "test:purchase-list": "pnpm test:purchase-list-storage && node --import tsx scripts/test-purchase-list-contracts.ts",
     "test:purchase-list:postgres": "ALLOW_LOCAL_DB_INTEGRATION_TESTS=1 NODE_ENV=test DATABASE_URL=postgresql://autozap_test:autozap_test_password@127.0.0.1:55432/autozap_integration_test node --import tsx scripts/test-purchase-list-postgres.ts",
+    "test:stage3-rehearsal": "ALLOW_LOCAL_DB_INTEGRATION_TESTS=1 NODE_ENV=test DATABASE_URL=postgresql://autozap_test:autozap_test_password@127.0.0.1:55432/autozap_integration_test ADMIN_IMPORT_PERF_LOGS=1 node --import tsx scripts/rehearse-product-identity-scale.ts",
     "test:product-identities": "node --import tsx scripts/test-product-identities.ts",
     "test:background-jobs:postgres": "node --import tsx scripts/test-background-jobs-postgres.ts",
     "test:review-group-apply": "node --import tsx scripts/test-review-group-apply.ts",

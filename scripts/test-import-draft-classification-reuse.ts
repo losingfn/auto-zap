@@ -109,8 +109,8 @@ run("draft creation uses the local run for every categorization consumer", () =>
   );
 
   assert.doesNotMatch(source, /categorizeImportRow/);
-  assert.match(source, /buildCategorizationSummary\(analysis\.rows, classificationRun\)/);
-  assert.match(source, /buildAutoCategorizationPreview\(analysis\.rows, classificationRun\)/);
+  assert.match(source, /buildCategorizationSummary\(\s*analysis\.rows,\s*classificationRun/);
+  assert.match(source, /buildAutoCategorizationPreview\(\s*analysis\.rows,\s*classificationRun/);
   assert.match(source, /classificationRun\.categorizationFor\(row\)!/);
 });
 

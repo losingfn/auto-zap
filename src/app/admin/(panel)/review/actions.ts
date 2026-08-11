@@ -34,6 +34,7 @@ export async function resolveReviewItemAction(formData: FormData) {
   const subcategoryId = String(formData.get("subcategoryId") ?? "");
   const learnRule = formData.get("learnRule") === "1";
   const rulePattern = String(formData.get("rulePattern") ?? "").trim();
+  const identityDecision = readIdentityReviewDecision(formData.get("identityDecision"));
   const filters = readReviewActionFilters(formData);
   let target = buildReviewRedirect(filters);
 
@@ -45,7 +46,8 @@ export async function resolveReviewItemAction(formData: FormData) {
       subcategoryId,
       adminUserId: session.user.id,
       learnRule,
-      rulePattern: learnRule ? rulePattern : undefined
+      rulePattern: learnRule ? rulePattern : undefined,
+      identityDecision
     });
 
     revalidatePath("/admin/review");
@@ -60,8 +62,14 @@ export async function resolveReviewItemAction(formData: FormData) {
     }
 
     target = `/admin/review?${params.toString()}`;
-  } catch {
-    target = buildReviewRedirect(filters, { error: "save_failed" });
+  } catch (error) {
+    target = buildReviewRedirect(filters, {
+      error:
+        error instanceof AdminReviewBulkSafetyError &&
+        error.code === "identity_conflict_requires_manual_resolution"
+          ? "identity_conflict"
+          : "save_failed"
+    });
   }
 
   redirect(target);
@@ -366,6 +374,10 @@ function readStringField(formData: FormData, name: string) {
   return value || null;
 }
 
+function readIdentityReviewDecision(value: FormDataEntryValue | null) {
+  return value === "same" || value === "new" ? value : null;
+}
+
 function errorParamsForBulkFailure(error: unknown, fallback: string) {
   if (error instanceof AdminReviewBulkSafetyError) {
     const params: Record<string, string> = {
@@ -374,8 +386,10 @@ function errorParamsForBulkFailure(error: unknown, fallback: string) {
           ? "bulk_scope_forbidden"
           : error.code === "count_confirmation_required"
             ? "bulk_confirmation_required"
-            : error.code === "preview_stale"
-              ? "bulk_preview_stale"
+          : error.code === "preview_stale"
+            ? "bulk_preview_stale"
+            : error.code === "identity_conflict_requires_manual_resolution"
+              ? "identity_conflict"
               : "bulk_rule_blocked"
     };
 

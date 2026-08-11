@@ -92,12 +92,14 @@ export async function getPublishSafetyReport({
     activeProductCount,
     draftActiveProductCount,
     invalidCategoryCount,
+    missingProductIdentityCount,
     hasBlockingImport
   ] = await Promise.all([
       getActiveCatalogVersionId(catalogVersionId),
       countActiveProductsInCurrentCatalog(catalogVersionId),
       countActiveProducts(catalogVersionId),
       countInvalidActiveCategories(catalogVersionId),
+      countActiveProductsMissingIdentity(catalogVersionId),
       hasOtherBlockingImport(catalogVersionId)
     ]);
 
@@ -106,6 +108,7 @@ export async function getPublishSafetyReport({
     activeProductCount,
     draftActiveProductCount,
     invalidCategoryCount,
+    missingProductIdentityCount,
     hasActiveVersion: Boolean(activeVersionId),
     hasBlockingImport
   });
@@ -186,6 +189,21 @@ async function countInvalidActiveCategories(catalogVersionId: string) {
           or ${subcategories.isActive} is distinct from true
           or not ${publicTaxonomyTargetCondition()}
         )`
+      )
+    );
+
+  return Number(row?.count ?? 0);
+}
+
+async function countActiveProductsMissingIdentity(catalogVersionId: string) {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(products)
+    .where(
+      and(
+        eq(products.catalogVersionId, catalogVersionId),
+        eq(products.status, "active"),
+        sql`${products.productIdentityId} is null`
       )
     );
 

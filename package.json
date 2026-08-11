@@ -15,6 +15,7 @@
     "test": "node --import tsx scripts/test-import-automation.ts && node --import tsx scripts/test-import-draft-classification-reuse.ts && node --import tsx scripts/test-import-perf.ts && node --import tsx scripts/test-review-reapply.ts && node --import tsx scripts/test-review-group-apply.ts && node --import tsx scripts/test-background-jobs.ts",
     "test:background-jobs": "node --import tsx scripts/test-background-jobs.ts",
     "test:purchase-list-storage": "node --import tsx scripts/test-purchase-list-storage.ts",
+    "test:product-identities": "node --import tsx scripts/test-product-identities.ts",
     "test:background-jobs:postgres": "node --import tsx scripts/test-background-jobs-postgres.ts",
     "test:review-group-apply": "node --import tsx scripts/test-review-group-apply.ts",
     "test:review-reapply": "node --import tsx scripts/test-review-reapply.ts",

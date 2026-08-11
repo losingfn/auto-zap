@@ -8,6 +8,7 @@ import {
   catalogVersions,
   categories,
   categorizationRules,
+  productIdentities,
   products,
   reviewQueue,
   reviewReapplyRuns,
@@ -93,6 +94,7 @@ export type AdminReviewActionFilters = Pick<
 >;
 
 export type ReviewSuggestionLevel = "ready" | "quick" | "manual";
+export type IdentityReviewDecision = "same" | "new";
 
 export type ReviewWorkspaceSummary = {
   id: string | null;
@@ -127,6 +129,8 @@ export type AdminReviewSummary = {
 export type AdminReviewItem = {
   reviewId: string;
   productId: string;
+  identityConflict: boolean;
+  pendingIdentityDecision: IdentityReviewDecision | null;
   reason: string;
   createdAt: Date;
   catalogVersionId: string | null;
@@ -224,6 +228,7 @@ export class AdminReviewBulkSafetyError extends Error {
       | "preview_stale"
       | "empty_workspace"
       | "invalid_target"
+      | "identity_conflict_requires_manual_resolution"
       | "post_condition_failed",
     message: string,
     readonly ruleSkippedReason?: string
@@ -255,6 +260,7 @@ type ReviewRow = {
   suggestedSubcategoryId: string | null;
   importRowNumber: number | null;
   productId: string;
+  identityCandidateId: string | null;
   catalogVersionId: string | null;
   shopCode: string;
   name: string;
@@ -268,6 +274,7 @@ type ReviewRow = {
   workspaceItemStatus: string | null;
   pendingCategoryId: string | null;
   pendingSubcategoryId: string | null;
+  pendingIdentityDecision: IdentityReviewDecision | null;
 };
 
 type EnrichedReviewRow = ReviewRow & {
@@ -291,6 +298,23 @@ type ReviewSuggestion = {
 };
 
 type ReviewDbClient = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+export type ReviewSnapshotIdentitySource = {
+  id: string;
+  status: string;
+  productIdentityId: string | null;
+};
+
+export type PendingReviewIdentityDecision = {
+  productId: string;
+  identityDecision: string | null;
+  productIdentityId: string | null;
+};
+
+export type ReviewSnapshotIdentityPlan = {
+  productIdentityIdFor: (productId: string) => string | null;
+  newProductIdentityIds: readonly string[];
+};
 
 type ReviewQueueStats = {
   total: number;
@@ -780,6 +804,7 @@ export async function applyManualReviewCorrection(input: {
   adminUserId: string;
   learnRule: boolean;
   rulePattern?: string;
+  identityDecision?: IdentityReviewDecision | null;
 }) {
   return applyReviewRuleToWorkspace({
     filters: {
@@ -795,7 +820,12 @@ export async function applyManualReviewCorrection(input: {
     adminUserId: input.adminUserId,
     learnRule: input.learnRule,
     rulePattern: input.rulePattern,
-    actionType: input.learnRule ? "manual_permanent_rule" : "manual_temporary",
+    identityDecision: input.identityDecision,
+    actionType: input.identityDecision
+      ? `manual_identity_${input.identityDecision}`
+      : input.learnRule
+        ? "manual_permanent_rule"
+        : "manual_temporary",
     expectedCount: 1,
     allowProductNounSingleWordRule: false
   });
@@ -816,8 +846,11 @@ export async function reapplyCategorizationRulesToReviewQueue(input: {
       suggestion: buildCategorySuggestion(row, context, targetBySlug)
     }))
     .filter(
-      ({ suggestion }) =>
-        suggestion.level !== "manual" && suggestion.categoryId && suggestion.subcategoryId
+      ({ row, suggestion }) =>
+        !row.identityCandidateId &&
+        suggestion.level !== "manual" &&
+        suggestion.categoryId &&
+        suggestion.subcategoryId
     );
 
   if (applicable.length === 0) {
@@ -936,6 +969,7 @@ export async function publishReviewWorkspace(input: { adminUserId: string }) {
 
   const searchSynonyms = await getSearchSynonyms();
   const sourceProducts = await getProductsForVersion(versionContext.activeVersion.id);
+  const identityPlan = planReviewSnapshotIdentities(sourceProducts, pendingRows);
   const pendingByProductId = new Map(pendingRows.map((row) => [row.productId, row]));
   const oldToNewProductId = new Map<string, string>();
   const now = new Date();
@@ -974,6 +1008,12 @@ export async function publishReviewWorkspace(input: { adminUserId: string }) {
       createdBy: input.adminUserId
     });
 
+    for (const chunk of chunked([...identityPlan.newProductIdentityIds], 1000)) {
+      if (chunk.length > 0) {
+        await tx.insert(productIdentities).values(chunk.map((id) => ({ id })));
+      }
+    }
+
     for (const chunk of chunked(sourceProducts, 1000)) {
       await tx.insert(products).values(
         chunk.map((product) => {
@@ -986,6 +1026,7 @@ export async function publishReviewWorkspace(input: { adminUserId: string }) {
           return {
             id,
             catalogVersionId: newVersionId,
+            productIdentityId: identityPlan.productIdentityIdFor(product.id),
             shopCode: product.shopCode,
             rawName: product.rawName,
             name: product.name,
@@ -1018,6 +1059,7 @@ export async function publishReviewWorkspace(input: { adminUserId: string }) {
       .select({
         reviewId: reviewQueue.id,
         productId: products.id,
+        identityCandidateId: reviewQueue.identityCandidateId,
         reason: reviewQueue.reason,
         suggestedCategoryId: reviewQueue.suggestedCategoryId,
         suggestedSubcategoryId: reviewQueue.suggestedSubcategoryId
@@ -1037,6 +1079,7 @@ export async function publishReviewWorkspace(input: { adminUserId: string }) {
       .map((row) => ({
         catalogVersionId: newVersionId,
         productId: oldToNewProductId.get(row.productId)!,
+        identityCandidateId: row.identityCandidateId,
         reason: row.reason,
         status: "open" as const,
         suggestedCategoryId: row.suggestedCategoryId,
@@ -1248,6 +1291,7 @@ async function applyReviewRuleToWorkspace(input: {
   adminUserId: string;
   learnRule: boolean;
   rulePattern?: string;
+  identityDecision?: IdentityReviewDecision | null;
   confirmationCount?: number | null;
   expectedCount?: number | null;
   previewToken?: string | null;
@@ -1306,6 +1350,26 @@ async function applyReviewRuleToWorkspace(input: {
     throw new AdminReviewBulkSafetyError("preview_stale", REVIEW_PREVIEW_STALE_MESSAGE);
   }
   const impactedRows = rows.filter((row) => !excluded.has(row.productId));
+  const identityConflictRows = impactedRows.filter((row) => row.identityCandidateId);
+  if (identityConflictRows.length > 0) {
+    if (
+      identityConflictRows.length !== 1 ||
+      impactedRows.length !== 1 ||
+      !input.identityDecision ||
+      (input.identityDecision === "same" && !identityConflictRows[0].identityCandidateId)
+    ) {
+      throw new AdminReviewBulkSafetyError(
+        "identity_conflict_requires_manual_resolution",
+        "Для конфликта постоянной identity выберите: это тот же товар или новая товарная позиция."
+      );
+    }
+  } else if (input.identityDecision) {
+    throw new AdminReviewBulkSafetyError(
+      "identity_conflict_requires_manual_resolution",
+      "Решение по постоянной identity доступно только для identity conflict."
+    );
+  }
+  const identityConflictRow = identityConflictRows[0] ?? null;
 
   assertLargeActionConfirmed(impactedRows.length, input.confirmationCount);
 
@@ -1365,7 +1429,8 @@ async function applyReviewRuleToWorkspace(input: {
         createdBy: input.adminUserId,
         metadata: {
           filters: input.filters,
-          excludedProductIds: [...excluded]
+          excludedProductIds: [...excluded],
+          identityDecision: input.identityDecision ?? null
         }
       })
       .onConflictDoNothing()
@@ -1451,6 +1516,12 @@ async function applyReviewRuleToWorkspace(input: {
             originalCategoryId: row.currentCategoryId,
             originalSubcategoryId: row.currentSubcategoryId,
             originalStatus: row.productStatus,
+            identityDecision:
+              row.productId === identityConflictRow?.productId ? input.identityDecision ?? null : null,
+            productIdentityId:
+              row.productId === identityConflictRow?.productId && input.identityDecision === "same"
+                ? row.identityCandidateId
+                : null,
             metadata: {
               source: input.actionType,
               group: input.filters.group || null
@@ -1464,6 +1535,14 @@ async function applyReviewRuleToWorkspace(input: {
             status: "pending",
             categoryId: input.categoryId,
             subcategoryId: input.subcategoryId,
+            identityDecision:
+              input.identityDecision && identityConflictRow
+                ? input.identityDecision
+                : null,
+            productIdentityId:
+              input.identityDecision === "same" && identityConflictRow
+                ? identityConflictRow.identityCandidateId
+                : null,
             updatedAt: new Date()
           }
         });
@@ -1618,6 +1697,7 @@ async function getWorkspaceReviewRows(
       suggestedSubcategoryId: reviewQueue.suggestedSubcategoryId,
       importRowNumber: sql<number | null>`null`,
       productId: products.id,
+      identityCandidateId: reviewQueue.identityCandidateId,
       catalogVersionId: reviewQueue.catalogVersionId,
       shopCode: products.shopCode,
       name: products.name,
@@ -1630,7 +1710,8 @@ async function getWorkspaceReviewRows(
       catalogVersionCreatedAt: catalogVersions.createdAt,
       workspaceItemStatus: reviewWorkspaceItems.status,
       pendingCategoryId: reviewWorkspaceItems.categoryId,
-      pendingSubcategoryId: reviewWorkspaceItems.subcategoryId
+      pendingSubcategoryId: reviewWorkspaceItems.subcategoryId,
+      pendingIdentityDecision: reviewWorkspaceItems.identityDecision
     })
     .from(reviewQueue)
     .innerJoin(products, eq(products.id, reviewQueue.productId))
@@ -1818,6 +1899,7 @@ async function getRowsByReviewIds(reviewQueueIds: string[], workspaceId: string 
       suggestedSubcategoryId: reviewQueue.suggestedSubcategoryId,
       importRowNumber: sql<number | null>`null`,
       productId: products.id,
+      identityCandidateId: reviewQueue.identityCandidateId,
       catalogVersionId: reviewQueue.catalogVersionId,
       shopCode: products.shopCode,
       name: products.name,
@@ -1830,7 +1912,8 @@ async function getRowsByReviewIds(reviewQueueIds: string[], workspaceId: string 
       catalogVersionCreatedAt: catalogVersions.createdAt,
       workspaceItemStatus: reviewWorkspaceItems.status,
       pendingCategoryId: reviewWorkspaceItems.categoryId,
-      pendingSubcategoryId: reviewWorkspaceItems.subcategoryId
+      pendingSubcategoryId: reviewWorkspaceItems.subcategoryId,
+      pendingIdentityDecision: reviewWorkspaceItems.identityDecision
     })
     .from(reviewQueue)
     .innerJoin(products, eq(products.id, reviewQueue.productId))
@@ -1875,6 +1958,7 @@ function enrichReviewRow(
     groupKey,
     groupLabel,
     safeToApply:
+      !row.identityCandidateId &&
       suggestion.level !== "manual" &&
       Boolean(suggestion.categoryId && suggestion.subcategoryId) &&
       suggestion.conflictingSignals.length === 0
@@ -2110,6 +2194,8 @@ function mapReviewItem(
   return {
     reviewId: row.reviewId,
     productId: row.productId,
+    identityConflict: Boolean(row.identityCandidateId),
+    pendingIdentityDecision: row.pendingIdentityDecision,
     reason: row.reason,
     createdAt: row.createdAt,
     catalogVersionId: row.catalogVersionId,
@@ -2386,6 +2472,8 @@ async function getPendingWorkspaceItems(workspaceId: string) {
   return db
     .select({
       productId: reviewWorkspaceItems.productId,
+      identityDecision: reviewWorkspaceItems.identityDecision,
+      productIdentityId: reviewWorkspaceItems.productIdentityId,
       categoryId: reviewWorkspaceItems.categoryId,
       subcategoryId: reviewWorkspaceItems.subcategoryId,
       categoryName: categories.name,
@@ -2397,10 +2485,57 @@ async function getPendingWorkspaceItems(workspaceId: string) {
     .where(and(eq(reviewWorkspaceItems.workspaceId, workspaceId), eq(reviewWorkspaceItems.status, "pending")));
 }
 
+export function planReviewSnapshotIdentities(
+  sourceProducts: ReviewSnapshotIdentitySource[],
+  pendingRows: PendingReviewIdentityDecision[],
+  createIdentityId: () => string = randomUUID
+): ReviewSnapshotIdentityPlan {
+  const pendingByProductId = new Map(pendingRows.map((row) => [row.productId, row]));
+  const identitiesByProductId = new Map<string, string>();
+  const newProductIdentityIds: string[] = [];
+
+  for (const product of sourceProducts) {
+    if (product.productIdentityId) {
+      identitiesByProductId.set(product.id, product.productIdentityId);
+      continue;
+    }
+
+    const pending = pendingByProductId.get(product.id);
+    if (!pending) {
+      if (product.status === "active") {
+        throw new Error("Нельзя опубликовать active товар без постоянной identity.");
+      }
+      continue;
+    }
+
+    if (pending.identityDecision === "same" && pending.productIdentityId) {
+      identitiesByProductId.set(product.id, pending.productIdentityId);
+      continue;
+    }
+
+    if (pending.identityDecision === "new") {
+      const productIdentityId = createIdentityId();
+      identitiesByProductId.set(product.id, productIdentityId);
+      newProductIdentityIds.push(productIdentityId);
+      continue;
+    }
+
+    throw new Error("Identity conflict не разрешён в рабочей сессии.");
+  }
+
+  return {
+    productIdentityIdFor(productId) {
+      return identitiesByProductId.get(productId) ?? null;
+    },
+    newProductIdentityIds
+  };
+}
+
 async function getProductsForVersion(catalogVersionId: string) {
   return db
     .select({
       id: products.id,
+      productIdentityId: products.productIdentityId,
       shopCode: products.shopCode,
       rawName: products.rawName,
       name: products.name,

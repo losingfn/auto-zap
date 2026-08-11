@@ -6,6 +6,7 @@ import {
   importBatches,
   importErrors,
   importRows,
+  productIdentities,
   products,
   reviewQueue,
   subcategories
@@ -29,6 +30,11 @@ import {
   isImportProductCandidate,
   type DraftClassificationRun
 } from "./draft-classification";
+import {
+  buildIdentityConflictReason,
+  createProductIdentityResolutionRun,
+  type ProductIdentityResolutionRun
+} from "./product-identity-resolver";
 import { evaluateImportSafety } from "./safety";
 import type {
   AnalyzedImportRow,
@@ -88,6 +94,13 @@ export async function createDraftImport(
         fileBuffer: input.fileBuffer,
         fileName: input.sourceFileName
       });
+  const identityResolutionRun = createProductIdentityResolutionRun({
+    rows: analysis.rows,
+    existingProducts: prepared.existingProducts
+  });
+  const identityConflictRows = new Set(
+    analysis.rows.filter((row) => identityResolutionRun.isIdentityConflict(row))
+  );
   const classificationRows = perf
     ? analysis.rows.filter(isImportProductCandidate).length
     : undefined;
@@ -103,6 +116,7 @@ export async function createDraftImport(
               rows: analysis.rows,
               categorizationContext: prepared.categorizationContext,
               existingProducts: prepared.existingProducts,
+              identityConflictRows,
               observer: classificationObserver
             }),
           { rows: classificationRows }
@@ -110,7 +124,8 @@ export async function createDraftImport(
       : createDraftClassificationRun({
           rows: analysis.rows,
           categorizationContext: prepared.categorizationContext,
-          existingProducts: prepared.existingProducts
+          existingProducts: prepared.existingProducts,
+          identityConflictRows
         });
     await classificationObserver?.log("success");
   } catch (error) {
@@ -123,14 +138,18 @@ export async function createDraftImport(
   let report: ReturnType<typeof analyzeImportFile>["report"];
 
   try {
-    const categorizationSummary = buildCategorizationSummary(analysis.rows, classificationRun);
+    const categorizationSummary = buildCategorizationSummary(
+      analysis.rows,
+      classificationRun,
+      identityConflictRows
+    );
     const autoCategorizationPreview = perf
       ? await perf.measure(
           "create_preview",
-          () => buildAutoCategorizationPreview(analysis.rows, classificationRun),
+          () => buildAutoCategorizationPreview(analysis.rows, classificationRun, identityConflictRows),
           { rows: classificationRows }
         )
-      : buildAutoCategorizationPreview(analysis.rows, classificationRun);
+      : buildAutoCategorizationPreview(analysis.rows, classificationRun, identityConflictRows);
     report = withCategorizationReport(
       analysis.report,
       categorizationSummary,
@@ -190,6 +209,7 @@ export async function createDraftImport(
       classificationRun,
       prepared.searchSynonyms,
       prepared.existingProducts,
+      identityResolutionRun,
       perf
     );
 
@@ -219,6 +239,7 @@ async function getActiveProducts(): Promise<ExistingProductSnapshot[]> {
 
   const rows = await db
     .select({
+      productIdentityId: products.productIdentityId,
       shopCode: products.shopCode,
       name: products.name,
       price: products.price,
@@ -236,6 +257,7 @@ async function getActiveProducts(): Promise<ExistingProductSnapshot[]> {
     .where(and(eq(products.catalogVersionId, activeVersion.id), eq(products.status, "active")));
 
   return rows.map((row) => ({
+    productIdentityId: row.productIdentityId,
     shopCode: row.shopCode,
     name: row.name,
     price: Number(row.price),
@@ -314,6 +336,7 @@ async function insertDraftProducts(
   classificationRun: DraftClassificationRun,
   searchSynonyms: SearchSynonymRecord[],
   existingProducts: ExistingProductSnapshot[],
+  identityResolutionRun: ProductIdentityResolutionRun,
   perf?: ImportPerfLogger
 ) {
   const existingByCode = buildExistingByCode(existingProducts);
@@ -325,32 +348,55 @@ async function insertDraftProducts(
   );
 
   const insertProducts = async () => {
+    for (const chunk of chunked([...identityResolutionRun.newProductIdentityIds], 1000)) {
+      if (chunk.length > 0) {
+        await tx.insert(productIdentities).values(chunk.map((id) => ({ id })));
+      }
+    }
+
     for (const chunk of chunked(productRows, 1000)) {
       if (chunk.length === 0) {
         continue;
       }
 
-      const categorizedChunk = chunk.map((row) => ({
-        row,
-        categorization: classificationRun.categorizationFor(row)!
-      }));
+      const categorizedChunk = chunk.map((row) => {
+        const identityResolution = identityResolutionRun.resolutionFor(row);
+        if (!identityResolution) {
+          throw new Error(`Не удалось определить постоянную identity для артикула ${row.shopCode}.`);
+        }
+
+        return {
+          row,
+          categorization: classificationRun.categorizationFor(row)!,
+          identityResolution
+        };
+      });
 
       const inserted = await tx
         .insert(products)
         .values(
-          categorizedChunk.map(({ row, categorization }) => {
-            const status = resolveDraftProductStatus(row, categorization);
+          categorizedChunk.map(({ row, categorization, identityResolution }) => {
+            const hasIdentityConflict = identityResolution.kind === "conflict";
+            const status = resolveDraftProductStatus(row, categorization, {
+              requiresIdentityReview: hasIdentityConflict
+            });
             const productName = resolveImportProductName(
               row,
               existingByCode.get(row.shopCode!)
             );
             const reviewReason =
-              status === "needs_review" || status === "invalid"
+              hasIdentityConflict
+                ? buildIdentityConflictReason(row, identityResolution)
+                : status === "needs_review" || status === "invalid"
                 ? buildReviewReason(row, categorization)
                 : null;
 
             return {
               catalogVersionId,
+              productIdentityId:
+                identityResolution.kind === "conflict"
+                  ? null
+                  : identityResolution.productIdentityId,
               shopCode: row.shopCode!,
               rawName: row.rawName,
               name: productName,
@@ -380,11 +426,21 @@ async function insertDraftProducts(
 
       const insertedByCode = new Map(inserted.map((row) => [row.shopCode, row.id]));
       const reviewValues = categorizedChunk
-        .filter(({ row, categorization }) => needsProductReview(row, categorization))
-        .map(({ row, categorization }) => ({
+        .filter(
+          ({ row, categorization, identityResolution }) =>
+            identityResolution.kind === "conflict" || needsProductReview(row, categorization)
+        )
+        .map(({ row, categorization, identityResolution }) => ({
           catalogVersionId,
           productId: insertedByCode.get(row.shopCode!),
-          reason: buildReviewReason(row, categorization) || "Товар требует проверки.",
+          identityCandidateId:
+            identityResolution.kind === "conflict"
+              ? identityResolution.existingProductIdentityId
+              : null,
+          reason:
+            identityResolution.kind === "conflict"
+              ? buildIdentityConflictReason(row, identityResolution)
+              : buildReviewReason(row, categorization) || "Товар требует проверки.",
           suggestedCategoryId: categorization.target?.categoryId,
           suggestedSubcategoryId: categorization.target?.subcategoryId
         }))
@@ -394,6 +450,7 @@ async function insertDraftProducts(
           ): row is {
             catalogVersionId: string;
             productId: string;
+            identityCandidateId: string | null;
             reason: string;
             suggestedCategoryId: string | undefined;
             suggestedSubcategoryId: string | undefined;
@@ -419,7 +476,8 @@ async function insertDraftProducts(
 
 function buildCategorizationSummary(
   rows: AnalyzedImportRow[],
-  classificationRun: DraftClassificationRun
+  classificationRun: DraftClassificationRun,
+  identityConflictRows: ReadonlySet<AnalyzedImportRow>
 ) {
   let matchedRows = 0;
   let unmatchedRows = 0;
@@ -437,7 +495,7 @@ function buildCategorizationSummary(
       unmatchedRows += 1;
     }
 
-    if (needsProductReview(row, categorization)) {
+    if (identityConflictRows.has(row) || needsProductReview(row, categorization)) {
       combinedReviewRows += 1;
     }
   }
@@ -485,7 +543,8 @@ function withCategorizationReport(
 
 function buildAutoCategorizationPreview(
   rows: AnalyzedImportRow[],
-  classificationRun: DraftClassificationRun
+  classificationRun: DraftClassificationRun,
+  identityConflictRows: ReadonlySet<AnalyzedImportRow> = new Set()
 ) {
   const sourceCounts = new Map<CategorizationSource, number>();
   const unresolvedGroups = new Map<string, AutoCategorizationGroupPreview>();
@@ -541,7 +600,7 @@ function buildAutoCategorizationPreview(
       existingCategoryPreserved += 1;
     }
 
-    if (shouldAutoPublishInShadow(row, categorization)) {
+    if (!identityConflictRows.has(row) && shouldAutoPublishInShadow(row, categorization)) {
       wouldAutoPublish += 1;
     } else {
       wouldRequireReview += 1;

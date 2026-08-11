@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { PurchaseListProvider } from "@/features/purchase-list/purchase-list-provider";
 import { siteConfig } from "@/config/site";
 import { publicAbsoluteUrl } from "@/features/seo/structured-data";
 
@@ -75,7 +76,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru">
-      <body>{children}</body>
+      <body>
+        <PurchaseListProvider>{children}</PurchaseListProvider>
+      </body>
     </html>
   );
 }

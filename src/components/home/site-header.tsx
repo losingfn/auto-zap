@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { publicBrandLogoSrc } from "@/config/public-brand";
+import { PurchaseListNavigationLink } from "@/components/purchase-list/purchase-list-navigation-link";
 
 const navigationItems = [
   { href: "#catalog", label: "Каталог" },
@@ -42,22 +43,26 @@ export function SiteHeader({
                 </span>
               </Link>
             ))}
+            <PurchaseListNavigationLink
+              className="tap-target block whitespace-nowrap rounded-card px-3 py-2 pr-7 transition hover:bg-white/10 hover:text-white"
+            />
           </nav>
         </div>
 
-        <nav className="mt-3 grid grid-cols-6 gap-1.5 text-[0.72rem] font-medium text-[#D6DEE9] sm:grid-cols-5 sm:gap-2 sm:text-sm lg:hidden">
-          {navigationItems.map((item, index) => (
+        <nav className="mt-3 grid grid-cols-6 gap-1.5 text-[0.72rem] font-medium text-[#D6DEE9] sm:gap-2 sm:text-sm lg:hidden">
+          {navigationItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={[
-                "tap-target flex min-h-9 min-w-0 items-center justify-center whitespace-nowrap rounded-card border border-white/10 bg-white/[0.06] px-1.5 py-2 leading-5 hover:border-[#2563EB]/60 hover:bg-white/[0.1] hover:text-white sm:col-span-1 sm:px-2.5",
-                index < 3 ? "col-span-2" : "col-span-3"
-              ].join(" ")}
+              className="tap-target col-span-2 flex min-h-9 min-w-0 items-center justify-center whitespace-nowrap rounded-card border border-white/10 bg-white/[0.06] px-1.5 py-2 leading-5 hover:border-[#2563EB]/60 hover:bg-white/[0.1] hover:text-white sm:px-2.5"
             >
               {item.label}
             </Link>
           ))}
+          <PurchaseListNavigationLink
+            mobileLabel="Список"
+            className="tap-target col-span-2 flex min-h-9 min-w-0 items-center justify-center whitespace-nowrap rounded-card border border-white/10 bg-white/[0.06] px-1.5 py-2 leading-5 hover:border-[#2563EB]/60 hover:bg-white/[0.1] hover:text-white sm:px-2.5"
+          />
         </nav>
       </div>
     </header>

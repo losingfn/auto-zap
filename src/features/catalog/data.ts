@@ -5,6 +5,7 @@ import {
   ALL_ASSORTMENT_CATEGORY_SLUG,
   ALL_PRODUCTS_SUBCATEGORY_SLUG,
   getPublicCategorySlugs,
+  getPublicProductPath,
   getPublicTaxonomyTargets,
   isPublicCategorySlug,
   isPublicNavigationTaxonomyTarget,
@@ -16,9 +17,11 @@ import type {
   PublicProductDetails,
   PublicProductListItem,
   PublicProductPagination,
+  PublicPurchaseListProduct,
   PublicSubcategory
 } from "./types";
 import { searchProducts } from "@/features/search/service";
+import { normalizePurchaseListIdentityIds } from "@/features/purchase-list/storage";
 
 const DEFAULT_PRODUCTS_PAGE_SIZE = 50;
 const PUBLIC_CATALOG_TIMEOUT_MS = 3500;
@@ -448,6 +451,8 @@ export async function getProductDetails(
   const [row] = await db
     .select({
       id: products.id,
+      productIdentityId: products.productIdentityId,
+      shopCode: products.shopCode,
       name: products.name,
       rawName: products.rawName,
       slug: products.slug,
@@ -496,6 +501,69 @@ export async function getProductDetails(
     ...row,
     price: Number(row.price)
   };
+}
+
+export async function getProductsForPurchaseList(
+  productIdentityIds: string[]
+): Promise<PublicPurchaseListProduct[]> {
+  const normalizedIds = normalizePurchaseListIdentityIds(productIdentityIds);
+  if (normalizedIds.length === 0) {
+    return [];
+  }
+
+  const activeVersionId = await getActiveCatalogVersionId();
+  if (!activeVersionId) {
+    return [];
+  }
+
+  const rows = await db
+    .select({
+      productIdentityId: products.productIdentityId,
+      name: products.name,
+      slug: products.slug,
+      price: products.price,
+      categorySlug: categories.slug,
+      categoryName: categories.name,
+      subcategorySlug: subcategories.slug,
+      subcategoryName: subcategories.name
+    })
+    .from(products)
+    .innerJoin(categories, eq(categories.id, products.categoryId))
+    .innerJoin(subcategories, eq(subcategories.id, products.subcategoryId))
+    .where(
+      and(
+        eq(products.catalogVersionId, activeVersionId),
+        eq(products.status, "active"),
+        eq(categories.isActive, true),
+        eq(subcategories.isActive, true),
+        inArray(products.productIdentityId, normalizedIds),
+        inArray(categories.slug, getPublicCategorySlugs()),
+        publicTaxonomyTargetCondition()
+      )
+    );
+
+  return rows.flatMap((row) => {
+    const productIdentityId = row.productIdentityId;
+    if (!productIdentityId) {
+      return [];
+    }
+
+    const product = {
+      productIdentityId,
+      name: row.name,
+      slug: row.slug,
+      price: Number(row.price),
+      categorySlug: row.categorySlug,
+      categoryName: row.categoryName,
+      subcategorySlug: row.subcategorySlug,
+      subcategoryName: row.subcategoryName
+    };
+
+    return [{
+      ...product,
+      url: getPublicProductPath(product)
+    }];
+  });
 }
 
 async function getActiveCatalogVersionId() {
@@ -554,6 +622,8 @@ async function getProductRows(
   const rows = await db
     .select({
       id: products.id,
+      productIdentityId: products.productIdentityId,
+      shopCode: products.shopCode,
       name: products.name,
       slug: products.slug,
       price: products.price,
@@ -601,6 +671,8 @@ async function getSearchProductRows({
   return {
     products: result.hits.map((hit) => ({
       id: hit.id,
+      productIdentityId: hit.productIdentityId,
+      shopCode: hit.shopCode,
       name: hit.name,
       slug: hit.slug,
       price: hit.price,

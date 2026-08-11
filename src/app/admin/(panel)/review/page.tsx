@@ -88,6 +88,7 @@ const ruleSkippedLabels: Record<string, string> = {
 
 const errorLabels: Record<string, string> = {
   save_failed: "Не удалось подготовить исправление. Проверьте категорию и подкатегорию.",
+  identity_conflict: "Для identity conflict выберите: это тот же товар или новая товарная позиция.",
   bulk_failed: "Не удалось выполнить массовое действие. Проверьте выбранную группу и категорию.",
   rules_failed: "Не удалось повторно применить правила к очереди.",
   undo_failed: "Не удалось отменить последнее неопубликованное действие.",
@@ -785,7 +786,7 @@ function ReviewCard({
                 value={item.reviewId}
                 form="review-selected-form"
                 data-review-select
-                disabled={bulkActionsDisabled || item.workspaceStatus !== "open"}
+                disabled={bulkActionsDisabled || item.workspaceStatus !== "open" || item.identityConflict}
                 className="h-4 w-4 accent-[#73A0F5]"
               />
               Выбрать
@@ -793,6 +794,7 @@ function ReviewCard({
             <Badge>{workspaceStatusLabels[item.workspaceStatus]}</Badge>
             <Badge>{suggestionLevelLabels[item.suggestionLevel]}</Badge>
             <Badge>{item.confidenceLabel} · {Math.round(item.confidence * 100)}%</Badge>
+            {item.identityConflict ? <Badge>Identity conflict</Badge> : null}
             <Badge>{versionStatusLabels[item.catalogVersionStatus] ?? item.catalogVersionStatus}</Badge>
             <Badge>{item.shopCode}</Badge>
             <Badge>{priceFormatter.format(item.price)}</Badge>
@@ -831,6 +833,46 @@ function ReviewCard({
           <HiddenReviewFilters filters={filters} />
           <input type="hidden" name="reviewQueueId" value={item.reviewId} />
           <input type="hidden" name="productId" value={item.productId} />
+
+          {item.identityConflict ? (
+            <fieldset className="mb-4 rounded-card border border-[#B7791F] bg-[#2B1C08] p-3">
+              <legend className="px-1 text-sm font-semibold text-[#F6C76E]">Постоянная identity</legend>
+              <p className="mt-1 text-xs leading-5 text-[#E8C98C]">
+                Код уже есть в активном каталоге, но название отличается. Категория не будет
+                унаследована автоматически.
+              </p>
+              <label className="mt-3 flex items-start gap-3 text-sm text-[#F4E4B8]">
+                <input
+                  type="radio"
+                  name="identityDecision"
+                  value="same"
+                  required
+                  defaultChecked={item.pendingIdentityDecision === "same"}
+                  disabled={item.workspaceStatus !== "open"}
+                  className="mt-1 h-4 w-4 accent-[#F6C76E]"
+                />
+                <span>
+                  <span className="block font-medium">Это тот же товар</span>
+                  <span className="block text-xs text-[#E8C98C]">Сохранить существующую permanent identity.</span>
+                </span>
+              </label>
+              <label className="mt-3 flex items-start gap-3 text-sm text-[#F4E4B8]">
+                <input
+                  type="radio"
+                  name="identityDecision"
+                  value="new"
+                  required
+                  defaultChecked={item.pendingIdentityDecision === "new"}
+                  disabled={item.workspaceStatus !== "open"}
+                  className="mt-1 h-4 w-4 accent-[#F6C76E]"
+                />
+                <span>
+                  <span className="block font-medium">Это новый товар</span>
+                  <span className="block text-xs text-[#E8C98C]">Создать новую permanent identity при публикации.</span>
+                </span>
+              </label>
+            </fieldset>
+          ) : null}
 
           <label className="block">
             <span className="text-sm font-medium text-[#C8D1DF]">Категория</span>

@@ -42,8 +42,13 @@ export function needsProductReview(
 
 export function resolveDraftProductStatus(
   row: Pick<AnalyzedImportRow, "status">,
-  categorization: CategorizationResult
+  categorization: CategorizationResult,
+  options: { requiresIdentityReview?: boolean } = {}
 ) {
+  if (options.requiresIdentityReview) {
+    return "needs_review" as const;
+  }
+
   if (isDoNotPublishCategorization(categorization)) {
     return "invalid" as const;
   }

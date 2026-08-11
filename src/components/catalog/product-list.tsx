@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PurchaseListProductBadge } from "@/components/purchase-list/purchase-list-product-badge";
 import type { PublicProductListItem, PublicProductPagination } from "@/features/catalog/types";
 
 export function ProductList({
@@ -61,7 +62,10 @@ export function ProductList({
                 href={`/catalog/${categorySlug}/${subcategorySlug}/${product.slug}`}
                 className="tap-target grid gap-2 p-4 hover:bg-[#2563EB]/10 sm:grid-cols-[1fr_auto]"
               >
-                <h2 className="text-base font-semibold leading-6">{product.name}</h2>
+                <div>
+                  <h2 className="text-base font-semibold leading-6">{product.name}</h2>
+                  <PurchaseListProductBadge productIdentityId={product.productIdentityId} />
+                </div>
                 <div className="text-lg font-semibold text-white">
                   {product.price.toLocaleString("ru-RU")} ₽
                 </div>

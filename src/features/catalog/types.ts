@@ -19,6 +19,8 @@ export interface PublicSubcategory {
 
 export interface PublicProductListItem {
   id: string;
+  productIdentityId?: string | null;
+  shopCode: string;
   name: string;
   slug: string;
   price: number;
@@ -30,6 +32,18 @@ export interface PublicProductListItem {
 
 export interface PublicProductDetails extends PublicProductListItem {
   rawName: string;
+}
+
+export interface PublicPurchaseListProduct {
+  productIdentityId: string;
+  name: string;
+  slug: string;
+  price: number;
+  categorySlug: string;
+  categoryName: string;
+  subcategorySlug: string;
+  subcategoryName: string;
+  url: string;
 }
 
 export interface PublicProductPagination {

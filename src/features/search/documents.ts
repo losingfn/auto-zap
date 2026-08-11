@@ -45,6 +45,7 @@ export async function getSearchDocumentsForCatalogVersion(
     .select({
       id: products.id,
       catalogVersionId: products.catalogVersionId,
+      productIdentityId: products.productIdentityId,
       shopCode: products.shopCode,
       rawName: products.rawName,
       name: products.name,
@@ -78,6 +79,49 @@ export async function getSearchDocumentsForCatalogVersion(
       },
       synonyms
     )
+  );
+}
+
+export async function hydrateMissingSearchProductIdentities(
+  hits: SearchProductDocument[]
+): Promise<SearchProductDocument[]> {
+  const snapshotIds = [...new Set(hits.filter((hit) => !hit.productIdentityId).map((hit) => hit.id))];
+  if (snapshotIds.length === 0) {
+    return hits;
+  }
+
+  const activeCatalogVersionId = await getActiveCatalogVersionId();
+  if (!activeCatalogVersionId) {
+    return hits;
+  }
+
+  const rows = await db
+    .select({
+      id: products.id,
+      productIdentityId: products.productIdentityId
+    })
+    .from(products)
+    .innerJoin(categories, eq(categories.id, products.categoryId))
+    .innerJoin(subcategories, eq(subcategories.id, products.subcategoryId))
+    .where(
+      and(
+        eq(products.catalogVersionId, activeCatalogVersionId),
+        eq(products.status, "active"),
+        eq(categories.isActive, true),
+        eq(subcategories.isActive, true),
+        inArray(products.id, snapshotIds),
+        inArray(categories.slug, getPublicCategorySlugs()),
+        publicTaxonomyTargetCondition()
+      )
+    );
+  const identitiesBySnapshotId = new Map(
+    rows.flatMap((row) => (row.productIdentityId ? [[row.id, row.productIdentityId] as const] : []))
+  );
+
+  return hits.map((hit) =>
+    hit.productIdentityId
+      ? hit
+      : { ...hit, productIdentityId: identitiesBySnapshotId.get(hit.id) ?? null }
   );
 }
 

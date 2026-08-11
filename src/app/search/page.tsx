@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { SearchPageForm } from "@/components/search/search-page-form";
+import { PurchaseListProductBadge } from "@/components/purchase-list/purchase-list-product-badge";
 import { PublicFooter } from "@/components/site/public-footer";
 import { formatPublicTargetLabel } from "@/config/public-taxonomy";
 import { searchProducts } from "@/features/search/service";
@@ -70,6 +71,7 @@ export default async function SearchPage({
                       <p className="mt-1 text-sm text-[#CBD5E1]">
                         {formatPublicTargetLabel(product)}
                       </p>
+                      <PurchaseListProductBadge productIdentityId={product.productIdentityId} />
                     </div>
                     <div className="text-lg font-semibold text-white">
                       {product.price.toLocaleString("ru-RU")} ₽

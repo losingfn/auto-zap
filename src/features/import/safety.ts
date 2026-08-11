@@ -21,6 +21,7 @@ export interface EvaluateImportSafetyInput {
   activeProductCount: number;
   draftActiveProductCount: number;
   invalidCategoryCount?: number;
+  missingProductIdentityCount?: number;
   hasActiveVersion: boolean;
   hasBlockingImport?: boolean;
   meilisearchAvailable?: boolean;
@@ -118,6 +119,16 @@ export function evaluateImportSafety(input: EvaluateImportSafetyInput): ImportSa
       threshold: 0,
       ok: (input.invalidCategoryCount ?? 0) === 0,
       message: "Все публикуемые товары имеют валидную категорию и подкатегорию."
+    }),
+    thresholdCheck({
+      code: "missing_product_identity",
+      value: input.missingProductIdentityCount ?? 0,
+      threshold: 0,
+      ok: (input.missingProductIdentityCount ?? 0) === 0,
+      message:
+        (input.missingProductIdentityCount ?? 0) === 0
+          ? "Все активные товары новой версии имеют постоянную identity."
+          : "В новой версии есть активные товары без постоянной identity."
     }),
     thresholdCheck({
       code: "existing_category_loss",

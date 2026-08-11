@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { PurchaseListNavigationLink } from "@/components/purchase-list/purchase-list-navigation-link";
 import { publicBrandLogoSrc } from "@/config/public-brand";
 import { getPublicHomeContent, type PublicHomeContent } from "@/features/content/public-home";
 
@@ -47,6 +48,9 @@ export async function PublicFooter({ content }: { content?: PublicHomeContent })
           <Link href="/#vacancies" className="tap-target transition hover:text-[#93C5FD]">
             Вакансии
           </Link>
+          <PurchaseListNavigationLink
+            className="tap-target w-fit pr-6 transition hover:text-[#93C5FD]"
+          />
         </nav>
       </div>
     </footer>

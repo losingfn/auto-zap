@@ -98,6 +98,7 @@ export async function searchProductsWithPostgres({
     .select({
       id: products.id,
       catalogVersionId: products.catalogVersionId,
+      productIdentityId: products.productIdentityId,
       shopCode: products.shopCode,
       rawName: products.rawName,
       name: products.name,
@@ -127,6 +128,7 @@ export async function searchProductsWithPostgres({
       {
         id: row.id,
         catalogVersionId: row.catalogVersionId,
+        productIdentityId: row.productIdentityId,
         shopCode: row.shopCode,
         rawName: row.rawName,
         name: row.name,

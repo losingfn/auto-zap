@@ -26,16 +26,18 @@ const UNDO_TIMEOUT_MS = 6000;
 
 export function PurchaseListPage({ contact }: PurchaseListPageProps) {
   const {
-    shopCodes,
+    productIdentityIds,
     isReady,
+    hasLegacyList,
     removeProduct,
     restoreProduct,
-    clearProducts
+    clearProducts,
+    acknowledgeLegacyList
   } = usePurchaseList();
   const [products, setProducts] = useState<PublicPurchaseListProduct[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [removingCode, setRemovingCode] = useState<string | null>(null);
+  const [removingProductIdentityId, setRemovingProductIdentityId] = useState<string | null>(null);
   const [undoItem, setUndoItem] = useState<RemovedPurchaseListItem | null>(null);
   const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
   const cancelClearButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -46,7 +48,7 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
       return;
     }
 
-    if (shopCodes.length === 0) {
+    if (productIdentityIds.length === 0) {
       setProducts([]);
       setLoadError(false);
       setIsLoading(false);
@@ -60,7 +62,7 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
     void fetch("/api/purchase-list", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shopCodes }),
+      body: JSON.stringify({ productIdentityIds }),
       signal: controller.signal
     })
       .then(async (response) => {
@@ -84,7 +86,7 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
       });
 
     return () => controller.abort();
-  }, [isReady, shopCodes]);
+  }, [isReady, productIdentityIds]);
 
   useEffect(() => {
     if (!undoItem) {
@@ -103,17 +105,17 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
     cancelClearButtonRef.current?.focus();
   }, [isClearDialogOpen]);
 
-  const productsByCode = useMemo(
-    () => new Map(products.map((product) => [product.shopCode, product])),
+  const productsByIdentityId = useMemo(
+    () => new Map(products.map((product) => [product.productIdentityId, product])),
     [products]
   );
 
-  function removeItem(shopCode: string) {
-    setRemovingCode(shopCode);
+  function removeItem(productIdentityId: string) {
+    setRemovingProductIdentityId(productIdentityId);
 
     window.setTimeout(() => {
-      const removed = removeProduct(shopCode);
-      setRemovingCode(null);
+      const removed = removeProduct(productIdentityId);
+      setRemovingProductIdentityId(null);
       if (removed) {
         setUndoItem(removed);
       }
@@ -143,8 +145,8 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
         </Link>
         <div className="mt-4 rounded-card border border-white/10 bg-[#111827] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.24)] sm:p-7">
           <h1 className="text-3xl font-semibold leading-tight sm:text-5xl">Список покупок</h1>
-          {isReady && shopCodes.length > 0 ? (
-            <p className="mt-3 text-[#CBD5E1]">{formatProductCount(shopCodes.length)}</p>
+          {isReady && productIdentityIds.length > 0 ? (
+            <p className="mt-3 text-[#CBD5E1]">{formatProductCount(productIdentityIds.length)}</p>
           ) : null}
         </div>
 
@@ -152,8 +154,11 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
           <div className="mt-6 rounded-card border border-white/10 bg-[#111827] p-5 text-[#CBD5E1] shadow-[0_18px_60px_rgba(0,0,0,0.2)]">
             Загружаем список покупок…
           </div>
-        ) : shopCodes.length === 0 ? (
-          <EmptyPurchaseList contact={contact} />
+        ) : productIdentityIds.length === 0 ? (
+          <>
+            {hasLegacyList ? <LegacyPurchaseListNotice onAcknowledge={acknowledgeLegacyList} /> : null}
+            <EmptyPurchaseList contact={contact} />
+          </>
         ) : (
           <div className="mt-6 space-y-6">
             {loadError ? (
@@ -162,13 +167,13 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
               </div>
             ) : (
               <div className="divide-y divide-white/10 overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_24px_80px_rgba(0,0,0,0.24)]">
-                {shopCodes.map((shopCode) => (
+                {productIdentityIds.map((productIdentityId) => (
                   <PurchaseListItem
-                    key={shopCode}
-                    product={productsByCode.get(shopCode)}
+                    key={productIdentityId}
+                    product={productsByIdentityId.get(productIdentityId)}
                     isLoading={isLoading}
-                    isRemoving={removingCode === shopCode}
-                    onRemove={() => removeItem(shopCode)}
+                    isRemoving={removingProductIdentityId === productIdentityId}
+                    onRemove={() => removeItem(productIdentityId)}
                   />
                 ))}
               </div>
@@ -309,6 +314,40 @@ function EmptyPurchaseList({ contact }: PurchaseListPageProps) {
       </div>
       <PurchaseInStoreNotice contact={contact} />
     </div>
+  );
+}
+
+function LegacyPurchaseListNotice({ onAcknowledge }: { onAcknowledge: () => void }) {
+  return (
+    <section className="rounded-card border border-[#2563EB]/45 bg-[#172554]/45 p-5 text-[#DBEAFE] shadow-[0_18px_60px_rgba(0,0,0,0.2)]">
+      <h2 className="text-lg font-semibold text-white">Список покупок обновлён</h2>
+      <p className="mt-2 max-w-2xl text-sm leading-6">
+        Старый список нельзя надёжно подтвердить, поэтому товары нужно добавить заново.
+      </p>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 sm:max-w-xl">
+        <Link
+          href="/catalog"
+          onClick={onAcknowledge}
+          className="tap-target inline-flex min-h-11 items-center justify-center rounded-card bg-[#2563EB] px-4 text-center text-sm font-semibold text-white hover:-translate-y-0.5 hover:bg-[#1D4ED8]"
+        >
+          Открыть каталог
+        </Link>
+        <Link
+          href="/search"
+          onClick={onAcknowledge}
+          className="tap-target inline-flex min-h-11 items-center justify-center rounded-card border border-[#93C5FD]/60 px-4 text-center text-sm font-semibold text-white hover:bg-white/10"
+        >
+          Найти товар
+        </Link>
+      </div>
+      <button
+        type="button"
+        onClick={onAcknowledge}
+        className="tap-target mt-4 min-h-10 rounded-card px-1 text-sm font-semibold text-[#BFDBFE] hover:text-white"
+      >
+        Понятно
+      </button>
+    </section>
   );
 }
 

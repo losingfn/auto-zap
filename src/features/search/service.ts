@@ -133,6 +133,7 @@ async function searchProductsWithMeili(
     attributesToRetrieve: [
       "id",
       "catalogVersionId",
+      "productIdentityId",
       "shopCode",
       "shopCodeNormalized",
       "shopCodeCompact",

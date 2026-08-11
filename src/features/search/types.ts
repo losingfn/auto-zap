@@ -3,6 +3,7 @@ export type SearchSource = "meilisearch" | "postgres_fallback" | "postgres_admin
 export interface SearchProductDocument {
   id: string;
   catalogVersionId: string;
+  productIdentityId?: string | null;
   status: "active";
   shopCode: string;
   shopCodeNormalized: string;

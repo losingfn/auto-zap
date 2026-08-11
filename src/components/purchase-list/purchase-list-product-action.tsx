@@ -3,9 +3,17 @@
 import Link from "next/link";
 import { usePurchaseList } from "@/features/purchase-list/purchase-list-provider";
 
-export function PurchaseListProductAction({ shopCode }: { shopCode: string }) {
+export function PurchaseListProductAction({
+  productIdentityId
+}: {
+  productIdentityId: string | null | undefined;
+}) {
   const { addProduct, hasProduct, isReady } = usePurchaseList();
-  const isSaved = isReady && hasProduct(shopCode);
+  const isSaved = isReady && hasProduct(productIdentityId);
+
+  if (!productIdentityId) {
+    return null;
+  }
 
   if (isSaved) {
     return (
@@ -27,10 +35,10 @@ export function PurchaseListProductAction({ shopCode }: { shopCode: string }) {
     <button
       type="button"
       disabled={!isReady}
-      onClick={() => addProduct(shopCode)}
+      onClick={() => addProduct(productIdentityId)}
       className="tap-target mt-6 inline-flex min-h-12 items-center rounded-card bg-[#2563EB] px-5 font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8] disabled:cursor-wait disabled:opacity-70"
     >
-      + Добавить в список
+      Добавить в список покупок
     </button>
   );
 }

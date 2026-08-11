@@ -21,7 +21,7 @@ import type {
   PublicSubcategory
 } from "./types";
 import { searchProducts } from "@/features/search/service";
-import { normalizePurchaseListCodes } from "@/features/purchase-list/storage";
+import { normalizePurchaseListIdentityIds } from "@/features/purchase-list/storage";
 
 const DEFAULT_PRODUCTS_PAGE_SIZE = 50;
 const PUBLIC_CATALOG_TIMEOUT_MS = 3500;
@@ -451,6 +451,7 @@ export async function getProductDetails(
   const [row] = await db
     .select({
       id: products.id,
+      productIdentityId: products.productIdentityId,
       shopCode: products.shopCode,
       name: products.name,
       rawName: products.rawName,
@@ -503,10 +504,10 @@ export async function getProductDetails(
 }
 
 export async function getProductsForPurchaseList(
-  shopCodes: string[]
+  productIdentityIds: string[]
 ): Promise<PublicPurchaseListProduct[]> {
-  const normalizedCodes = normalizePurchaseListCodes(shopCodes);
-  if (normalizedCodes.length === 0) {
+  const normalizedIds = normalizePurchaseListIdentityIds(productIdentityIds);
+  if (normalizedIds.length === 0) {
     return [];
   }
 
@@ -517,8 +518,7 @@ export async function getProductsForPurchaseList(
 
   const rows = await db
     .select({
-      id: products.id,
-      shopCode: products.shopCode,
+      productIdentityId: products.productIdentityId,
       name: products.name,
       slug: products.slug,
       price: products.price,
@@ -536,22 +536,33 @@ export async function getProductsForPurchaseList(
         eq(products.status, "active"),
         eq(categories.isActive, true),
         eq(subcategories.isActive, true),
-        inArray(products.shopCode, normalizedCodes),
+        inArray(products.productIdentityId, normalizedIds),
         inArray(categories.slug, getPublicCategorySlugs()),
         publicTaxonomyTargetCondition()
       )
     );
 
-  return rows.map((row) => {
+  return rows.flatMap((row) => {
+    const productIdentityId = row.productIdentityId;
+    if (!productIdentityId) {
+      return [];
+    }
+
     const product = {
-      ...row,
-      price: Number(row.price)
+      productIdentityId,
+      name: row.name,
+      slug: row.slug,
+      price: Number(row.price),
+      categorySlug: row.categorySlug,
+      categoryName: row.categoryName,
+      subcategorySlug: row.subcategorySlug,
+      subcategoryName: row.subcategoryName
     };
 
-    return {
+    return [{
       ...product,
       url: getPublicProductPath(product)
-    };
+    }];
   });
 }
 
@@ -611,6 +622,7 @@ async function getProductRows(
   const rows = await db
     .select({
       id: products.id,
+      productIdentityId: products.productIdentityId,
       shopCode: products.shopCode,
       name: products.name,
       slug: products.slug,
@@ -659,6 +671,7 @@ async function getSearchProductRows({
   return {
     products: result.hits.map((hit) => ({
       id: hit.id,
+      productIdentityId: hit.productIdentityId,
       shopCode: hit.shopCode,
       name: hit.name,
       slug: hit.slug,

@@ -12,11 +12,16 @@ export function PurchaseListNavigationLink({
   label?: string;
   mobileLabel?: string;
 }) {
-  const { isReady, shopCodes } = usePurchaseList();
-  const count = isReady ? shopCodes.length : 0;
+  const { isReady, productIdentityIds } = usePurchaseList();
+  const count = isReady ? productIdentityIds.length : 0;
+  const countLabel = count > 99 ? "99+" : String(count);
 
   return (
-    <Link href="/spisok-pokupok" className={`relative ${className}`}>
+    <Link
+      href="/spisok-pokupok"
+      className={`relative ${className}`}
+      aria-label={count > 0 ? `${label}: ${countLabel}` : label}
+    >
       {mobileLabel ? (
         <>
           <span className="sm:hidden">{mobileLabel}</span>
@@ -32,7 +37,7 @@ export function PurchaseListNavigationLink({
           count > 0 ? "opacity-100" : "invisible opacity-0"
         ].join(" ")}
       >
-        {count}
+        {countLabel}
       </span>
     </Link>
   );

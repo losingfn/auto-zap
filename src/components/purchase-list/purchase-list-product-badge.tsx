@@ -2,10 +2,14 @@
 
 import { usePurchaseList } from "@/features/purchase-list/purchase-list-provider";
 
-export function PurchaseListProductBadge({ shopCode }: { shopCode: string }) {
+export function PurchaseListProductBadge({
+  productIdentityId
+}: {
+  productIdentityId: string | null | undefined;
+}) {
   const { hasProduct, isReady } = usePurchaseList();
 
-  if (!isReady || !hasProduct(shopCode)) {
+  if (!isReady || !hasProduct(productIdentityId)) {
     return null;
   }
 

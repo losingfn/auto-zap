@@ -45,6 +45,7 @@ export async function getSearchDocumentsForCatalogVersion(
     .select({
       id: products.id,
       catalogVersionId: products.catalogVersionId,
+      productIdentityId: products.productIdentityId,
       shopCode: products.shopCode,
       rawName: products.rawName,
       name: products.name,

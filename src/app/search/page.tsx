@@ -71,7 +71,7 @@ export default async function SearchPage({
                       <p className="mt-1 text-sm text-[#CBD5E1]">
                         {formatPublicTargetLabel(product)}
                       </p>
-                      <PurchaseListProductBadge shopCode={product.shopCode} />
+                      <PurchaseListProductBadge productIdentityId={product.productIdentityId} />
                     </div>
                     <div className="text-lg font-semibold text-white">
                       {product.price.toLocaleString("ru-RU")} ₽

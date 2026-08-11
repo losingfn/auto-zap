@@ -85,7 +85,7 @@ export default async function ProductPage({
         <p className="mt-3 text-3xl font-semibold text-white sm:text-4xl">
           {product.price.toLocaleString("ru-RU")} ₽
         </p>
-        <PurchaseListProductAction shopCode={product.shopCode} />
+        <PurchaseListProductAction productIdentityId={product.productIdentityId} />
       </article>
     </CatalogPageShell>
   );

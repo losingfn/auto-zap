@@ -64,7 +64,7 @@ export function ProductList({
               >
                 <div>
                   <h2 className="text-base font-semibold leading-6">{product.name}</h2>
-                  <PurchaseListProductBadge shopCode={product.shopCode} />
+                  <PurchaseListProductBadge productIdentityId={product.productIdentityId} />
                 </div>
                 <div className="text-lg font-semibold text-white">
                   {product.price.toLocaleString("ru-RU")} ₽

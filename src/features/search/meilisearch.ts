@@ -264,6 +264,7 @@ function buildSearchIndexSettings(synonyms: SearchSynonymRecord[]) {
     displayedAttributes: [
       "id",
       "catalogVersionId",
+      "productIdentityId",
       "shopCode",
       "shopCodeNormalized",
       "shopCodeCompact",

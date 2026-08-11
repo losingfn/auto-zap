@@ -10,36 +10,43 @@ import {
   type ReactNode
 } from "react";
 import {
+  hasLegacyPurchaseList,
+  isProductIdentityId,
+  LEGACY_PURCHASE_LIST_ACKNOWLEDGEMENT_KEY,
+  LEGACY_PURCHASE_LIST_STORAGE_KEY,
   parsePurchaseListStorage,
   PURCHASE_LIST_STORAGE_KEY
 } from "@/features/purchase-list/storage";
 
 export type RemovedPurchaseListItem = {
-  shopCode: string;
+  productIdentityId: string;
   index: number;
 };
 
 type PurchaseListContextValue = {
-  shopCodes: string[];
+  productIdentityIds: string[];
   isReady: boolean;
-  hasProduct: (shopCode: string) => boolean;
-  addProduct: (shopCode: string) => void;
-  removeProduct: (shopCode: string) => RemovedPurchaseListItem | null;
+  hasLegacyList: boolean;
+  hasProduct: (productIdentityId: string | null | undefined) => boolean;
+  addProduct: (productIdentityId: string) => void;
+  removeProduct: (productIdentityId: string) => RemovedPurchaseListItem | null;
   restoreProduct: (item: RemovedPurchaseListItem) => void;
   clearProducts: () => void;
+  acknowledgeLegacyList: () => void;
 };
 
 const PurchaseListContext = createContext<PurchaseListContextValue | null>(null);
 
 export function PurchaseListProvider({ children }: { children: ReactNode }) {
-  const [shopCodes, setShopCodes] = useState<string[]>([]);
+  const [productIdentityIds, setProductIdentityIds] = useState<string[]>([]);
   const [isReady, setIsReady] = useState(false);
+  const [hasLegacyList, setHasLegacyList] = useState(false);
 
-  const writeShopCodes = useCallback((nextCodes: string[]) => {
-    setShopCodes(nextCodes);
+  const writeProductIdentityIds = useCallback((nextIds: string[]) => {
+    setProductIdentityIds(nextIds);
 
     try {
-      window.localStorage.setItem(PURCHASE_LIST_STORAGE_KEY, JSON.stringify(nextCodes));
+      window.localStorage.setItem(PURCHASE_LIST_STORAGE_KEY, JSON.stringify(nextIds));
     } catch {
       // The in-memory list still works if browser storage is unavailable.
     }
@@ -47,15 +54,23 @@ export function PurchaseListProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      const storedValue = window.localStorage.getItem(PURCHASE_LIST_STORAGE_KEY);
-      const parsedCodes = parsePurchaseListStorage(storedValue);
-      setShopCodes(parsedCodes);
+      const v2Value = window.localStorage.getItem(PURCHASE_LIST_STORAGE_KEY);
+      const parsedIds = parsePurchaseListStorage(v2Value);
+      setProductIdentityIds(parsedIds);
+      setHasLegacyList(
+        hasLegacyPurchaseList(
+          window.localStorage.getItem(LEGACY_PURCHASE_LIST_STORAGE_KEY),
+          v2Value,
+          window.localStorage.getItem(LEGACY_PURCHASE_LIST_ACKNOWLEDGEMENT_KEY)
+        )
+      );
 
-      if (storedValue && storedValue !== JSON.stringify(parsedCodes)) {
-        window.localStorage.setItem(PURCHASE_LIST_STORAGE_KEY, JSON.stringify(parsedCodes));
+      if (v2Value !== null && v2Value !== JSON.stringify(parsedIds)) {
+        window.localStorage.setItem(PURCHASE_LIST_STORAGE_KEY, JSON.stringify(parsedIds));
       }
     } catch {
-      setShopCodes([]);
+      setProductIdentityIds([]);
+      setHasLegacyList(false);
     } finally {
       setIsReady(true);
     }
@@ -64,7 +79,7 @@ export function PurchaseListProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     function handleStorage(event: StorageEvent) {
       if (event.key === PURCHASE_LIST_STORAGE_KEY) {
-        setShopCodes(parsePurchaseListStorage(event.newValue));
+        setProductIdentityIds(parsePurchaseListStorage(event.newValue));
       }
     }
 
@@ -73,61 +88,85 @@ export function PurchaseListProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const hasProduct = useCallback(
-    (shopCode: string) => shopCodes.includes(shopCode.trim()),
-    [shopCodes]
+    (productIdentityId: string | null | undefined) =>
+      Boolean(productIdentityId && productIdentityIds.includes(productIdentityId.toLowerCase())),
+    [productIdentityIds]
   );
 
   const addProduct = useCallback(
-    (shopCode: string) => {
-      const normalizedCode = shopCode.trim();
-      if (!normalizedCode || normalizedCode.length > 64 || shopCodes.includes(normalizedCode)) {
+    (productIdentityId: string) => {
+      const normalizedId = productIdentityId.trim().toLowerCase();
+      if (!isProductIdentityId(normalizedId) || productIdentityIds.includes(normalizedId)) {
         return;
       }
 
-      writeShopCodes([...shopCodes, normalizedCode]);
+      writeProductIdentityIds([...productIdentityIds, normalizedId]);
     },
-    [shopCodes, writeShopCodes]
+    [productIdentityIds, writeProductIdentityIds]
   );
 
   const removeProduct = useCallback(
-    (shopCode: string): RemovedPurchaseListItem | null => {
-      const index = shopCodes.indexOf(shopCode);
+    (productIdentityId: string): RemovedPurchaseListItem | null => {
+      const index = productIdentityIds.indexOf(productIdentityId);
       if (index < 0) {
         return null;
       }
 
-      writeShopCodes(shopCodes.filter((code) => code !== shopCode));
-      return { shopCode, index };
+      writeProductIdentityIds(productIdentityIds.filter((id) => id !== productIdentityId));
+      return { productIdentityId, index };
     },
-    [shopCodes, writeShopCodes]
+    [productIdentityIds, writeProductIdentityIds]
   );
 
   const restoreProduct = useCallback(
-    ({ shopCode, index }: RemovedPurchaseListItem) => {
-      if (!shopCode || shopCodes.includes(shopCode)) {
+    ({ productIdentityId, index }: RemovedPurchaseListItem) => {
+      if (!isProductIdentityId(productIdentityId) || productIdentityIds.includes(productIdentityId)) {
         return;
       }
 
-      const restoredCodes = [...shopCodes];
-      restoredCodes.splice(Math.min(Math.max(index, 0), restoredCodes.length), 0, shopCode);
-      writeShopCodes(restoredCodes);
+      const restoredIds = [...productIdentityIds];
+      restoredIds.splice(Math.min(Math.max(index, 0), restoredIds.length), 0, productIdentityId);
+      writeProductIdentityIds(restoredIds);
     },
-    [shopCodes, writeShopCodes]
+    [productIdentityIds, writeProductIdentityIds]
   );
 
-  const clearProducts = useCallback(() => writeShopCodes([]), [writeShopCodes]);
+  const clearProducts = useCallback(() => writeProductIdentityIds([]), [writeProductIdentityIds]);
+
+  const acknowledgeLegacyList = useCallback(() => {
+    setHasLegacyList(false);
+
+    try {
+      window.localStorage.setItem(LEGACY_PURCHASE_LIST_ACKNOWLEDGEMENT_KEY, "1");
+      window.localStorage.removeItem(LEGACY_PURCHASE_LIST_STORAGE_KEY);
+    } catch {
+      // Acknowledgement stays in memory if browser storage is unavailable.
+    }
+  }, []);
 
   const value = useMemo(
     () => ({
-      shopCodes,
+      productIdentityIds,
       isReady,
+      hasLegacyList,
       hasProduct,
       addProduct,
       removeProduct,
       restoreProduct,
-      clearProducts
+      clearProducts,
+      acknowledgeLegacyList
     }),
-    [shopCodes, isReady, hasProduct, addProduct, removeProduct, restoreProduct, clearProducts]
+    [
+      productIdentityIds,
+      isReady,
+      hasLegacyList,
+      hasProduct,
+      addProduct,
+      removeProduct,
+      restoreProduct,
+      clearProducts,
+      acknowledgeLegacyList
+    ]
   );
 
   return <PurchaseListContext.Provider value={value}>{children}</PurchaseListContext.Provider>;

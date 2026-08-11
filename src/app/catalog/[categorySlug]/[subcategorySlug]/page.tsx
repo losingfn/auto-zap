@@ -6,6 +6,10 @@ import { JsonLd } from "@/components/seo/json-ld";
 import { catalogTaxonomy } from "@/config/catalog-taxonomy";
 import { isPublicNavigationTaxonomyTarget } from "@/config/public-taxonomy";
 import { getProductsForSubcategory } from "@/features/catalog/data";
+import {
+  getCatalogNavigationContext,
+  withCatalogNavigationContext
+} from "@/features/catalog/navigation-context";
 import { buildPublicPageMetadata, normalizeSeoText } from "@/features/seo/metadata";
 import { buildBreadcrumbList } from "@/features/seo/structured-data";
 
@@ -13,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 type SubcategoryPageProps = {
   params: Promise<{ categorySlug: string; subcategorySlug: string }>;
-  searchParams: Promise<{ page?: string; q?: string }>;
+  searchParams: Promise<{ page?: string; q?: string; from?: string }>;
 };
 
 export async function generateMetadata({ params }: SubcategoryPageProps): Promise<Metadata> {
@@ -40,6 +44,7 @@ export default async function SubcategoryPage({
   const [{ categorySlug, subcategorySlug }, query] = await Promise.all([params, searchParams]);
   const page = parsePage(query.page);
   const searchQuery = String(query.q ?? "").trim();
+  const context = getCatalogNavigationContext(query.from);
   const { category, subcategory, products, pagination } = await getProductsForSubcategory(
     categorySlug,
     subcategorySlug,
@@ -54,7 +59,7 @@ export default async function SubcategoryPage({
     <CatalogPageShell
       title={subcategory.name}
       subtitle={`${category.name} → ${subcategory.name}`}
-      backHref={`/catalog/${category.slug}`}
+      backHref={withCatalogNavigationContext(`/catalog/${category.slug}`, context)}
     >
       <JsonLd
         data={buildBreadcrumbList([
@@ -69,6 +74,7 @@ export default async function SubcategoryPage({
         subcategorySlug={subcategory.slug}
         pagination={pagination}
         searchQuery={searchQuery}
+        navigationContext={context}
       />
     </CatalogPageShell>
   );

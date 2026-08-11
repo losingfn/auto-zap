@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode
 } from "react";
@@ -41,10 +42,9 @@ export function PurchaseListProvider({ children }: { children: ReactNode }) {
   const [productIdentityIds, setProductIdentityIds] = useState<string[]>([]);
   const [isReady, setIsReady] = useState(false);
   const [hasLegacyList, setHasLegacyList] = useState(false);
+  const productIdentityIdsRef = useRef<string[]>([]);
 
-  const writeProductIdentityIds = useCallback((nextIds: string[]) => {
-    setProductIdentityIds(nextIds);
-
+  const persistProductIdentityIds = useCallback((nextIds: string[]) => {
     try {
       window.localStorage.setItem(PURCHASE_LIST_STORAGE_KEY, JSON.stringify(nextIds));
     } catch {
@@ -52,10 +52,27 @@ export function PurchaseListProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const updateProductIdentityIds = useCallback(
+    (updater: (previousIds: string[]) => string[]) => {
+      const nextIds = updater(productIdentityIdsRef.current);
+      if (nextIds === productIdentityIdsRef.current) {
+        return nextIds;
+      }
+
+      productIdentityIdsRef.current = nextIds;
+      persistProductIdentityIds(nextIds);
+      setProductIdentityIds((previousIds) => updater(previousIds));
+
+      return nextIds;
+    },
+    [persistProductIdentityIds]
+  );
+
   useEffect(() => {
     try {
       const v2Value = window.localStorage.getItem(PURCHASE_LIST_STORAGE_KEY);
       const parsedIds = parsePurchaseListStorage(v2Value);
+      productIdentityIdsRef.current = parsedIds;
       setProductIdentityIds(parsedIds);
       setHasLegacyList(
         hasLegacyPurchaseList(
@@ -69,6 +86,7 @@ export function PurchaseListProvider({ children }: { children: ReactNode }) {
         window.localStorage.setItem(PURCHASE_LIST_STORAGE_KEY, JSON.stringify(parsedIds));
       }
     } catch {
+      productIdentityIdsRef.current = [];
       setProductIdentityIds([]);
       setHasLegacyList(false);
     } finally {
@@ -79,7 +97,9 @@ export function PurchaseListProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     function handleStorage(event: StorageEvent) {
       if (event.key === PURCHASE_LIST_STORAGE_KEY) {
-        setProductIdentityIds(parsePurchaseListStorage(event.newValue));
+        const nextIds = parsePurchaseListStorage(event.newValue);
+        productIdentityIdsRef.current = nextIds;
+        setProductIdentityIds(nextIds);
       }
     }
 
@@ -96,42 +116,57 @@ export function PurchaseListProvider({ children }: { children: ReactNode }) {
   const addProduct = useCallback(
     (productIdentityId: string) => {
       const normalizedId = productIdentityId.trim().toLowerCase();
-      if (!isProductIdentityId(normalizedId) || productIdentityIds.includes(normalizedId)) {
+      if (!isProductIdentityId(normalizedId) || productIdentityIdsRef.current.includes(normalizedId)) {
         return;
       }
 
-      writeProductIdentityIds([...productIdentityIds, normalizedId]);
+      updateProductIdentityIds((previousIds) =>
+        previousIds.includes(normalizedId) ? previousIds : [...previousIds, normalizedId]
+      );
     },
-    [productIdentityIds, writeProductIdentityIds]
+    [updateProductIdentityIds]
   );
 
   const removeProduct = useCallback(
     (productIdentityId: string): RemovedPurchaseListItem | null => {
-      const index = productIdentityIds.indexOf(productIdentityId);
+      const normalizedId = productIdentityId.trim().toLowerCase();
+      const index = productIdentityIdsRef.current.indexOf(normalizedId);
       if (index < 0) {
         return null;
       }
 
-      writeProductIdentityIds(productIdentityIds.filter((id) => id !== productIdentityId));
-      return { productIdentityId, index };
+      updateProductIdentityIds((previousIds) =>
+        previousIds.filter((id) => id !== normalizedId)
+      );
+      return { productIdentityId: normalizedId, index };
     },
-    [productIdentityIds, writeProductIdentityIds]
+    [updateProductIdentityIds]
   );
 
   const restoreProduct = useCallback(
     ({ productIdentityId, index }: RemovedPurchaseListItem) => {
-      if (!isProductIdentityId(productIdentityId) || productIdentityIds.includes(productIdentityId)) {
+      const normalizedId = productIdentityId.trim().toLowerCase();
+      if (!isProductIdentityId(normalizedId) || productIdentityIdsRef.current.includes(normalizedId)) {
         return;
       }
 
-      const restoredIds = [...productIdentityIds];
-      restoredIds.splice(Math.min(Math.max(index, 0), restoredIds.length), 0, productIdentityId);
-      writeProductIdentityIds(restoredIds);
+      updateProductIdentityIds((previousIds) => {
+        if (previousIds.includes(normalizedId)) {
+          return previousIds;
+        }
+
+        const restoredIds = [...previousIds];
+        restoredIds.splice(Math.min(Math.max(index, 0), restoredIds.length), 0, normalizedId);
+        return restoredIds;
+      });
     },
-    [productIdentityIds, writeProductIdentityIds]
+    [updateProductIdentityIds]
   );
 
-  const clearProducts = useCallback(() => writeProductIdentityIds([]), [writeProductIdentityIds]);
+  const clearProducts = useCallback(
+    () => updateProductIdentityIds((previousIds) => (previousIds.length > 0 ? [] : previousIds)),
+    [updateProductIdentityIds]
+  );
 
   const acknowledgeLegacyList = useCallback(() => {
     setHasLegacyList(false);

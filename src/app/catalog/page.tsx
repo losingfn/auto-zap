@@ -3,6 +3,9 @@ import { CategoryGrid } from "@/components/catalog/category-grid";
 import { CatalogPageShell } from "@/components/catalog/page-shell";
 import { JsonLd } from "@/components/seo/json-ld";
 import { getPublicCatalogCategories } from "@/features/catalog/data";
+import {
+  getCatalogNavigationContext
+} from "@/features/catalog/navigation-context";
 import { buildPublicPageMetadata } from "@/features/seo/metadata";
 import { buildBreadcrumbList } from "@/features/seo/structured-data";
 
@@ -18,13 +21,18 @@ export const metadata: Metadata = buildPublicPageMetadata({
   path: "/catalog"
 });
 
-export default async function CatalogPage() {
+export default async function CatalogPage({
+  searchParams
+}: {
+  searchParams: Promise<{ from?: string }>;
+}) {
+  const context = getCatalogNavigationContext((await searchParams).from);
   const categories = await getPublicCatalogCategories();
 
   return (
     <CatalogPageShell
       title="Каталог"
-      backHref="/"
+      backHref={context === "purchase-list" ? "/spisok-pokupok" : "/"}
     >
       <JsonLd
         data={buildBreadcrumbList([
@@ -32,7 +40,7 @@ export default async function CatalogPage() {
           { name: "Каталог", url: "/catalog" }
         ])}
       />
-      <CategoryGrid categories={categories} />
+      <CategoryGrid categories={categories} navigationContext={context} />
     </CatalogPageShell>
   );
 }

@@ -55,6 +55,19 @@ run("navigation caps a large saved-list badge without changing the list cardinal
   assert.match(navigationSource, /const countLabel = count > 99 \? "99\+" : String\(count\)/);
 });
 
+run("purchase-list mutations use current state and keep fixed overlays outside the page flow", () => {
+  const providerSource = readFileSync("src/features/purchase-list/purchase-list-provider.tsx", "utf8");
+  const pageSource = readFileSync("src/components/purchase-list/purchase-list-page.tsx", "utf8");
+
+  assert.match(providerSource, /productIdentityIdsRef/);
+  assert.match(providerSource, /setProductIdentityIds\(\(previousIds\) => updater\(previousIds\)\)/);
+  assert.match(providerSource, /persistProductIdentityIds\(nextIds\)/);
+  assert.match(pageSource, /createPortal\(/);
+  assert.match(pageSource, /document\.body/);
+  assert.match(pageSource, /safe-area-inset-bottom/);
+  assert.doesNotMatch(pageSource, /min-h-dvh/);
+});
+
 function run(name: string, test: () => void) {
   test();
   console.log(`✓ ${name}`);

@@ -1,19 +1,25 @@
 import Link from "next/link";
 import { PurchaseListProductBadge } from "@/components/purchase-list/purchase-list-product-badge";
 import type { PublicProductListItem, PublicProductPagination } from "@/features/catalog/types";
+import {
+  type CatalogNavigationContext,
+  withCatalogNavigationContext
+} from "@/features/catalog/navigation-context";
 
 export function ProductList({
   products,
   categorySlug,
   subcategorySlug,
   pagination,
-  searchQuery = ""
+  searchQuery = "",
+  navigationContext
 }: {
   products: PublicProductListItem[];
   categorySlug: string;
   subcategorySlug: string;
   pagination: PublicProductPagination;
   searchQuery?: string;
+  navigationContext: CatalogNavigationContext;
 }) {
   const hasSearch = Boolean(searchQuery.trim());
   return (
@@ -34,6 +40,7 @@ export function ProductList({
             placeholder="Искать в этой подкатегории"
             className="min-h-12 rounded-card border border-white/10 bg-[#0B1220] px-4 text-base text-white outline-none transition placeholder:text-[#9CA3AF] focus:border-[#2563EB]"
           />
+          {navigationContext ? <input type="hidden" name="from" value={navigationContext} /> : null}
           <button className="tap-target min-h-12 rounded-card bg-[#2563EB] px-5 font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8]">
             Найти
           </button>
@@ -59,7 +66,10 @@ export function ProductList({
             {products.map((product) => (
               <Link
                 key={product.id}
-                href={`/catalog/${categorySlug}/${subcategorySlug}/${product.slug}`}
+                href={withCatalogNavigationContext(
+                  `/catalog/${categorySlug}/${subcategorySlug}/${product.slug}`,
+                  navigationContext
+                )}
                 className="tap-target grid gap-2 p-4 hover:bg-[#2563EB]/10 sm:grid-cols-[1fr_auto]"
               >
                 <div>
@@ -78,6 +88,7 @@ export function ProductList({
             subcategorySlug={subcategorySlug}
             pagination={pagination}
             searchQuery={searchQuery}
+            navigationContext={navigationContext}
           />
         </>
       ) : (
@@ -93,12 +104,14 @@ function PaginationControls({
   categorySlug,
   subcategorySlug,
   pagination,
-  searchQuery
+  searchQuery,
+  navigationContext
 }: {
   categorySlug: string;
   subcategorySlug: string;
   pagination: PublicProductPagination;
   searchQuery: string;
+  navigationContext: CatalogNavigationContext;
 }) {
   if (pagination.totalPages <= 1) {
     return null;
@@ -110,7 +123,7 @@ function PaginationControls({
   return (
     <nav className="mt-5 flex flex-wrap items-center gap-2" aria-label="Пагинация товаров">
       <PageLink
-        href={pageHref(baseHref, pagination.page - 1, searchQuery)}
+        href={pageHref(baseHref, pagination.page - 1, searchQuery, navigationContext)}
         disabled={pagination.page <= 1}
         label="Назад"
       />
@@ -125,14 +138,14 @@ function PaginationControls({
         ) : (
           <PageLink
             key={page}
-            href={pageHref(baseHref, page, searchQuery)}
+            href={pageHref(baseHref, page, searchQuery, navigationContext)}
             label={String(page)}
             isActive={page === pagination.page}
           />
         )
       )}
       <PageLink
-        href={pageHref(baseHref, pagination.page + 1, searchQuery)}
+        href={pageHref(baseHref, pagination.page + 1, searchQuery, navigationContext)}
         disabled={pagination.page >= pagination.totalPages}
         label="Вперед"
       />
@@ -174,7 +187,12 @@ function PageLink({
   );
 }
 
-function pageHref(baseHref: string, page: number, searchQuery: string) {
+function pageHref(
+  baseHref: string,
+  page: number,
+  searchQuery: string,
+  navigationContext: CatalogNavigationContext
+) {
   const params = new URLSearchParams();
 
   if (searchQuery.trim()) {
@@ -186,7 +204,7 @@ function pageHref(baseHref: string, page: number, searchQuery: string) {
   }
 
   const query = params.toString();
-  return query ? `${baseHref}?${query}` : baseHref;
+  return withCatalogNavigationContext(query ? `${baseHref}?${query}` : baseHref, navigationContext);
 }
 
 function visiblePages(currentPage: number, totalPages: number) {

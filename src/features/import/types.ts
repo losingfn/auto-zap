@@ -66,6 +66,7 @@ export interface AnalyzedImportRow {
 }
 
 export interface ExistingProductSnapshot {
+  productIdentityId?: string | null;
   shopCode: string;
   name: string;
   price: number;

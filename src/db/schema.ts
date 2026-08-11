@@ -235,6 +235,17 @@ export const catalogVersions = pgTable(
   })
 );
 
+export const productIdentities = pgTable(
+  "product_identities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ...timestamps
+  },
+  (table) => ({
+    createdIdx: index("product_identities_created_idx").on(table.createdAt)
+  })
+);
+
 export const products = pgTable(
   "products",
   {
@@ -242,6 +253,9 @@ export const products = pgTable(
     catalogVersionId: uuid("catalog_version_id")
       .notNull()
       .references(() => catalogVersions.id, { onDelete: "cascade" }),
+    productIdentityId: uuid("product_identity_id").references(() => productIdentities.id, {
+      onDelete: "restrict"
+    }),
     shopCode: varchar("shop_code", { length: 64 }).notNull(),
     rawName: text("raw_name").notNull(),
     name: text("name").notNull(),
@@ -263,6 +277,9 @@ export const products = pgTable(
       table.catalogVersionId,
       table.shopCode
     ),
+    versionIdentityUnique: uniqueIndex("products_version_identity_unique")
+      .on(table.catalogVersionId, table.productIdentityId)
+      .where(sql`${table.productIdentityId} IS NOT NULL`),
     versionStatusIdx: index("products_version_status_idx").on(
       table.catalogVersionId,
       table.status
@@ -398,6 +415,9 @@ export const reviewQueue = pgTable(
       onDelete: "cascade"
     }),
     productId: uuid("product_id").references(() => products.id, { onDelete: "cascade" }),
+    identityCandidateId: uuid("identity_candidate_id").references(() => productIdentities.id, {
+      onDelete: "restrict"
+    }),
     importRowId: uuid("import_row_id").references(() => importRows.id, { onDelete: "cascade" }),
     reason: text("reason").notNull(),
     status: reviewStatus("status").notNull().default("open"),
@@ -505,6 +525,10 @@ export const reviewWorkspaceItems = pgTable(
     productId: uuid("product_id")
       .notNull()
       .references(() => products.id, { onDelete: "cascade" }),
+    identityDecision: varchar("identity_decision", { length: 16 }),
+    productIdentityId: uuid("product_identity_id").references(() => productIdentities.id, {
+      onDelete: "restrict"
+    }),
     status: reviewWorkspaceItemStatus("status").notNull().default("pending"),
     categoryId: uuid("category_id").references(() => categories.id, { onDelete: "set null" }),
     subcategoryId: uuid("subcategory_id").references(() => subcategories.id, {

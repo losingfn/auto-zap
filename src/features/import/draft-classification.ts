@@ -26,11 +26,13 @@ export function createDraftClassificationRun({
   rows,
   categorizationContext,
   existingProducts,
+  identityConflictRows,
   observer
 }: {
   rows: AnalyzedImportRow[];
   categorizationContext: CategorizationContext;
   existingProducts: ExistingProductSnapshot[];
+  identityConflictRows?: ReadonlySet<AnalyzedImportRow>;
   observer?: DraftClassificationObserver;
 }): DraftClassificationRun {
   const existingByCode = buildExistingByCode(existingProducts);
@@ -44,7 +46,14 @@ export function createDraftClassificationRun({
 
     categorizations.set(
       row,
-      categorizeImportRow(row, categorizationContext, existingByCode, similarityExistingProducts, observer)
+      categorizeImportRow(
+        row,
+        categorizationContext,
+        existingByCode,
+        similarityExistingProducts,
+        identityConflictRows?.has(row) === true,
+        observer
+      )
     );
   }
 
@@ -70,9 +79,10 @@ function categorizeImportRow(
   categorizationContext: CategorizationContext,
   existingByCode: Map<string, ExistingProductSnapshot>,
   similarityExistingProducts: ExistingProductSnapshot[],
+  hasIdentityConflict: boolean,
   observer?: DraftClassificationObserver
 ) {
-  const existingProduct = row.shopCode ? existingByCode.get(row.shopCode) : null;
+  const existingProduct = hasIdentityConflict ? null : row.shopCode ? existingByCode.get(row.shopCode) : null;
   observer?.onCategorizeProductName?.();
   const initialResult = categorizeProductName(buildCategorizationTitle(row), categorizationContext, {
     existingProduct

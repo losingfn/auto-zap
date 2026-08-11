@@ -28,6 +28,31 @@ async function main() {
   await seedInitialActiveCatalog();
 
   const { POST } = await import("../src/app/api/purchase-list/route");
+  const { buildSearchDocument, hydrateMissingSearchProductIdentities } = await import(
+    "../src/features/search/documents"
+  );
+
+  await run("legacy Meilisearch hits hydrate a missing identity from the current public snapshot", async () => {
+    const legacyHit = buildSearchDocument(
+      {
+        id: firstSnapshotId,
+        catalogVersionId: versionOneId,
+        shopCode: "A-100",
+        name: "Фильтр масляный",
+        slug: "a-100-filter-maslyanyy",
+        price: 140,
+        categorySlug: "filtry-i-masla",
+        categoryName: "Фильтры и масла",
+        subcategorySlug: "maslyanye-filtry",
+        subcategoryName: "Масляные фильтры"
+      },
+      []
+    );
+    delete legacyHit.productIdentityId;
+
+    const [hydratedHit] = await hydrateMissingSearchProductIdentities([legacyHit]);
+    assert.equal(hydratedHit?.productIdentityId, identityX);
+  });
 
   await run("batch API resolves an active product by permanent identity only", async () => {
     const products = await loadProducts(POST, [identityX]);
@@ -65,6 +90,25 @@ async function main() {
     assert.equal((await sql`SELECT count(*)::int AS count FROM products WHERE product_identity_id = ${identityX}`)[0]?.count, 2);
     const currentProducts = await loadProducts(POST, [identityX, identityY]);
     assert.deepEqual(currentProducts.map((product) => product.productIdentityId), [identityY]);
+
+    const [staleHit] = await hydrateMissingSearchProductIdentities([
+      buildSearchDocument(
+        {
+          id: firstSnapshotId,
+          catalogVersionId: versionOneId,
+          shopCode: "A-100",
+          name: "Фильтр масляный",
+          slug: "a-100-filter-maslyanyy",
+          price: 140,
+          categorySlug: "filtry-i-masla",
+          categoryName: "Фильтры и масла",
+          subcategorySlug: "maslyanye-filtry",
+          subcategoryName: "Масляные фильтры"
+        },
+        []
+      )
+    ]);
+    assert.equal(staleHit?.productIdentityId, null);
   });
 
   await run("the same identity becomes resolvable again when it returns in a later active snapshot", async () => {

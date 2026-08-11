@@ -3,6 +3,7 @@ import {
   isPublicCategorySlug,
   isPublicNavigationTaxonomyTarget
 } from "@/config/public-taxonomy";
+import { hydrateMissingSearchProductIdentities } from "./documents";
 import { getSearchIndex } from "./meilisearch";
 import { buildExpandedQuery, normalizeSearchText } from "./normalization";
 import { searchProductsWithPostgres } from "./postgres";
@@ -162,9 +163,11 @@ async function searchProductsWithMeili(
     return rankedHit;
   });
 
+  const hydratedHits = await hydrateMissingSearchProductIdentities(hits);
+
   return {
     estimatedTotalHits: Number(response.estimatedTotalHits ?? hits.length),
-    hits: rankSearchHits(hits, query, synonyms, sourceScores).slice(offset, offset + limit)
+    hits: rankSearchHits(hydratedHits, query, synonyms, sourceScores).slice(offset, offset + limit)
   };
 }
 

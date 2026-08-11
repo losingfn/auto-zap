@@ -34,6 +34,7 @@ run("PostgreSQL fallback and Meilisearch retrieve productIdentityId for saved in
   assert.match(postgresSource, /productIdentityId: products\.productIdentityId/);
   assert.match(serviceSource, /"productIdentityId"/);
   assert.match(meiliSource, /"productIdentityId"/);
+  assert.match(serviceSource, /hydrateMissingSearchProductIdentities/);
 });
 
 run("purchase-list API accepts only productIdentityIds and queries that field", () => {

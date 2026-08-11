@@ -61,7 +61,7 @@ export function SiteHeader({
           ))}
           <PurchaseListNavigationLink
             mobileLabel="Список"
-            className="tap-target col-span-2 flex min-h-9 min-w-0 items-center justify-center whitespace-nowrap rounded-card border border-white/10 bg-white/[0.06] px-1.5 py-2 pr-6 leading-5 hover:border-[#2563EB]/60 hover:bg-white/[0.1] hover:text-white sm:px-2.5 sm:pr-7"
+            className="tap-target col-span-2 flex min-h-9 min-w-0 items-center justify-center whitespace-nowrap rounded-card border border-white/10 bg-white/[0.06] px-1.5 py-2 leading-5 hover:border-[#2563EB]/60 hover:bg-white/[0.1] hover:text-white sm:px-2.5"
           />
         </nav>
       </div>

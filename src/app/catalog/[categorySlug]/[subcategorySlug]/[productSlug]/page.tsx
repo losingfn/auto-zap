@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CatalogPageShell } from "@/components/catalog/page-shell";
+import { PurchaseListProductAction } from "@/components/purchase-list/purchase-list-product-action";
 import {
   ALL_ASSORTMENT_CATEGORY_SLUG,
   ALL_PRODUCTS_SUBCATEGORY_SLUG,
@@ -84,6 +85,7 @@ export default async function ProductPage({
         <p className="mt-3 text-3xl font-semibold text-white sm:text-4xl">
           {product.price.toLocaleString("ru-RU")} ₽
         </p>
+        <PurchaseListProductAction shopCode={product.shopCode} />
       </article>
     </CatalogPageShell>
   );

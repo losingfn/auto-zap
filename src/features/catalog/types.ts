@@ -19,6 +19,7 @@ export interface PublicSubcategory {
 
 export interface PublicProductListItem {
   id: string;
+  shopCode: string;
   name: string;
   slug: string;
   price: number;
@@ -30,6 +31,10 @@ export interface PublicProductListItem {
 
 export interface PublicProductDetails extends PublicProductListItem {
   rawName: string;
+}
+
+export interface PublicPurchaseListProduct extends PublicProductListItem {
+  url: string;
 }
 
 export interface PublicProductPagination {

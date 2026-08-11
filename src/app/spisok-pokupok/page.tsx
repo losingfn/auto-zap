@@ -17,7 +17,7 @@ export default async function PurchaseListRoute() {
   const content = await getPublicHomeContent();
 
   return (
-    <>
+    <div className="flex min-h-[100svh] flex-col bg-[#111827]">
       <PurchaseListPage
         contact={{
           phone: content.contact.phone,
@@ -25,7 +25,9 @@ export default async function PurchaseListRoute() {
           yandexMapsUrl: content.contact.yandexMapsUrl
         }}
       />
-      <PublicFooter content={content} />
-    </>
+      <div className="shrink-0">
+        <PublicFooter content={content} />
+      </div>
+    </div>
   );
 }

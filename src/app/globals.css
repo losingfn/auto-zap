@@ -79,6 +79,20 @@ button,
   outline-offset: 3px;
 }
 
+@media (hover: hover) {
+  .purchase-list-remove:hover {
+    border-color: rgba(248, 113, 113, 0.78);
+    background-color: rgba(185, 28, 28, 0.16);
+    color: #fecaca;
+  }
+}
+
+.purchase-list-remove:active {
+  border-color: rgba(248, 113, 113, 0.86);
+  background-color: rgba(185, 28, 28, 0.22);
+  color: #fecaca;
+}
+
 @media (hover: none) and (pointer: coarse) {
   .tap-target {
     transition:

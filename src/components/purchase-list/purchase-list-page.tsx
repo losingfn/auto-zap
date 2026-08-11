@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { TrashIcon } from "@/components/icons/lucide";
 import type { PublicPurchaseListProduct } from "@/features/catalog/types";
+import { withCatalogNavigationContext } from "@/features/catalog/navigation-context";
 import {
   type RemovedPurchaseListItem,
   usePurchaseList
@@ -21,8 +23,8 @@ type PurchaseListResponse = {
   products: PublicPurchaseListProduct[];
 };
 
-const REMOVE_TRANSITION_MS = 160;
 const UNDO_TIMEOUT_MS = 6000;
+const UNDO_FADE_DURATION_MS = 200;
 
 export function PurchaseListPage({ contact }: PurchaseListPageProps) {
   const {
@@ -37,11 +39,13 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
   const [products, setProducts] = useState<PublicPurchaseListProduct[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [removingProductIdentityId, setRemovingProductIdentityId] = useState<string | null>(null);
   const [undoItem, setUndoItem] = useState<RemovedPurchaseListItem | null>(null);
+  const [isUndoToastVisible, setIsUndoToastVisible] = useState(false);
   const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
+  const clearTriggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const cancelClearButtonRef = useRef<HTMLButtonElement | null>(null);
   const confirmClearButtonRef = useRef<HTMLButtonElement | null>(null);
+  const shouldRestoreClearTriggerFocusRef = useRef(false);
 
   useEffect(() => {
     if (!isReady) {
@@ -93,16 +97,63 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
       return;
     }
 
+    setIsUndoToastVisible(true);
+    const fadeTimeout = window.setTimeout(
+      () => setIsUndoToastVisible(false),
+      UNDO_TIMEOUT_MS - UNDO_FADE_DURATION_MS
+    );
     const timeout = window.setTimeout(() => setUndoItem(null), UNDO_TIMEOUT_MS);
-    return () => window.clearTimeout(timeout);
+
+    return () => {
+      window.clearTimeout(fadeTimeout);
+      window.clearTimeout(timeout);
+    };
   }, [undoItem]);
+
+  useEffect(() => {
+    if (isClearDialogOpen) {
+      cancelClearButtonRef.current?.focus();
+      return;
+    }
+
+    if (shouldRestoreClearTriggerFocusRef.current) {
+      clearTriggerButtonRef.current?.focus();
+      shouldRestoreClearTriggerFocusRef.current = false;
+    }
+  }, [isClearDialogOpen]);
 
   useEffect(() => {
     if (!isClearDialogOpen) {
       return;
     }
 
-    cancelClearButtonRef.current?.focus();
+    const { body, documentElement } = document;
+    const scrollY = window.scrollY;
+    const scrollbarWidth = window.innerWidth - documentElement.clientWidth;
+    const previousStyles = {
+      overflow: body.style.overflow,
+      paddingRight: body.style.paddingRight,
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width
+    };
+
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.width = "100%";
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    return () => {
+      body.style.overflow = previousStyles.overflow;
+      body.style.paddingRight = previousStyles.paddingRight;
+      body.style.position = previousStyles.position;
+      body.style.top = previousStyles.top;
+      body.style.width = previousStyles.width;
+      window.scrollTo(0, scrollY);
+    };
   }, [isClearDialogOpen]);
 
   const productsByIdentityId = useMemo(
@@ -111,15 +162,10 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
   );
 
   function removeItem(productIdentityId: string) {
-    setRemovingProductIdentityId(productIdentityId);
-
-    window.setTimeout(() => {
-      const removed = removeProduct(productIdentityId);
-      setRemovingProductIdentityId(null);
-      if (removed) {
-        setUndoItem(removed);
-      }
-    }, REMOVE_TRANSITION_MS);
+    const removed = removeProduct(productIdentityId);
+    if (removed) {
+      setUndoItem(removed);
+    }
   }
 
   function restoreRemovedItem() {
@@ -134,12 +180,23 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
   function confirmClear() {
     clearProducts();
     setUndoItem(null);
+    closeClearDialog();
+  }
+
+  function openClearDialog() {
+    shouldRestoreClearTriggerFocusRef.current = false;
+    setIsClearDialogOpen(true);
+  }
+
+  function closeClearDialog() {
+    shouldRestoreClearTriggerFocusRef.current = true;
     setIsClearDialogOpen(false);
   }
 
   return (
-    <main className="premium-page min-h-dvh bg-[#111827] text-white">
-      <section className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+    <>
+      <main className="premium-page flex-1 bg-[#111827] text-white">
+        <section className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         <Link href="/" className="tap-target inline-flex min-h-10 items-center text-sm text-[#93C5FD] hover:text-white">
           ← На главную
         </Link>
@@ -172,7 +229,6 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
                     key={productIdentityId}
                     product={productsByIdentityId.get(productIdentityId)}
                     isLoading={isLoading}
-                    isRemoving={removingProductIdentityId === productIdentityId}
                     onRemove={() => removeItem(productIdentityId)}
                   />
                 ))}
@@ -181,7 +237,8 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
 
             <button
               type="button"
-              onClick={() => setIsClearDialogOpen(true)}
+              ref={clearTriggerButtonRef}
+              onClick={openClearDialog}
               className="tap-target inline-flex min-h-11 items-center rounded-card border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-[#CBD5E1] hover:border-[#93C5FD]/70 hover:bg-white/[0.08] hover:text-white"
             >
               Очистить список
@@ -191,7 +248,7 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
 
             <div className="grid gap-3 sm:grid-cols-2">
               <Link
-                href="/catalog"
+                href={withCatalogNavigationContext("/catalog", "purchase-list")}
                 className="tap-target inline-flex min-h-12 items-center justify-center rounded-card border border-[#2563EB]/[0.55] px-5 text-center font-semibold text-white hover:border-[#93C5FD] hover:bg-[#1A2740]"
               >
                 Продолжить выбор
@@ -205,10 +262,16 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
             </div>
           </div>
         )}
-      </section>
+        </section>
+      </main>
 
-      {undoItem ? (
-        <div className="fixed inset-x-4 bottom-4 z-40 mx-auto flex w-auto max-w-md items-center justify-between gap-3 rounded-card border border-white/10 bg-[#0B1220] p-3 text-sm text-[#E5E7EB] shadow-[0_20px_60px_rgba(0,0,0,0.38)] sm:inset-x-auto sm:right-6 sm:w-full">
+      {undoItem && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className={`fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-[60] mx-auto flex w-auto max-w-md items-center justify-between gap-3 rounded-card border border-white/10 bg-[#0B1220] p-3 text-sm text-[#E5E7EB] shadow-[0_20px_60px_rgba(0,0,0,0.38)] transition-opacity duration-200 ${isUndoToastVisible ? "opacity-100" : "opacity-0"} sm:inset-x-auto sm:right-6 sm:w-full sm:bottom-6`}
+              role="status"
+              aria-live="polite"
+            >
           <span role="status">Товар удалён из списка</span>
           <button
             type="button"
@@ -217,27 +280,31 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
           >
             Вернуть
           </button>
-        </div>
-      ) : null}
+            </div>,
+            document.body
+          )
+        : null}
 
-      {isClearDialogOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end bg-[#020617]/75 p-4 sm:items-center sm:justify-center"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setIsClearDialogOpen(false);
-            }
-          }}
-        >
+      {isClearDialogOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[70] flex items-center justify-center bg-[#020617]/75 p-4"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget) {
+                  closeClearDialog();
+                }
+              }}
+            >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="clear-purchase-list-title"
             aria-describedby="clear-purchase-list-description"
             className="w-full max-w-md rounded-card border border-white/10 bg-[#111827] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.42)] sm:p-6"
+            onMouseDown={(event) => event.stopPropagation()}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
-                setIsClearDialogOpen(false);
+                closeClearDialog();
                 return;
               }
 
@@ -268,7 +335,7 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
               <button
                 ref={cancelClearButtonRef}
                 type="button"
-                onClick={() => setIsClearDialogOpen(false)}
+                onClick={closeClearDialog}
                 className="tap-target min-h-11 rounded-card border border-white/10 px-4 font-semibold text-[#CBD5E1] hover:border-[#93C5FD]/70 hover:bg-white/[0.08] hover:text-white"
               >
                 Отмена
@@ -283,9 +350,11 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
               </button>
             </div>
           </div>
-        </div>
-      ) : null}
-    </main>
+            </div>,
+            document.body
+          )
+        : null}
+    </>
   );
 }
 
@@ -299,7 +368,7 @@ function EmptyPurchaseList({ contact }: PurchaseListPageProps) {
         </p>
         <div className="mt-5 grid gap-3 sm:grid-cols-2 sm:max-w-xl">
           <Link
-            href="/catalog"
+            href={withCatalogNavigationContext("/catalog", "purchase-list")}
             className="tap-target inline-flex min-h-12 items-center justify-center rounded-card bg-[#2563EB] px-5 text-center font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8]"
           >
             Открыть каталог
@@ -326,7 +395,7 @@ function LegacyPurchaseListNotice({ onAcknowledge }: { onAcknowledge: () => void
       </p>
       <div className="mt-5 grid gap-3 sm:grid-cols-2 sm:max-w-xl">
         <Link
-          href="/catalog"
+          href={withCatalogNavigationContext("/catalog", "purchase-list")}
           onClick={onAcknowledge}
           className="tap-target inline-flex min-h-11 items-center justify-center rounded-card bg-[#2563EB] px-4 text-center text-sm font-semibold text-white hover:-translate-y-0.5 hover:bg-[#1D4ED8]"
         >
@@ -354,17 +423,15 @@ function LegacyPurchaseListNotice({ onAcknowledge }: { onAcknowledge: () => void
 function PurchaseListItem({
   product,
   isLoading,
-  isRemoving,
   onRemove
 }: {
   product: PublicPurchaseListProduct | undefined;
   isLoading: boolean;
-  isRemoving: boolean;
   onRemove: () => void;
 }) {
   const itemClassName = [
     "grid gap-4 p-4 transition duration-150 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-5",
-    isRemoving ? "-translate-x-2 opacity-0" : "translate-x-0 opacity-100"
+    "translate-x-0 opacity-100"
   ].join(" ");
 
   if (isLoading && !product) {
@@ -398,7 +465,7 @@ function PurchaseListItem({
       </div>
       <div className="flex flex-wrap gap-2 sm:justify-end">
         <Link
-          href={product.url}
+          href={withCatalogNavigationContext(product.url, "purchase-list-direct")}
           className="tap-target inline-flex min-h-10 items-center justify-center rounded-card border border-[#2563EB]/[0.55] px-3 text-sm font-semibold text-white hover:border-[#93C5FD] hover:bg-[#1A2740]"
         >
           Открыть товар
@@ -414,7 +481,7 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="tap-target inline-flex min-h-10 items-center justify-center gap-2 rounded-card border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-[#CBD5E1] hover:border-[#93C5FD]/70 hover:bg-white/[0.08] hover:text-white"
+      className="purchase-list-remove tap-target inline-flex min-h-10 items-center justify-center gap-2 rounded-card border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-[#CBD5E1]"
     >
       <TrashIcon className="h-4 w-4" />
       Удалить

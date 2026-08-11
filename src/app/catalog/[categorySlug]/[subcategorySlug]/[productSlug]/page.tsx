@@ -12,6 +12,10 @@ import {
 import { JsonLd } from "@/components/seo/json-ld";
 import { getProductDetails } from "@/features/catalog/data";
 import {
+  getCatalogNavigationContext,
+  withCatalogNavigationContext
+} from "@/features/catalog/navigation-context";
+import {
   buildProductSeoDescription,
   buildProductSeoTitle,
   buildPublicPageMetadata
@@ -22,6 +26,7 @@ export const dynamic = "force-dynamic";
 
 type ProductPageProps = {
   params: Promise<{ categorySlug: string; subcategorySlug: string; productSlug: string }>;
+  searchParams: Promise<{ from?: string }>;
 };
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
@@ -42,9 +47,14 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 }
 
 export default async function ProductPage({
-  params
+  params,
+  searchParams
 }: ProductPageProps) {
-  const { categorySlug, subcategorySlug, productSlug } = await params;
+  const [{ categorySlug, subcategorySlug, productSlug }, query] = await Promise.all([
+    params,
+    searchParams
+  ]);
+  const context = getCatalogNavigationContext(query.from);
   const product = await getProductDetails(categorySlug, subcategorySlug, productSlug);
 
   if (!product) {
@@ -57,9 +67,15 @@ export default async function ProductPage({
     product.categorySlug,
     product.subcategorySlug
   );
-  const backHref = targetIsOtherProducts
-    ? `/catalog/${ALL_ASSORTMENT_CATEGORY_SLUG}/${ALL_PRODUCTS_SUBCATEGORY_SLUG}`
-    : `/catalog/${categorySlug}/${subcategorySlug}`;
+  const backHref =
+    context === "purchase-list-direct"
+      ? "/spisok-pokupok"
+      : withCatalogNavigationContext(
+          targetIsOtherProducts
+            ? `/catalog/${ALL_ASSORTMENT_CATEGORY_SLUG}/${ALL_PRODUCTS_SUBCATEGORY_SLUG}`
+            : `/catalog/${categorySlug}/${subcategorySlug}`,
+          context
+        );
   const breadcrumbs = targetIsOtherProducts
     ? [
         { name: "Главная", url: "/" },

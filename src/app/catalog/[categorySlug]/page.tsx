@@ -5,6 +5,10 @@ import { CatalogPageShell } from "@/components/catalog/page-shell";
 import { SubcategoryGrid } from "@/components/catalog/subcategory-grid";
 import { JsonLd } from "@/components/seo/json-ld";
 import { getStaticPublicCategories, getSubcategoriesForCategory } from "@/features/catalog/data";
+import {
+  getCatalogNavigationContext,
+  withCatalogNavigationContext
+} from "@/features/catalog/navigation-context";
 import { buildPublicPageMetadata, normalizeSeoText } from "@/features/seo/metadata";
 import { buildBreadcrumbList } from "@/features/seo/structured-data";
 
@@ -12,6 +16,7 @@ export const dynamic = "force-dynamic";
 
 type CategoryPageProps = {
   params: Promise<{ categorySlug: string }>;
+  searchParams: Promise<{ from?: string }>;
 };
 
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
@@ -32,9 +37,11 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
 }
 
 export default async function CategoryPage({
-  params
+  params,
+  searchParams
 }: CategoryPageProps) {
-  const { categorySlug } = await params;
+  const [{ categorySlug }, query] = await Promise.all([params, searchParams]);
+  const context = getCatalogNavigationContext(query.from);
   const { category, subcategories } = await getSubcategoriesForCategory(categorySlug);
 
   if (!category) {
@@ -44,7 +51,7 @@ export default async function CategoryPage({
   return (
     <CatalogPageShell
       title={category.name}
-      backHref="/"
+      backHref={withCatalogNavigationContext("/catalog", context)}
     >
       <JsonLd
         data={buildBreadcrumbList([
@@ -52,7 +59,11 @@ export default async function CategoryPage({
           { name: category.name, url: `/catalog/${category.slug}` }
         ])}
       />
-      <SubcategoryGrid categorySlug={category.slug} subcategories={subcategories} />
+      <SubcategoryGrid
+        categorySlug={category.slug}
+        subcategories={subcategories}
+        navigationContext={context}
+      />
       <CategoryInformation categorySlug={category.slug} />
     </CatalogPageShell>
   );

@@ -73,6 +73,7 @@ async function main() {
       publishReviewWorkspace
     } = await import("../src/features/admin/review");
     const { publishCatalogVersion } = await import("../src/features/import/publish-service");
+    const { getProductDetails } = await import("../src/features/catalog/data");
     const { createImportPerfLogger } = await import("../src/lib/server/import-perf");
     const { POST } = await import("../src/app/api/purchase-list/route");
     const { searchProducts } = await import("../src/features/search/service");
@@ -150,10 +151,21 @@ async function main() {
     await assertUnresolvedConflictCarriesForward({
       catalogVersionId: partialReviewPublish.catalogVersionId,
       unresolvedProductNumber: newConflict.productNumber,
-      post: POST
+      post: POST,
+      getProductDetails
     });
+    const partialPublishReviewPage = await getAdminReviewPageData(
+      { scope: "active", pageSize: "20" },
+      { adminUserId: ADMIN_ID, createWorkspaceIfNeeded: true }
+    );
+    assert.equal(partialPublishReviewPage.queueCount, 1);
+    assert.equal(partialPublishReviewPage.items.length, 1);
+    assert.equal(partialPublishReviewPage.items[0]?.shopCode, shopCode(newConflict.productNumber));
+    assert.equal(partialPublishReviewPage.items[0]?.identityConflict, true);
+    assert.equal(partialPublishReviewPage.items[0]?.workspaceStatus, "open");
+    assert.equal(partialPublishReviewPage.items[0]?.pendingIdentityDecision, null);
     console.log(
-      "[stage3][safety-gap] unresolved identity conflict did not reject review publication; it was carried forward as non-public needs_review"
+      "[stage3][partial-publish-pass] unresolved identity conflict was carried forward as non-public needs_review and remains visible in review"
     );
 
     const [carriedConflict] = await getOpenIdentityConflicts(partialReviewPublish.catalogVersionId);
@@ -554,19 +566,41 @@ async function assertReviewPublication(
 async function assertUnresolvedConflictCarriesForward({
   catalogVersionId,
   unresolvedProductNumber,
-  post
+  post,
+  getProductDetails
 }: {
   catalogVersionId: string;
   unresolvedProductNumber: number;
   post: typeof import("../src/app/api/purchase-list/route").POST;
+  getProductDetails: typeof import("../src/features/catalog/data").getProductDetails;
 }) {
-  const [status] = await sql<{ status: string; product_identity_id: string | null }[]>`
-    SELECT status, product_identity_id
-    FROM products
-    WHERE catalog_version_id = ${catalogVersionId} AND shop_code = ${shopCode(unresolvedProductNumber)}
+  const [product] = await sql<
+    Array<{
+      status: string;
+      productIdentityId: string | null;
+      slug: string;
+      categorySlug: string;
+      subcategorySlug: string;
+    }>
+  >`
+    SELECT
+      p.status,
+      p.product_identity_id AS "productIdentityId",
+      p.slug,
+      c.slug AS "categorySlug",
+      s.slug AS "subcategorySlug"
+    FROM products p
+    INNER JOIN categories c ON c.id = p.category_id
+    INNER JOIN subcategories s ON s.id = p.subcategory_id
+    WHERE p.catalog_version_id = ${catalogVersionId} AND p.shop_code = ${shopCode(unresolvedProductNumber)}
   `;
-  assert.equal(status?.status, "needs_review");
-  assert.equal(status?.product_identity_id, null);
+  assert.equal(product?.status, "needs_review");
+  assert.equal(product?.productIdentityId, null);
+  assert.equal(
+    await getProductDetails(product!.categorySlug, product!.subcategorySlug, product!.slug),
+    null,
+    "Unresolved conflict must not be retrievable through the public catalog product lookup."
+  );
   assert.deepEqual(await loadPurchaseList(post, [identityId(unresolvedProductNumber)]), []);
   const conflicts = await getOpenIdentityConflicts(catalogVersionId);
   assert.equal(conflicts.length, 1);

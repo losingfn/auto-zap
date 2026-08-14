@@ -53,38 +53,54 @@ export default async function SearchPage({
             Поиск временно недоступен. Попробуйте обновить страницу чуть позже.
           </div>
         ) : result ? (
-          <div className="space-y-4">
-            <div className="text-sm text-[#CBD5E1]">
-              Найдено: {result.total.toLocaleString("ru-RU")}
-            </div>
+          result.total > 0 ? (
+            <div className="space-y-4">
+              <div className="text-sm text-[#CBD5E1]">
+                Найдено: {result.total.toLocaleString("ru-RU")}
+              </div>
 
-            {result.hits.length > 0 ? (
-              <div className="divide-y divide-white/10 overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_24px_80px_rgba(0,0,0,0.24)]">
-                {result.hits.map((product) => (
-                  <Link
-                    key={product.id}
-                    href={product.url}
-                    className="tap-target grid gap-2 p-4 hover:bg-[#2563EB]/10 sm:grid-cols-[1fr_auto]"
-                  >
-                    <div>
-                      <h2 className="text-base font-semibold leading-6">{product.name}</h2>
-                      <p className="mt-1 text-sm text-[#CBD5E1]">
-                        {formatPublicTargetLabel(product)}
-                      </p>
-                      <PurchaseListProductBadge productIdentityId={product.productIdentityId} />
-                    </div>
-                    <div className="text-lg font-semibold text-white">
-                      {product.price.toLocaleString("ru-RU")} ₽
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-card border border-white/10 bg-[#111827] p-5 text-[#CBD5E1] shadow-[0_18px_60px_rgba(0,0,0,0.2)]">
-                Ничего не найдено.
-              </div>
-            )}
-          </div>
+              {result.hits.length > 0 ? (
+                <div className="divide-y divide-white/10 overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_24px_80px_rgba(0,0,0,0.24)]">
+                  {result.hits.map((product) => (
+                    <Link
+                      key={product.id}
+                      href={product.url}
+                      className="tap-target grid gap-2 p-4 hover:bg-[#2563EB]/10 sm:grid-cols-[1fr_auto]"
+                    >
+                      <div>
+                        <h2 className="text-base font-semibold leading-6">{product.name}</h2>
+                        <p className="mt-1 text-sm text-[#CBD5E1]">
+                          {formatPublicTargetLabel(product)}
+                        </p>
+                        <PurchaseListProductBadge productIdentityId={product.productIdentityId} />
+                      </div>
+                      <div className="text-lg font-semibold text-white">
+                        {product.price.toLocaleString("ru-RU")} ₽
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-card border border-white/10 bg-[#111827] p-5 text-[#CBD5E1] shadow-[0_18px_60px_rgba(0,0,0,0.2)]">
+                  Ничего не найдено.
+                </div>
+              )}
+            </div>
+          ) : (
+            <section className="rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.94),rgba(17,24,39,0.98))] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.22)] sm:p-6">
+              <h2 className="text-xl font-semibold leading-7 text-white">По вашему запросу ничего не найдено.</h2>
+              <p className="mt-3 max-w-2xl leading-6 text-[#CBD5E1]">
+                Нужную деталь можно привезти под заказ — уточните у продавца в магазине или позвоните нам.
+              </p>
+              <a
+                href="tel:+74962063304"
+                className="tap-target mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-card bg-[#2563EB] px-5 py-3 text-center font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8] sm:w-auto"
+              >
+                <span>Позвонить</span>
+                <span>+7 (496) 206-33-04</span>
+              </a>
+            </section>
+          )
         ) : null}
       </section>
       <PublicFooter />

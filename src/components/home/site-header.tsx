@@ -24,11 +24,11 @@ export function SiteHeader({
             <Image
               src={publicBrandLogoSrc}
               alt=""
-              width={64}
-              height={64}
-              sizes="(min-width: 640px) 64px, 56px"
+              width={72}
+              height={72}
+              sizes="(min-width: 1024px) 72px, (min-width: 640px) 64px, 56px"
               priority
-              className="aspect-square h-14 w-14 shrink-0 object-contain drop-shadow-[0_1px_1px_rgba(226,232,240,0.2)] sm:h-16 sm:w-16"
+              className="aspect-square h-14 w-14 shrink-0 object-contain drop-shadow-[0_1px_1px_rgba(226,232,240,0.2)] sm:h-16 sm:w-16 lg:h-[72px] lg:w-[72px]"
             />
             <span className="min-w-0 max-w-[218px] text-xs font-semibold leading-4 text-white sm:max-w-none sm:text-base sm:leading-5">
               {siteName}

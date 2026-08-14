@@ -1,1 +1,1 @@
-export const publicBrandLogoSrc = "/assets/brand/logo-3d.png";
+export const publicBrandLogoSrc = "/assets/brand/autozap-logo.webp";

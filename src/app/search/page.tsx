@@ -53,38 +53,54 @@ export default async function SearchPage({
             Поиск временно недоступен. Попробуйте обновить страницу чуть позже.
           </div>
         ) : result ? (
-          <div className="space-y-4">
-            <div className="text-sm text-[#CBD5E1]">
-              Найдено: {result.total.toLocaleString("ru-RU")}
-            </div>
+          result.total > 0 ? (
+            <div className="space-y-4">
+              <div className="text-sm text-[#CBD5E1]">
+                Найдено: {result.total.toLocaleString("ru-RU")}
+              </div>
 
-            {result.hits.length > 0 ? (
-              <div className="divide-y divide-white/10 overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_24px_80px_rgba(0,0,0,0.24)]">
-                {result.hits.map((product) => (
-                  <Link
-                    key={product.id}
-                    href={product.url}
-                    className="tap-target grid gap-2 p-4 hover:bg-[#2563EB]/10 sm:grid-cols-[1fr_auto]"
-                  >
-                    <div>
-                      <h2 className="text-base font-semibold leading-6">{product.name}</h2>
-                      <p className="mt-1 text-sm text-[#CBD5E1]">
-                        {formatPublicTargetLabel(product)}
-                      </p>
-                      <PurchaseListProductBadge productIdentityId={product.productIdentityId} />
-                    </div>
-                    <div className="text-lg font-semibold text-white">
-                      {product.price.toLocaleString("ru-RU")} ₽
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-card border border-white/10 bg-[#111827] p-5 text-[#CBD5E1] shadow-[0_18px_60px_rgba(0,0,0,0.2)]">
-                Ничего не найдено.
-              </div>
-            )}
-          </div>
+              {result.hits.length > 0 ? (
+                <div className="divide-y divide-white/10 overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_24px_80px_rgba(0,0,0,0.24)]">
+                  {result.hits.map((product) => (
+                    <Link
+                      key={product.id}
+                      href={product.url}
+                      className="tap-target grid gap-2 p-4 hover:bg-[#2563EB]/10 sm:grid-cols-[1fr_auto]"
+                    >
+                      <div>
+                        <h2 className="text-base font-semibold leading-6">{product.name}</h2>
+                        <p className="mt-1 text-sm text-[#CBD5E1]">
+                          {formatPublicTargetLabel(product)}
+                        </p>
+                        <PurchaseListProductBadge productIdentityId={product.productIdentityId} />
+                      </div>
+                      <div className="text-lg font-semibold text-white">
+                        {product.price.toLocaleString("ru-RU")} ₽
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-card border border-white/10 bg-[#111827] p-5 text-[#CBD5E1] shadow-[0_18px_60px_rgba(0,0,0,0.2)]">
+                  Ничего не найдено.
+                </div>
+              )}
+            </div>
+          ) : (
+            <section className="isolate overflow-hidden rounded-[24px] border border-white/[0.12] bg-[radial-gradient(ellipse_at_20%_0%,rgba(70,110,255,0.07),transparent_58%),linear-gradient(145deg,rgba(17,30,50,0.8),rgba(7,15,28,0.9))] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.09),inset_0_-1px_0_rgba(3,8,18,0.28)] backdrop-blur-[20px] backdrop-saturate-150 sm:p-7">
+              <h2 className="text-xl font-semibold leading-7 text-white">По вашему запросу ничего не найдено.</h2>
+              <p className="mt-3 max-w-2xl leading-6 text-[#CBD5E1]">
+                Нужную деталь можно привезти под заказ — уточните у продавца в магазине или позвоните нам.
+              </p>
+              <a
+                href="tel:+74962063304"
+                className="tap-target mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[15px] border border-white/[0.14] bg-[linear-gradient(135deg,#2563EB,#1D4ED8)] px-5 py-3 text-center font-semibold text-white shadow-[0_12px_28px_rgba(29,78,216,0.3),inset_0_1px_0_rgba(255,255,255,0.25)] transition-[transform,border-color,box-shadow,filter] duration-150 hover:-translate-y-0.5 hover:border-white/[0.28] hover:brightness-110 hover:shadow-[0_16px_32px_rgba(29,78,216,0.36),inset_0_1px_0_rgba(255,255,255,0.32)] active:translate-y-px active:brightness-95 active:shadow-[0_8px_20px_rgba(29,78,216,0.24),inset_0_1px_0_rgba(255,255,255,0.16)] sm:w-auto"
+              >
+                <span>Позвонить</span>
+                <span>+7 (496) 206-33-04</span>
+              </a>
+            </section>
+          )
         ) : null}
       </section>
       <PublicFooter />

@@ -87,7 +87,7 @@ export default async function SearchPage({
               )}
             </div>
           ) : (
-            <section className="isolate overflow-hidden rounded-[24px] border border-white/[0.12] bg-[linear-gradient(145deg,rgba(17,30,50,0.8),rgba(7,15,28,0.9))] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.09),inset_0_-1px_0_rgba(3,8,18,0.28)] backdrop-blur-[20px] backdrop-saturate-150 sm:p-7">
+            <section className="isolate overflow-hidden rounded-[24px] border border-white/[0.12] bg-[radial-gradient(ellipse_at_20%_0%,rgba(70,110,255,0.07),transparent_58%),linear-gradient(145deg,rgba(17,30,50,0.8),rgba(7,15,28,0.9))] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.09),inset_0_-1px_0_rgba(3,8,18,0.28)] backdrop-blur-[20px] backdrop-saturate-150 sm:p-7">
               <h2 className="text-xl font-semibold leading-7 text-white">По вашему запросу ничего не найдено.</h2>
               <p className="mt-3 max-w-2xl leading-6 text-[#CBD5E1]">
                 Нужную деталь можно привезти под заказ — уточните у продавца в магазине или позвоните нам.

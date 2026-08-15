@@ -24,18 +24,26 @@ export function rankSearchHits<T extends SearchProductDocument>(
   documents: T[],
   query: string,
   synonyms: SearchSynonymRecord[],
-  sourceScores = new Map<string, number>()
+  sourceScores = new Map<string, number>(),
+  useStableTieBreaker = false
 ): SearchProductHit[] {
+  const profile = buildSearchQueryProfile(query, synonyms);
+
   return documents
     .map((document) => {
       const sourceScore = sourceScores.get(document.id) ?? 0;
       return {
         ...document,
         sourceScore,
-        relevanceScore: scoreSearchDocument(document, query, synonyms, sourceScore)
+        relevanceScore: scoreSearchDocumentWithProfile(document, profile, sourceScore)
       };
     })
-    .sort((a, b) => b.relevanceScore - a.relevanceScore || a.name.localeCompare(b.name, "ru"));
+    .sort(
+      (a, b) =>
+        b.relevanceScore - a.relevanceScore ||
+        a.name.localeCompare(b.name, "ru") ||
+        (useStableTieBreaker ? a.id.localeCompare(b.id) : 0)
+    );
 }
 
 export function scoreSearchDocument(
@@ -44,23 +52,33 @@ export function scoreSearchDocument(
   synonyms: SearchSynonymRecord[],
   sourceScore = 0
 ) {
-  const profile = buildSearchQueryProfile(query, synonyms);
+  return scoreSearchDocumentWithProfile(
+    document,
+    buildSearchQueryProfile(query, synonyms),
+    sourceScore
+  );
+}
+
+function scoreSearchDocumentWithProfile(
+  document: SearchProductDocument,
+  profile: ReturnType<typeof buildSearchQueryProfile>,
+  sourceScore: number
+) {
   const {
     normalizedQuery,
     compactQuery,
-    queryTerms,
     queryTokens,
     queryVariants,
-    technicalTokens
+    technicalTokens,
+    intentBoosts,
+    nameStartTerms
   } = profile;
   const documentText = normalizeSearchText(
     `${document.shopCode} ${document.shopCodeCompact} ${document.name} ${document.categoryName} ${document.subcategoryName} ${document.searchText} ${document.synonymText} ${document.translitText} ${document.brandText}`
   );
-  const semanticDocumentText = buildSemanticDocumentText(document);
   const documentTokens = new Set(tokenizeSearchText(documentText));
-  const semanticDocumentTokens = new Set(tokenizeSearchText(semanticDocumentText));
-  const documentTechnicalTokens = extractTechnicalTokens(semanticDocumentText);
   const normalizedName = normalizeSearchText(document.name);
+  let documentTechnicalTokens: string[] = [];
   let score = sourceScore * 100;
 
   if (compactQuery && document.shopCodeCompact === compactQuery) {
@@ -80,6 +98,10 @@ export function scoreSearchDocument(
   }
 
   if (technicalTokens.length > 0) {
+    const semanticDocumentText = buildSemanticDocumentText(document);
+    const semanticDocumentTokens = new Set(tokenizeSearchText(semanticDocumentText));
+    documentTechnicalTokens = extractTechnicalTokens(semanticDocumentText);
+
     if (hasAllTechnicalTokens(documentTechnicalTokens, technicalTokens)) {
       score += 700 + technicalTokens.length * 240;
     } else if (!(compactQuery && document.shopCodeCompact === compactQuery)) {
@@ -121,8 +143,8 @@ export function scoreSearchDocument(
     }
   }
 
-  score += scoreSearchIntents(document, queryTerms);
-  score += scoreNameStart(document, queryTerms);
+  score += scoreSearchIntents(document, intentBoosts);
+  score += scoreNameStart(normalizedName, nameStartTerms);
   score += scoreCompleteness(document);
 
   return score;
@@ -189,6 +211,14 @@ function buildSearchQueryProfile(query: string, synonyms: SearchSynonymRecord[])
   const queryVariants = buildQueryVariants(query, synonyms);
   const technicalTokens = extractTechnicalTokens(queryTerms.join(" "));
   const hasLampSubject = queryTokens.some((token) => lampSubjectTokens.has(token));
+  const joinedTerms = normalizeSearchText(queryTerms.join(" "));
+  const intentBoosts = searchIntentBoosts.filter((boost) =>
+    boost.terms.some((term) => joinedTerms.includes(normalizeSearchText(term)))
+  );
+  const nameStartTerms = queryTerms
+    .map(normalizeSearchText)
+    .filter((term) => term.length >= 3)
+    .sort((a, b) => b.length - a.length);
 
   return {
     normalizedQuery,
@@ -198,7 +228,9 @@ function buildSearchQueryProfile(query: string, synonyms: SearchSynonymRecord[])
     queryVariants,
     variants: queryVariants,
     technicalTokens,
-    hasLampSubject
+    hasLampSubject,
+    intentBoosts,
+    nameStartTerms
   };
 }
 
@@ -235,16 +267,13 @@ function hasLampSubject(document: SearchProductDocument, documentTokens: Set<str
   ) || [...lampSubjectTokens].some((token) => documentTokens.has(token));
 }
 
-function scoreSearchIntents(document: SearchProductDocument, queryTerms: string[]) {
+function scoreSearchIntents(
+  document: SearchProductDocument,
+  intentBoosts: typeof searchIntentBoosts
+) {
   let score = 0;
-  const joinedTerms = normalizeSearchText(queryTerms.join(" "));
 
-  for (const boost of searchIntentBoosts) {
-    const matchedIntent = boost.terms.some((term) => joinedTerms.includes(normalizeSearchText(term)));
-    if (!matchedIntent) {
-      continue;
-    }
-
+  for (const boost of intentBoosts) {
     if (boost.categorySlug && document.categorySlug !== boost.categorySlug) {
       continue;
     }
@@ -259,13 +288,7 @@ function scoreSearchIntents(document: SearchProductDocument, queryTerms: string[
   return score;
 }
 
-function scoreNameStart(document: SearchProductDocument, queryTerms: string[]) {
-  const normalizedName = normalizeSearchText(document.name);
-  const terms = queryTerms
-    .map(normalizeSearchText)
-    .filter((term) => term.length >= 3)
-    .sort((a, b) => b.length - a.length);
-
+function scoreNameStart(normalizedName: string, terms: string[]) {
   let score = 0;
   for (const term of terms) {
     if (normalizedName.startsWith(term)) {

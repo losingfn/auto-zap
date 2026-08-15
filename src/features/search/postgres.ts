@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   getPublicCategorySlugs,
   getPublicTaxonomyTargets,
@@ -8,6 +8,8 @@ import { db } from "@/db/client";
 import { catalogVersions, categories, products, subcategories } from "@/db/schema";
 import { compactShopCode, normalizeSearchText } from "./normalization";
 import { buildSearchDocument, getActiveCatalogVersionId } from "./documents";
+import { SEARCH_MAX_TOTAL_HITS } from "./meilisearch";
+import { getAccessibleTotal } from "./pagination";
 import { rankSearchHits } from "./ranking";
 import type { SearchProductHit, SearchSynonymRecord } from "./types";
 
@@ -29,7 +31,11 @@ export async function searchProductsWithPostgres({
   synonyms,
   categorySlug,
   subcategorySlug
-}: PostgresSearchOptions): Promise<{ total: number; hits: SearchProductHit[] }> {
+}: PostgresSearchOptions): Promise<{
+  total: number;
+  accessibleTotal: number;
+  hits: SearchProductHit[];
+}> {
   const normalizedQuery = normalizeSearchText(query);
   const compactCode = compactShopCode(query);
   const likeQuery = `%${query.trim()}%`;
@@ -38,7 +44,7 @@ export async function searchProductsWithPostgres({
   const activeVersionId = admin ? null : await getActiveCatalogVersionId();
 
   if (!normalizedQuery && !compactCode) {
-    return { total: 0, hits: [] };
+    return { total: 0, accessibleTotal: 0, hits: [] };
   }
 
   const scoreExpression = sql<number>`greatest(
@@ -67,7 +73,7 @@ export async function searchProductsWithPostgres({
 
   if (categorySlug) {
     if (!admin && !isPublicCategorySlug(categorySlug)) {
-      return { total: 0, hits: [] };
+      return { total: 0, accessibleTotal: 0, hits: [] };
     }
 
     whereConditions.push(eq(categories.slug, categorySlug));
@@ -94,6 +100,7 @@ export async function searchProductsWithPostgres({
     .innerJoin(catalogVersions, eq(catalogVersions.id, products.catalogVersionId))
     .where(and(...whereConditions));
 
+  const candidateLimit = admin ? Math.min(Math.max(limit * 5, 50), 250) : SEARCH_MAX_TOTAL_HITS;
   const rows = await db
     .select({
       id: products.id,
@@ -117,10 +124,11 @@ export async function searchProductsWithPostgres({
     .where(and(...whereConditions))
     .orderBy(
       desc(sql<number>`case when regexp_replace(upper(${products.shopCode}), '[^0-9А-ЯA-Z]', '', 'g') = ${compactCode} then 1 else 0 end`),
-      desc(scoreExpression)
+      desc(scoreExpression),
+      ...(admin ? [] : [asc(products.id)])
     )
-    .limit(Math.min(Math.max(limit * 5, 50), 250))
-    .offset(offset);
+    .limit(candidateLimit)
+    .offset(admin ? offset : 0);
 
   const sourceScores = new Map(rows.map((row) => [row.id, Number(row.sourceScore ?? 0)]));
   const documents = rows.map((row) =>
@@ -143,9 +151,14 @@ export async function searchProductsWithPostgres({
     )
   );
 
+  const total = Number(totalRow?.count ?? 0);
+  const rankedHits = rankSearchHits(documents, query, synonyms, sourceScores, !admin);
+  const accessibleTotal = admin ? total : getAccessibleTotal(total, SEARCH_MAX_TOTAL_HITS);
+
   return {
-    total: Number(totalRow?.count ?? 0),
-    hits: rankSearchHits(documents, query, synonyms, sourceScores).slice(0, limit)
+    total,
+    accessibleTotal,
+    hits: admin ? rankedHits.slice(0, limit) : rankedHits.slice(offset, offset + limit)
   };
 }
 

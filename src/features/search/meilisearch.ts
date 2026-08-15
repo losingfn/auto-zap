@@ -5,6 +5,7 @@ import { buildMeiliSynonyms } from "./synonyms";
 import type { SearchProductDocument, SearchSynonymRecord } from "./types";
 
 export const SEARCH_INDEX_UID = "autozap_products_active";
+export const SEARCH_MAX_TOTAL_HITS = 1000;
 
 let cachedClient: MeiliSearch | null = null;
 
@@ -296,7 +297,7 @@ function buildSearchIndexSettings(synonyms: SearchSynonymRecord[]) {
     },
     synonyms: buildMeiliSynonyms(synonyms),
     pagination: {
-      maxTotalHits: 1000
+      maxTotalHits: SEARCH_MAX_TOTAL_HITS
     }
   };
 }

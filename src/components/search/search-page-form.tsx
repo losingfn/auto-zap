@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { XIcon } from "@/components/icons/lucide";
+import { getSearchPageHref } from "@/features/search/pagination";
 
 export function SearchPageForm({ initialQuery }: { initialQuery: string }) {
   const router = useRouter();
@@ -23,7 +24,7 @@ export function SearchPageForm({ initialQuery }: { initialQuery: string }) {
       return;
     }
 
-    router.push(`/search?q=${encodeURIComponent(normalizedQuery)}`);
+    router.push(getSearchPageHref(normalizedQuery, 1));
   }
 
   function clearSearch() {

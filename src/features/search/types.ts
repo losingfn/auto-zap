@@ -44,6 +44,7 @@ export interface SearchProductsResult {
   expandedQuery: string;
   source: SearchSource;
   total: number;
+  accessibleTotal: number;
   processingTimeMs: number;
   hits: SearchProductHit[];
   fallbackReason?: string;

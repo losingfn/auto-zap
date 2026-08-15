@@ -24,7 +24,8 @@ export function rankSearchHits<T extends SearchProductDocument>(
   documents: T[],
   query: string,
   synonyms: SearchSynonymRecord[],
-  sourceScores = new Map<string, number>()
+  sourceScores = new Map<string, number>(),
+  useStableTieBreaker = false
 ): SearchProductHit[] {
   return documents
     .map((document) => {
@@ -35,7 +36,12 @@ export function rankSearchHits<T extends SearchProductDocument>(
         relevanceScore: scoreSearchDocument(document, query, synonyms, sourceScore)
       };
     })
-    .sort((a, b) => b.relevanceScore - a.relevanceScore || a.name.localeCompare(b.name, "ru"));
+    .sort(
+      (a, b) =>
+        b.relevanceScore - a.relevanceScore ||
+        a.name.localeCompare(b.name, "ru") ||
+        (useStableTieBreaker ? a.id.localeCompare(b.id) : 0)
+    );
 }
 
 export function scoreSearchDocument(

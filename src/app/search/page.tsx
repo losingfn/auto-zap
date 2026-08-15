@@ -1,9 +1,19 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { SearchPagination } from "@/components/search/search-pagination";
 import { SearchPageForm } from "@/components/search/search-page-form";
 import { PurchaseListProductBadge } from "@/components/purchase-list/purchase-list-product-badge";
 import { PublicFooter } from "@/components/site/public-footer";
 import { formatPublicTargetLabel } from "@/config/public-taxonomy";
+import {
+  getAccessibleSearchPage,
+  getSearchOffset,
+  getSearchPageHref,
+  getSearchTotalPages,
+  parseSearchPage,
+  SEARCH_PAGE_SIZE
+} from "@/features/search/pagination";
 import { searchProducts } from "@/features/search/service";
 
 export const dynamic = "force-dynamic";
@@ -18,15 +28,18 @@ export const metadata: Metadata = {
 export default async function SearchPage({
   searchParams
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string | string[]; page?: string | string[] }>;
 }) {
-  const { q = "" } = await searchParams;
+  const search = await searchParams;
+  const q = typeof search.q === "string" ? search.q : "";
+  const page = parseSearchPage(search.page);
   let searchError = false;
   const result = q.trim()
     ? await withTimeout(
         searchProducts({
           query: q,
-          limit: 30
+          limit: SEARCH_PAGE_SIZE,
+          offset: getSearchOffset(page)
         }),
         6000
       ).catch((error) => {
@@ -35,6 +48,12 @@ export default async function SearchPage({
         return null;
       })
     : null;
+
+  const totalPages = result ? getSearchTotalPages(result.accessibleTotal) : 0;
+  const accessiblePage = getAccessibleSearchPage(page, totalPages);
+  if (result && accessiblePage !== page) {
+    redirect(getSearchPageHref(q, accessiblePage));
+  }
 
   return (
     <main className="premium-page min-h-screen bg-[#111827] text-white">
@@ -60,26 +79,29 @@ export default async function SearchPage({
               </div>
 
               {result.hits.length > 0 ? (
-                <div className="divide-y divide-white/10 overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_24px_80px_rgba(0,0,0,0.24)]">
-                  {result.hits.map((product) => (
-                    <Link
-                      key={product.id}
-                      href={product.url}
-                      className="tap-target grid gap-2 p-4 hover:bg-[#2563EB]/10 sm:grid-cols-[1fr_auto]"
-                    >
-                      <div>
-                        <h2 className="text-base font-semibold leading-6">{product.name}</h2>
-                        <p className="mt-1 text-sm text-[#CBD5E1]">
-                          {formatPublicTargetLabel(product)}
-                        </p>
-                        <PurchaseListProductBadge productIdentityId={product.productIdentityId} />
-                      </div>
-                      <div className="text-lg font-semibold text-white">
-                        {product.price.toLocaleString("ru-RU")} ₽
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                <>
+                  <div className="divide-y divide-white/10 overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_24px_80px_rgba(0,0,0,0.24)]">
+                    {result.hits.map((product) => (
+                      <Link
+                        key={product.id}
+                        href={product.url}
+                        className="tap-target grid gap-2 p-4 hover:bg-[#2563EB]/10 sm:grid-cols-[1fr_auto]"
+                      >
+                        <div>
+                          <h2 className="text-base font-semibold leading-6">{product.name}</h2>
+                          <p className="mt-1 text-sm text-[#CBD5E1]">
+                            {formatPublicTargetLabel(product)}
+                          </p>
+                          <PurchaseListProductBadge productIdentityId={product.productIdentityId} />
+                        </div>
+                        <div className="text-lg font-semibold text-white">
+                          {product.price.toLocaleString("ru-RU")} ₽
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                  <SearchPagination query={q} page={page} totalPages={totalPages} />
+                </>
               ) : (
                 <div className="rounded-card border border-white/10 bg-[#111827] p-5 text-[#CBD5E1] shadow-[0_18px_60px_rgba(0,0,0,0.2)]">
                   Ничего не найдено.

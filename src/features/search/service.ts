@@ -4,8 +4,9 @@ import {
   isPublicNavigationTaxonomyTarget
 } from "@/config/public-taxonomy";
 import { hydrateMissingSearchProductIdentities } from "./documents";
-import { getSearchIndex } from "./meilisearch";
+import { getSearchIndex, SEARCH_MAX_TOTAL_HITS } from "./meilisearch";
 import { buildExpandedQuery, normalizeSearchText } from "./normalization";
+import { getAccessibleTotal } from "./pagination";
 import { searchProductsWithPostgres } from "./postgres";
 import { rankSearchHits } from "./ranking";
 import { getSearchSynonyms } from "./synonyms";
@@ -39,6 +40,7 @@ export async function searchProducts(input: SearchProductsInput): Promise<Search
       expandedQuery,
       source: "meilisearch",
       total: 0,
+      accessibleTotal: 0,
       processingTimeMs: Date.now() - startedAt,
       hits: []
     };
@@ -51,6 +53,7 @@ export async function searchProducts(input: SearchProductsInput): Promise<Search
       expandedQuery,
       source: input.admin ? "postgres_admin" : "meilisearch",
       total: 0,
+      accessibleTotal: 0,
       processingTimeMs: Date.now() - startedAt,
       hits: []
     };
@@ -71,6 +74,7 @@ export async function searchProducts(input: SearchProductsInput): Promise<Search
       expandedQuery,
       source: "postgres_admin",
       total: result.total,
+      accessibleTotal: result.accessibleTotal,
       processingTimeMs: Date.now() - startedAt,
       hits: result.hits
     };
@@ -83,7 +87,8 @@ export async function searchProducts(input: SearchProductsInput): Promise<Search
       normalizedQuery,
       expandedQuery,
       source: "meilisearch",
-      total: result.estimatedTotalHits,
+      total: result.total,
+      accessibleTotal: result.accessibleTotal,
       processingTimeMs: Date.now() - startedAt,
       hits: result.hits
     };
@@ -95,6 +100,7 @@ export async function searchProducts(input: SearchProductsInput): Promise<Search
       expandedQuery,
       source: "postgres_fallback",
       total: result.total,
+      accessibleTotal: result.accessibleTotal,
       processingTimeMs: Date.now() - startedAt,
       hits: result.hits,
       fallbackReason: error instanceof Error ? error.message : "Meilisearch unavailable"
@@ -126,11 +132,10 @@ async function searchProductsWithMeili(
   offset: number,
   synonyms: Awaited<ReturnType<typeof getSearchSynonyms>>,
   filters: { categorySlug?: string; subcategorySlug?: string }
-): Promise<{ estimatedTotalHits: number; hits: SearchProductHit[] }> {
+): Promise<{ total: number; accessibleTotal: number; hits: SearchProductHit[] }> {
   const index = getSearchIndex();
-  const meiliLimit = Math.min(Math.max((offset + limit) * 5, 50), 1000);
   const response = await index.search<SearchProductDocument>(query, {
-    limit: meiliLimit,
+    limit: SEARCH_MAX_TOTAL_HITS,
     attributesToRetrieve: [
       "id",
       "catalogVersionId",
@@ -165,9 +170,14 @@ async function searchProductsWithMeili(
 
   const hydratedHits = await hydrateMissingSearchProductIdentities(hits);
 
+  const total = Number(response.estimatedTotalHits ?? hits.length);
+  const accessibleTotal = getAccessibleTotal(total, SEARCH_MAX_TOTAL_HITS);
+  const rankedHits = rankSearchHits(hydratedHits, query, synonyms, sourceScores, true);
+
   return {
-    estimatedTotalHits: Number(response.estimatedTotalHits ?? hits.length),
-    hits: rankSearchHits(hydratedHits, query, synonyms, sourceScores).slice(offset, offset + limit)
+    total,
+    accessibleTotal,
+    hits: rankedHits.slice(offset, offset + limit)
   };
 }
 

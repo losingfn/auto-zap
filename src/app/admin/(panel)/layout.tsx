@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import { publicBrandLogoSrc } from "@/config/public-brand";
 import { requireAdminSession } from "@/features/admin/auth";
 import { AdminNav } from "./admin-nav";
 
@@ -27,11 +28,11 @@ export default async function AdminPanelLayout({
           <div className="flex w-full items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <Image
-              src="/assets/brand/logo.svg"
+              src={publicBrandLogoSrc}
               alt="Автозапчасти на Салтыкова-Щедрина"
               width={44}
               height={44}
-              className="h-11 w-11"
+              className="h-11 w-11 object-contain"
             />
             <div className="min-w-0">
               <p className="truncate text-sm text-[#9DBDFB]">Админ-панель</p>

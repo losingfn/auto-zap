@@ -1,5 +1,6 @@
 import Image from "next/image";
 import type { Metadata } from "next";
+import { publicBrandLogoSrc } from "@/config/public-brand";
 import { loginAction } from "./actions";
 
 export const metadata: Metadata = {
@@ -28,12 +29,12 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
         <div className="w-full max-w-md">
           <div className="mb-10 flex items-center gap-4">
             <Image
-              src="/assets/brand/logo.svg"
+              src={publicBrandLogoSrc}
               alt="Автозапчасти на Салтыкова-Щедрина"
               width={56}
               height={56}
               priority
-              className="h-14 w-14"
+              className="h-14 w-14 object-contain"
             />
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#9DBDFB]">

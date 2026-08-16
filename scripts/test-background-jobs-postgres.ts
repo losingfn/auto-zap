@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, readdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import postgres from "postgres";
 import { assertLocalTestDatabase } from "../src/lib/server/local-db-safety";
@@ -479,6 +479,65 @@ async function main() {
     } finally {
       restoreEnvironment("BACKGROUND_JOBS_ENABLED", previousBackground);
       restoreEnvironment("IMPORT_VIA_WORKER_ENABLED", previousImport);
+    }
+  });
+
+  await run("concurrent colliding uploads retain the accepted file and clean only the rejected file", async () => {
+    await clearImportFixtures();
+    const uploadDir = path.join(process.cwd(), "data", "imports", "uploads");
+    await mkdir(uploadDir, { recursive: true });
+    const before = new Set(await readdir(uploadDir));
+    const contents = Buffer.from("same timestamp, name, and content");
+    const fileHash = createHash("sha256").update(contents).digest("hex");
+    const firstFile = new File([contents], "same-catalog.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+    const secondFile = new File([contents], "same-catalog.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+    const originalDateNow = Date.now;
+    const previousBackground = process.env.BACKGROUND_JOBS_ENABLED;
+    const previousImport = process.env.IMPORT_VIA_WORKER_ENABLED;
+    let acceptedFilePath: string | null = null;
+
+    Date.now = () => 1_725_000_000_000;
+    process.env.BACKGROUND_JOBS_ENABLED = "true";
+    process.env.IMPORT_VIA_WORKER_ENABLED = "true";
+    try {
+      const attempts = await Promise.allSettled([
+        adminImports.enqueueAdminImportFromUpload({ file: firstFile, adminUserId: TEST_ADMIN_ID }),
+        adminImports.enqueueAdminImportFromUpload({ file: secondFile, adminUserId: TEST_ADMIN_ID })
+      ]);
+      const accepted = attempts.filter(
+        (attempt): attempt is PromiseFulfilledResult<{ importBatchId: string; backgroundJobId: string }> =>
+          attempt.status === "fulfilled"
+      );
+      const rejected = attempts.filter((attempt): attempt is PromiseRejectedResult => attempt.status === "rejected");
+
+      assert.equal(accepted.length, 1);
+      assert.equal(rejected.length, 1);
+      assert.ok(rejected[0]?.reason instanceof adminImports.AdminImportError);
+      assert.equal(rejected[0]?.reason.code, "import_in_progress");
+
+      const [acceptedBatch] = await sql<{ id: string; storage_path: string; file_hash: string }[]>`
+        SELECT id, storage_path, file_hash
+        FROM import_batches
+        WHERE id = ${accepted[0]!.value.importBatchId}
+      `;
+      assert.ok(acceptedBatch);
+      assert.equal(acceptedBatch.file_hash, fileHash);
+      acceptedFilePath = path.resolve(process.cwd(), acceptedBatch.storage_path);
+      assert.equal(path.dirname(acceptedFilePath), uploadDir);
+      assert.deepEqual(await readFile(acceptedFilePath), contents);
+      assert.deepEqual(
+        (await readdir(uploadDir)).filter((fileName) => !before.has(fileName)).sort(),
+        [path.basename(acceptedFilePath)]
+      );
+    } finally {
+      Date.now = originalDateNow;
+      restoreEnvironment("BACKGROUND_JOBS_ENABLED", previousBackground);
+      restoreEnvironment("IMPORT_VIA_WORKER_ENABLED", previousImport);
+      if (acceptedFilePath) await unlink(acceptedFilePath);
     }
   });
 

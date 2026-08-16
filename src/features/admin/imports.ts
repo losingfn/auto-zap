@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
@@ -710,13 +710,10 @@ async function saveUploadedImportFile(file: File | null) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const fileHash = createHash("sha256").update(buffer).digest("hex");
-  const extension = path.extname(file.name).toLowerCase();
-  const safeBaseName = path
-    .basename(file.name, extension)
-    .replace(/[^a-zA-Z0-9а-яА-ЯёЁ._-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-  const storedFileName = `${Date.now()}-${fileHash.slice(0, 12)}-${safeBaseName || "catalog"}${extension}`;
+  const storedFileName = buildImportUploadStorageFileName({
+    originalName: file.name,
+    fileHash
+  });
   const filePath = path.join(IMPORT_UPLOAD_DIR, storedFileName);
 
   await mkdir(IMPORT_UPLOAD_DIR, { recursive: true });
@@ -729,6 +726,27 @@ async function saveUploadedImportFile(file: File | null) {
     fileHash,
     size: file.size
   };
+}
+
+export function buildImportUploadStorageFileName({
+  originalName,
+  fileHash,
+  timestamp = Date.now(),
+  storageId = randomUUID()
+}: {
+  originalName: string;
+  fileHash: string;
+  timestamp?: number;
+  storageId?: string;
+}) {
+  const extension = path.extname(originalName).toLowerCase();
+  const safeBaseName = path
+    .basename(originalName, extension)
+    .replace(/[^a-zA-Z0-9а-яА-ЯёЁ._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+
+  return `${timestamp}-${storageId}-${fileHash.slice(0, 12)}-${safeBaseName || "catalog"}${extension}`;
 }
 
 async function removeRejectedUploadFileSafely(filePath: string) {
@@ -819,12 +837,19 @@ export async function getImportStartBlocker(fileHash: string): Promise<ImportSta
 }
 
 function isActiveWorkerImportConstraint(error: unknown) {
-  return Boolean(
-    error &&
-      typeof error === "object" &&
-      "constraint_name" in error &&
-      (error as { constraint_name?: unknown }).constraint_name === "import_batches_one_active_worker_analyze"
-  );
+  let candidate = error;
+  for (let depth = 0; depth < 3; depth += 1) {
+    if (!candidate || typeof candidate !== "object") return false;
+    if (
+      "constraint_name" in candidate &&
+      (candidate as { constraint_name?: unknown }).constraint_name === "import_batches_one_active_worker_analyze"
+    ) {
+      return true;
+    }
+    candidate = "cause" in candidate ? (candidate as { cause?: unknown }).cause : null;
+  }
+
+  return false;
 }
 
 export async function getBlockingImportDraft(exceptCatalogVersionId?: string) {

@@ -20,8 +20,10 @@ import {
   canCancelImportForUi,
   canCancelImportStrict,
   canPublishImport,
+  buildImportUploadStorageFileName,
   isBlockingDuplicateFileImport,
   isBlockingImportDraft,
+  isDuplicateFileBlockerForHash,
   isFinalizedImport,
   normalizeStoredImportReport
 } from "../src/features/admin/imports";
@@ -221,6 +223,34 @@ run("same file hash from active unfinished draft still blocks duplicate upload",
     false
   );
   assert.equal(isBlockingDuplicateFileImport(importState({ status: "failed" })), false);
+});
+
+run("matching concurrent uploads receive distinct storage paths while hash protection stays content-based", () => {
+  const shared = {
+    originalName: "same-catalog.xlsx",
+    fileHash: "a".repeat(64),
+    timestamp: 1_725_000_000_000
+  };
+  const first = buildImportUploadStorageFileName({
+    ...shared,
+    storageId: "11111111-1111-4111-8111-111111111111"
+  });
+  const second = buildImportUploadStorageFileName({
+    ...shared,
+    storageId: "22222222-2222-4222-8222-222222222222"
+  });
+
+  assert.notEqual(first, second);
+  assert.match(first, /^1725000000000-11111111-1111-4111-8111-111111111111-aaaaaaaaaaaa-same-catalog\.xlsx$/);
+  assert.match(second, /^1725000000000-22222222-2222-4222-8222-222222222222-aaaaaaaaaaaa-same-catalog\.xlsx$/);
+  assert.equal(
+    isDuplicateFileBlockerForHash(importState({ status: "analyzed", fileHash: shared.fileHash }), shared.fileHash),
+    true
+  );
+  assert.equal(
+    isDuplicateFileBlockerForHash(importState({ status: "analyzed", fileHash: shared.fileHash }), "b".repeat(64)),
+    false
+  );
 });
 
 run("cancelled and rolled back draft state is no longer blocking", () => {

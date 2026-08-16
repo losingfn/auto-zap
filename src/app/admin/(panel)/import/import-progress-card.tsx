@@ -89,7 +89,7 @@ function isTerminal(phase: ImportStatus["phase"]) {
 
 function normalizeInitialPhase(phase: string | null | undefined) {
   if (["queued", "analyzing", "retrying"].includes(phase ?? "")) return "analyzing";
-  if (["publish_queued", "publishing"].includes(phase ?? "")) return "publishing";
+  if (["publish_queued", "publishing", "publish_retrying"].includes(phase ?? "")) return "publishing";
   if (phase === "failed") return "failed";
   return null;
 }

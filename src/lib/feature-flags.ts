@@ -18,6 +18,15 @@ export function isBackgroundJobsInfrastructureEnabled() {
   return getFeatureFlags().backgroundJobsInfrastructure;
 }
 
+/**
+ * Import jobs may only be accepted when both the feature and its worker
+ * infrastructure are enabled. Keeping this check central prevents a pending
+ * import from being created in a configuration with no process to consume it.
+ */
+export function isImportWorkerModeAvailable(flags = getFeatureFlags()) {
+  return flags.backgroundJobsInfrastructure && flags.importViaWorker;
+}
+
 function readBooleanFlag(value: string | undefined) {
   return value === "1" || value === "true";
 }

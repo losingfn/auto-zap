@@ -48,7 +48,8 @@ const errorMessages: Record<string, string> = {
   import_in_progress: "Сейчас уже обрабатывается другой прайс. Дождитесь его завершения.",
   cancel_failed: "Не удалось отменить импорт.",
   not_found: "Импорт не найден.",
-  not_ready: "Этот импорт пока нельзя опубликовать."
+  not_ready: "Этот импорт пока нельзя опубликовать.",
+  worker_unavailable: "Фоновая обработка импорта сейчас недоступна. Попробуйте позже."
 };
 
 type SelectedImportBatch = NonNullable<
@@ -223,7 +224,11 @@ function ImportActions({ batch }: { batch: SelectedImportBatch }) {
   }
   return (
     <div className="flex flex-wrap gap-3">
-      <PublishImportButton disabled={!batch.canPublish} formAction={publish} />
+      <PublishImportButton
+        disabled={!batch.canPublish}
+        formAction={publish}
+        recovery={batch.status === "published" && batch.versionStatus === "active" && batch.phase === "failed"}
+      />
       <ImportCancelButton batchId={batch.id} disabled={!batch.canCancel} />
       <ActionLink href="/admin/catalog">Открыть каталог</ActionLink>
       <ActionLink href="#new-import">Загрузить другой файл</ActionLink>
@@ -249,7 +254,7 @@ function RecentImports({ batches, selectedId }: { batches: Awaited<ReturnType<ty
 function EmptyReport() { return <section className="rounded-card border border-[#243249] bg-[#101827] p-8 text-[#C8D1DF]">Импортов пока нет. Загрузите Excel-файл, чтобы увидеть результат проверки.</section>; }
 function Metric({ label, value, warning }: { label: string; value: number; warning?: boolean }) { return <div className={`rounded-card border p-4 ${warning ? "border-[#854D0E] bg-[#2A2113]" : "border-[#243249] bg-[#0B1220]"}`}><p className="text-sm text-[#8FA1B8]">{label}</p><p className="mt-2 text-2xl font-semibold">{numberFormatter.format(value)}</p></div>; }
 function StatusBadge({ status, phase }: { status: string; phase?: string | null }) {
-  const label = phase === "failed" ? "Ошибка" : phase === "publishing" || phase === "publish_queued" ? "Обрабатывается" : statusLabels[status] ?? status;
+  const label = phase === "failed" ? "Ошибка" : phase === "publishing" || phase === "publish_queued" || phase === "publish_retrying" ? "Обрабатывается" : statusLabels[status] ?? status;
   return <span className="inline-flex rounded-full bg-[#243249] px-3 py-1 text-xs font-semibold text-[#C8D1DF]">{label}</span>;
 }
 function Notice({ children, tone = "info" }: { children: React.ReactNode; tone?: "info" | "danger" | "warning" }) { const style = tone === "danger" ? "border-[#7F1D1D] bg-[#2A1218] text-[#FECACA]" : tone === "warning" ? "border-[#854D0E] bg-[#2A2113] text-[#FDE68A]" : "border-[#14532D] bg-[#10231A] text-[#BBF7D0]"; return <p className={`mb-5 rounded-card border px-4 py-3 text-sm ${style}`}>{children}</p>; }

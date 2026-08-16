@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db/client";
-import { backgroundJobs, importBatches } from "@/db/schema";
+import { backgroundJobs, catalogVersions, importBatches } from "@/db/schema";
 import { getCurrentAdminSession } from "@/features/admin/auth";
 import { canPublishImport } from "@/features/import/import-state";
 
@@ -17,6 +17,7 @@ export async function GET(_request: Request, context: RouteContext) {
       id: importBatches.id,
       status: importBatches.status,
       catalogVersionId: importBatches.catalogVersionId,
+      versionStatus: catalogVersions.status,
       report: importBatches.report,
       publishJobId: importBatches.publishJobId,
       phase: importBatches.phase,
@@ -29,6 +30,7 @@ export async function GET(_request: Request, context: RouteContext) {
     })
     .from(importBatches)
     .leftJoin(backgroundJobs, eq(backgroundJobs.id, importBatches.analyzeJobId))
+    .leftJoin(catalogVersions, eq(catalogVersions.id, importBatches.catalogVersionId))
     .where(eq(importBatches.id, batchId))
     .limit(1);
 
@@ -37,13 +39,21 @@ export async function GET(_request: Request, context: RouteContext) {
   const [publishJob] = await db
     .select({ status: backgroundJobs.status, attempt: backgroundJobs.attemptCount })
     .from(backgroundJobs)
-    .where(eq(backgroundJobs.id, (await getPublishJobId(batchId)) ?? "00000000-0000-0000-0000-000000000000"))
+    .where(eq(backgroundJobs.id, batch.publishJobId ?? "00000000-0000-0000-0000-000000000000"))
     .limit(1);
-  const job = isPublishingPhase(batch.phase) ? publishJob : { status: batch.analyzeJobStatus, attempt: batch.analyzeJobAttempt };
+  const job = batch.publishJobId
+    ? publishJob
+    : { status: batch.analyzeJobStatus, attempt: batch.analyzeJobAttempt };
   const report = isRecord(batch.report) ? batch.report : null;
+  const canRetryPublishedSearch =
+    batch.status === "published" &&
+    batch.versionStatus === "active" &&
+    Boolean(batch.publishJobId) &&
+    batch.phase === "failed" &&
+    job?.status === "failed";
   const canPublish =
-    canPublishImport(batch.status, batch.catalogVersionId ? "draft" : null, report) &&
-    (!batch.publishJobId || batch.phase === "failed");
+    (canPublishImport(batch.status, batch.versionStatus, report) || canRetryPublishedSearch) &&
+    (!batch.publishJobId || (batch.phase === "failed" && job?.status === "failed"));
   const terminal = batch.status === "published" || batch.status === "cancelled" || batch.status === "failed" || job?.status === "failed";
 
   return NextResponse.json({
@@ -61,20 +71,15 @@ export async function GET(_request: Request, context: RouteContext) {
   });
 }
 
-async function getPublishJobId(batchId: string) {
-  const [row] = await db.select({ id: importBatches.publishJobId }).from(importBatches).where(eq(importBatches.id, batchId)).limit(1);
-  return row?.id ?? null;
-}
-
 function isPublishingPhase(phase: string | null) {
-  return phase === "publish_queued" || phase === "publishing" || phase === "published";
+  return phase === "publish_queued" || phase === "publishing" || phase === "publish_retrying" || phase === "published";
 }
 
 function toUserPhase(status: string, phase: string | null, jobStatus: string | null | undefined) {
-  if (status === "published" || phase === "published") return "published";
   if (status === "cancelled") return "cancelled";
   if (status === "failed" || jobStatus === "failed" || phase === "failed") return "failed";
-  if (jobStatus === "retry_wait" || phase === "retrying") return "retrying";
+  if (jobStatus === "retry_wait" || phase === "retrying" || phase === "publish_retrying") return "retrying";
+  if (status === "published" || phase === "published") return "published";
   if (isPublishingPhase(phase)) return "publishing";
   if (status === "analyzed" || phase === "analyzed") return "ready";
   return "analyzing";

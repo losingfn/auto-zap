@@ -1,11 +1,10 @@
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   adminUsers,
-  auditLogs,
   backgroundJobs,
   catalogVersions,
   importBatches,
@@ -28,9 +27,11 @@ import {
   type ImportStateBatch
 } from "@/features/import/import-state";
 import { publishCatalogVersion } from "@/features/import/publish-service";
+import { writeImportAuditSafely } from "@/features/import/audit";
 import { ImportSafetyError } from "@/features/import/safety";
 import type { ImportPerfLogger } from "@/lib/server/import-perf";
 import type { ImportPreviewReport, ImportSafetyCheckStatus } from "@/features/import/types";
+import { isImportWorkerModeAvailable } from "@/lib/feature-flags";
 
 export {
   canCancelImportForUi,
@@ -66,7 +67,8 @@ export type AdminImportErrorCode =
   | "cancel_failed"
   | "not_found"
   | "not_ready"
-  | "already_finalized";
+  | "already_finalized"
+  | "worker_unavailable";
 
 export class AdminImportError extends Error {
   constructor(
@@ -152,9 +154,9 @@ export async function createAdminDraftImportFromUpload({
   const storedFile = perf
     ? await perf.measure("save_uploaded_file", () => saveUploadedImportFile(file))
     : await saveUploadedImportFile(file);
-  await assertImportCanStart(storedFile.fileHash);
 
   try {
+    await assertImportCanStart(storedFile.fileHash);
     const result = await createDraftImport({
       filePath: storedFile.filePath,
       sourceFileName: storedFile.originalName,
@@ -164,7 +166,7 @@ export async function createAdminDraftImportFromUpload({
       perf
     });
 
-    await db.insert(auditLogs).values({
+    await writeImportAuditSafely({
       adminUserId,
       action: "import.analyze",
       entityType: "import_batch",
@@ -179,6 +181,10 @@ export async function createAdminDraftImportFromUpload({
 
     return result;
   } catch (error) {
+    await removeRejectedUploadFileSafely(storedFile.filePath);
+    if (error instanceof AdminImportError) {
+      throw error;
+    }
     console.error("[admin/import] analysis_failed", {
       sourceFileName: storedFile.originalName,
       fileSizeBytes: storedFile.size,
@@ -186,7 +192,7 @@ export async function createAdminDraftImportFromUpload({
       stack: error instanceof Error ? error.stack : undefined
     });
 
-    await db.insert(auditLogs).values({
+    await writeImportAuditSafely({
       adminUserId,
       action: "import.analysis_failed",
       entityType: "import_batch",
@@ -215,11 +221,12 @@ export async function enqueueAdminImportFromUpload({
   file: File | null;
   adminUserId: string;
 }) {
+  assertWorkerImportAvailable();
   const storedFile = await saveUploadedImportFile(file);
-  await assertImportCanStart(storedFile.fileHash);
 
   try {
-    return await db.transaction(async (tx) => {
+    await assertImportCanStart(storedFile.fileHash);
+    const accepted = await db.transaction(async (tx) => {
       const [batch] = await tx
         .insert(importBatches)
         .values({
@@ -255,21 +262,24 @@ export async function enqueueAdminImportFromUpload({
         .set({ analyzeJobId: job.id })
         .where(eq(importBatches.id, batch.id));
 
-      await tx.insert(auditLogs).values({
-        adminUserId,
-        action: "import.accepted",
-        entityType: "import_batch",
-        entityId: batch.id,
-        metadata: {
-          sourceFileName: storedFile.originalName,
-          fileSizeBytes: storedFile.size,
-          backgroundJobId: job.id
-        }
-      });
-
       return { importBatchId: batch.id, backgroundJobId: job.id };
     });
+
+    await writeImportAuditSafely({
+      adminUserId,
+      action: "import.accepted",
+      entityType: "import_batch",
+      entityId: accepted.importBatchId,
+      metadata: {
+        sourceFileName: storedFile.originalName,
+        fileSizeBytes: storedFile.size,
+        backgroundJobId: accepted.backgroundJobId
+      }
+    });
+
+    return accepted;
   } catch (error) {
+    await removeRejectedUploadFileSafely(storedFile.filePath);
     if (isActiveWorkerImportConstraint(error)) {
       throw new AdminImportError(
         "import_in_progress",
@@ -287,7 +297,8 @@ export async function enqueueAdminImportPublish({
   importBatchId: string;
   adminUserId: string;
 }) {
-  return db.transaction(async (tx) => {
+  assertWorkerImportAvailable();
+  const queued = await db.transaction(async (tx) => {
     const [batch] = await tx
       .select({
         id: importBatches.id,
@@ -304,9 +315,14 @@ export async function enqueueAdminImportPublish({
 
     if (!batch) throw new AdminImportError("not_found", "Импорт не найден.");
     const report = toStoredReport(batch.report);
-    if (!batch.catalogVersionId || batch.status !== "analyzed" || report?.safety?.canPublish !== true) {
-      throw new AdminImportError("not_ready", "Этот импорт пока нельзя опубликовать.");
-    }
+    const [catalogVersion] = batch.catalogVersionId
+      ? await tx
+          .select({ status: catalogVersions.status })
+          .from(catalogVersions)
+          .where(eq(catalogVersions.id, batch.catalogVersionId))
+          .for("update")
+          .limit(1)
+      : [null];
 
     if (batch.publishJobId) {
       const [existingJob] = await tx
@@ -315,7 +331,11 @@ export async function enqueueAdminImportPublish({
         .where(and(eq(backgroundJobs.id, batch.publishJobId), eq(backgroundJobs.type, "publish_import")))
         .limit(1);
 
-      if (existingJob?.status === "failed") {
+      const canRetryPublish =
+        existingJob?.status === "failed" &&
+        ((batch.status === "analyzed" && catalogVersion?.status === "draft" && report?.safety?.canPublish === true) ||
+          (batch.status === "published" && catalogVersion?.status === "active"));
+      if (canRetryPublish) {
         await tx
           .update(backgroundJobs)
           .set({
@@ -339,7 +359,7 @@ export async function enqueueAdminImportPublish({
           .update(importBatches)
           .set({
             phase: "publish_queued",
-            stage: "Повторно проверяем изменения",
+            stage: "Повторяем публикацию",
             progress: 0,
             lastErrorCode: null,
             lastErrorMessage: null,
@@ -347,17 +367,26 @@ export async function enqueueAdminImportPublish({
           })
           .where(eq(importBatches.id, batch.id));
 
-        await tx.insert(auditLogs).values({
-          adminUserId,
-          action: "import.publish_retried",
-          entityType: "import_batch",
-          entityId: batch.id,
-          metadata: { backgroundJobId: batch.publishJobId }
-        });
-
-        return { importBatchId: batch.id, backgroundJobId: batch.publishJobId, created: true };
+        return {
+          importBatchId: batch.id,
+          backgroundJobId: batch.publishJobId,
+          created: true,
+          auditAction: "import.publish_retried"
+        };
       }
-      return { importBatchId: batch.id, backgroundJobId: batch.publishJobId, created: false };
+      if (existingJob?.status === "failed") {
+        throw new AdminImportError("not_ready", "Этот импорт пока нельзя опубликовать.");
+      }
+      return { importBatchId: batch.id, backgroundJobId: batch.publishJobId, created: false, auditAction: null };
+    }
+
+    if (
+      !batch.catalogVersionId ||
+      batch.status !== "analyzed" ||
+      catalogVersion?.status !== "draft" ||
+      report?.safety?.canPublish !== true
+    ) {
+      throw new AdminImportError("not_ready", "Этот импорт пока нельзя опубликовать.");
     }
 
     const payload = { batchId: batch.id };
@@ -380,7 +409,7 @@ export async function enqueueAdminImportPublish({
       .set({
         publishJobId: job.id,
         phase: "publish_queued",
-        stage: "Проверяем изменения",
+        stage: "Публикация поставлена в очередь",
         progress: 0,
         lastErrorCode: null,
         lastErrorMessage: null,
@@ -388,16 +417,29 @@ export async function enqueueAdminImportPublish({
       })
       .where(eq(importBatches.id, batch.id));
 
-    await tx.insert(auditLogs).values({
-      adminUserId,
-      action: "import.publish_requested",
-      entityType: "import_batch",
-      entityId: batch.id,
-      metadata: { backgroundJobId: job.id }
-    });
-
-    return { importBatchId: batch.id, backgroundJobId: job.id, created: true };
+    return {
+      importBatchId: batch.id,
+      backgroundJobId: job.id,
+      created: true,
+      auditAction: "import.publish_requested"
+    };
   });
+
+  if (queued.auditAction) {
+    await writeImportAuditSafely({
+      adminUserId,
+      action: queued.auditAction,
+      entityType: "import_batch",
+      entityId: queued.importBatchId,
+      metadata: { backgroundJobId: queued.backgroundJobId }
+    });
+  }
+
+  return {
+    importBatchId: queued.importBatchId,
+    backgroundJobId: queued.backgroundJobId,
+    created: queued.created
+  };
 }
 
 export async function getAdminImportPageData(selectedBatchId?: string) {
@@ -485,7 +527,8 @@ export async function publishAdminImportBatch({
       !batch.catalogVersionId ||
       batch.status !== "analyzed" ||
       batch.versionStatus !== "draft" ||
-      batch.report.safety?.canPublish !== true
+      batch.report.safety?.canPublish !== true ||
+      batch.publishJobId
     ) {
       throw new AdminImportError("already_finalized", "Этот импорт уже нельзя опубликовать.");
     }
@@ -499,7 +542,7 @@ export async function publishAdminImportBatch({
         perf
       });
     } catch (error) {
-      await db.insert(auditLogs).values({
+      await writeImportAuditSafely({
         adminUserId,
         action: "import.publish_failed",
         entityType: "catalog_version",
@@ -522,7 +565,7 @@ export async function publishAdminImportBatch({
       );
     }
 
-    await db.insert(auditLogs).values({
+    await writeImportAuditSafely({
       adminUserId,
       action: "import.publish",
       entityType: "catalog_version",
@@ -554,47 +597,89 @@ export async function cancelAdminImportBatch({
   importBatchId: string;
   adminUserId: string;
 }) {
-  const batch = await getImportBatchForAction(importBatchId);
-
-  if (batch.status === "cancelled") {
-    return;
-  }
-
-  if (!canCancelImportStrict(batch)) {
-    throw new AdminImportError("already_finalized", "Этот импорт уже нельзя отменить.");
-  }
-
+  let cancelled: {
+    id: string;
+    catalogVersionId: string | null;
+    sourceFileName: string;
+    report: StoredImportReport | null;
+  } | null = null;
   try {
-    await db.transaction(async (tx) => {
+    cancelled = await db.transaction(async (tx) => {
+      const [batch] = await tx
+        .select({
+          id: importBatches.id,
+          catalogVersionId: importBatches.catalogVersionId,
+          sourceFileName: importBatches.sourceFileName,
+          status: importBatches.status,
+          report: importBatches.report,
+          fileHash: importBatches.fileHash,
+          publishJobId: importBatches.publishJobId,
+          phase: importBatches.phase
+        })
+        .from(importBatches)
+        .where(eq(importBatches.id, importBatchId))
+        .for("update")
+        .limit(1);
+
+      if (!batch) throw new AdminImportError("not_found", "Импорт не найден.");
+      if (batch.status === "cancelled") return null;
+
+      const [version] = batch.catalogVersionId
+        ? await tx
+            .select({ status: catalogVersions.status })
+            .from(catalogVersions)
+            .where(eq(catalogVersions.id, batch.catalogVersionId))
+            .for("update")
+            .limit(1)
+        : [null];
+      const report = toStoredReport(batch.report);
+      const state = toImportStateBatch(
+        { ...batch, versionStatus: version?.status ?? null },
+        report
+      );
+      if (!canCancelImportStrict(state)) {
+        throw new AdminImportError("already_finalized", "Этот импорт уже нельзя отменить.");
+      }
+
       await tx
         .update(importBatches)
         .set({ status: "cancelled" })
         .where(eq(importBatches.id, batch.id));
 
-      if (batch.catalogVersionId && batch.versionStatus === "draft") {
+      if (batch.catalogVersionId && version?.status === "draft") {
         await tx
           .update(catalogVersions)
           .set({ status: "rolled_back" })
-          .where(eq(catalogVersions.id, batch.catalogVersionId));
+          .where(and(eq(catalogVersions.id, batch.catalogVersionId), eq(catalogVersions.status, "draft")));
       }
 
-      await tx.insert(auditLogs).values({
-        adminUserId,
-        action: "import.cancel",
-        entityType: "catalog_version",
-        entityId: batch.catalogVersionId,
-        metadata: {
-          importBatchId: batch.id,
-          sourceFileName: batch.sourceFileName,
-          report: batch.report ? toAuditReportSummary(batch.report) : null
-        }
-      });
+      return {
+        id: batch.id,
+        catalogVersionId: batch.catalogVersionId,
+        sourceFileName: batch.sourceFileName,
+        report
+      };
     });
   } catch (error) {
+    if (error instanceof AdminImportError) throw error;
     throw new AdminImportError(
       "cancel_failed",
       error instanceof Error ? error.message : "Не удалось отменить импорт."
     );
+  }
+
+  if (cancelled) {
+    await writeImportAuditSafely({
+      adminUserId,
+      action: "import.cancel",
+      entityType: "catalog_version",
+      entityId: cancelled.catalogVersionId,
+      metadata: {
+        importBatchId: cancelled.id,
+        sourceFileName: cancelled.sourceFileName,
+        report: cancelled.report ? toAuditReportSummary(cancelled.report) : null
+      }
+    });
   }
 }
 
@@ -644,6 +729,26 @@ async function saveUploadedImportFile(file: File | null) {
     fileHash,
     size: file.size
   };
+}
+
+async function removeRejectedUploadFileSafely(filePath: string) {
+  try {
+    await unlink(filePath);
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? error.code : null;
+    if (code !== "ENOENT") {
+      console.error("[admin/import] rejected_upload_cleanup_failed", { fileName: path.basename(filePath) });
+    }
+  }
+}
+
+function assertWorkerImportAvailable() {
+  if (!isImportWorkerModeAvailable()) {
+    throw new AdminImportError(
+      "worker_unavailable",
+      "Фоновая обработка импорта сейчас недоступна. Попробуйте позже."
+    );
+  }
 }
 
 async function assertImportCanStart(fileHash: string) {
@@ -735,6 +840,8 @@ export async function getBlockingImportDraft(exceptCatalogVersionId?: string) {
       report: importBatches.report,
       versionStatus: catalogVersions.status,
       fileHash: importBatches.fileHash,
+      publishJobId: importBatches.publishJobId,
+      phase: importBatches.phase,
       uploadedByName: adminUsers.fullName,
       uploadedByEmail: adminUsers.email
     })
@@ -766,6 +873,8 @@ export async function getDuplicateFileBlocker(fileHash: string) {
       report: importBatches.report,
       versionStatus: catalogVersions.status,
       fileHash: importBatches.fileHash,
+      publishJobId: importBatches.publishJobId,
+      phase: importBatches.phase,
       uploadedByName: adminUsers.fullName,
       uploadedByEmail: adminUsers.email
     })
@@ -792,6 +901,8 @@ async function getImportBatchById(importBatchId: string) {
       report: importBatches.report,
       versionStatus: catalogVersions.status,
       fileHash: importBatches.fileHash,
+      publishJobId: importBatches.publishJobId,
+      phase: importBatches.phase,
       uploadedByName: adminUsers.fullName,
       uploadedByEmail: adminUsers.email
     })
@@ -813,7 +924,9 @@ async function getImportBatchForAction(importBatchId: string) {
       status: importBatches.status,
       report: importBatches.report,
       versionStatus: catalogVersions.status,
-      fileHash: importBatches.fileHash
+      fileHash: importBatches.fileHash,
+      publishJobId: importBatches.publishJobId,
+      phase: importBatches.phase
     })
     .from(importBatches)
     .leftJoin(catalogVersions, eq(catalogVersions.id, importBatches.catalogVersionId))
@@ -835,6 +948,11 @@ function toAdminImportBatchSummary(
 ): AdminImportBatchSummary {
   const report = toStoredReport(batch.report);
   const state = toImportStateBatch(batch, report);
+  const canRetryPublishedSearch =
+    batch.status === "published" &&
+    batch.versionStatus === "active" &&
+    Boolean(batch.publishJobId) &&
+    batch.phase === "failed";
 
   return {
     ...batch,
@@ -842,7 +960,7 @@ function toAdminImportBatchSummary(
     publishJobId: batch.publishJobId ?? null,
     phase: batch.phase ?? null,
     canPublish:
-      canPublishImport(batch.status, batch.versionStatus, report) &&
+      (canPublishImport(batch.status, batch.versionStatus, report) || canRetryPublishedSearch) &&
       (!batch.publishJobId || batch.phase === "failed") &&
       batch.phase !== "publishing" &&
       batch.phase !== "publish_queued",
@@ -863,7 +981,10 @@ export function canCancelImport(status: string, versionStatus: string | null) {
 }
 
 function toImportStateBatch(
-  batch: Pick<ImportBatchRecord, "id" | "catalogVersionId" | "status" | "versionStatus" | "fileHash">,
+  batch: Pick<
+    ImportBatchRecord,
+    "id" | "catalogVersionId" | "status" | "versionStatus" | "fileHash" | "publishJobId" | "phase"
+  >,
   report?: StoredImportReport | null
 ): ImportStateBatch {
   return {
@@ -872,6 +993,8 @@ function toImportStateBatch(
     status: batch.status,
     versionStatus: batch.versionStatus,
     fileHash: batch.fileHash,
+    publishJobId: batch.publishJobId,
+    phase: batch.phase,
     report
   };
 }

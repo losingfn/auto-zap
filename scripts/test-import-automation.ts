@@ -248,6 +248,23 @@ run("active published and archived imports cannot be cancelled", () => {
   );
 });
 
+run("publish reservation disables cancellation before a worker starts", () => {
+  assert.equal(
+    canCancelImportStrict(
+      importState({ publishJobId: "publish-job-1", phase: "publish_queued" })
+    ),
+    false
+  );
+  assert.equal(
+    canCancelImportStrict(importState({ phase: "publishing" })),
+    false
+  );
+  assert.equal(
+    canCancelImportStrict(importState({ phase: "publish_retrying" })),
+    false
+  );
+});
+
 run("admin import selection prefers hidden blocking draft over newer finalized import", () => {
   const blocking = importState({ id: "old-blocking", status: "legacy_unknown" });
   const finalized = importState({
@@ -1276,13 +1293,15 @@ run("publish prepares and checkpoints the search index before catalog activation
   );
   const prepareIndex = source.indexOf("prepareSearchIndexForCatalogVersion(catalogVersionId, perf)");
   const swapIndex = source.indexOf("activatePreparedCatalogSearchIndex(preparedSearchIndex, perf)");
-  const activation = source.indexOf("activateCatalogVersionInDatabase(catalogVersionId)");
+  const activation = source.indexOf("activateCatalogVersionInDatabase(catalogVersionId, activation)");
 
   assert.ok(prepareIndex > -1);
   assert.ok(swapIndex > prepareIndex);
   assert.ok(activation > swapIndex);
   assert.match(source, /search_swap_started/);
   assert.match(source, /search_swapped/);
+  assert.match(source, /eq\(catalogVersions\.status, "draft"\)/);
+  assert.match(source, /CatalogActivationGuardError/);
 });
 
 run("search indexing failure message keeps old search explicit", () => {

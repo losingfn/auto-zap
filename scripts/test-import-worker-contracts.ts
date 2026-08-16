@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { validateBackgroundJobPayload } from "../src/features/background-jobs/handlers";
-import { isBackgroundJobsInfrastructureEnabled } from "../src/lib/feature-flags";
+import {
+  isBackgroundJobsInfrastructureEnabled,
+  isImportWorkerModeAvailable
+} from "../src/lib/feature-flags";
+import { getPublishReconciliationAction } from "../src/features/import/worker-service";
 
 const importsSource = readFileSync("src/features/admin/imports.ts", "utf8");
 const actionsSource = readFileSync("src/app/admin/(panel)/import/actions.ts", "utf8");
@@ -35,6 +39,8 @@ function main() {
     assert.match(source, /db\.transaction/);
     assert.match(source, /type: "analyze_import"/);
     assert.match(source, /analyzeJobId/);
+    assert.match(source, /removeRejectedUploadFileSafely/);
+    assert.match(source, /assertWorkerImportAvailable/);
     assert.doesNotMatch(source, /createDraftImport/);
   });
 
@@ -49,7 +55,10 @@ function main() {
     assert.match(workerSource, /\["analyzed", "published", "cancelled"\]/);
     assert.match(workerSource, /importBatchId: batch\.id/);
     assert.match(workerSource, /onProgress/);
-    assert.match(workerSource, /reconcileSearchSwapIfNeeded/);
+    assert.match(workerSource, /reconcilePublishState/);
+    assert.match(workerSource, /sync_search_to_database/);
+    assert.match(workerSource, /publish_retrying/);
+    assert.match(workerSource, /exists\(/);
     assert.match(workerSource, /PUBLISH_BLOCKED/);
     assert.match(workerSource, /SEARCH_TEMPORARY_ERROR/);
   });
@@ -59,6 +68,47 @@ function main() {
     assert.match(publishSource, /search_swapped/);
     assert.match(publishSource, /activateCatalogVersionInDatabase/);
     assert.match(workerSource, /getLiveSearchCatalogVersionId/);
+    assert.match(publishSource, /PostgreSQL is now the source of truth/);
+    assert.match(publishSource, /CatalogActivationGuardError/);
+  });
+
+  run("publish reconciliation always converges search to the active database catalog", () => {
+    assert.equal(
+      getPublishReconciliationAction({
+        activeCatalogVersionId: "new",
+        liveCatalogVersionId: "new",
+        targetCatalogVersionId: "new",
+        batchStatus: "published"
+      }),
+      "already_converged"
+    );
+    assert.equal(
+      getPublishReconciliationAction({
+        activeCatalogVersionId: "new",
+        liveCatalogVersionId: "old",
+        targetCatalogVersionId: "new",
+        batchStatus: "published"
+      }),
+      "sync_search_to_database"
+    );
+    assert.equal(
+      getPublishReconciliationAction({
+        activeCatalogVersionId: "old",
+        liveCatalogVersionId: "new",
+        targetCatalogVersionId: "new",
+        batchStatus: "analyzed"
+      }),
+      "activate_database"
+    );
+    assert.equal(
+      getPublishReconciliationAction({
+        activeCatalogVersionId: "old",
+        liveCatalogVersionId: "old",
+        targetCatalogVersionId: "new",
+        batchStatus: "analyzed"
+      }),
+      "continue_publish"
+    );
   });
 
   run("status API is authenticated and returns only user-safe status fields", () => {
@@ -92,6 +142,13 @@ function main() {
       if (before === undefined) delete process.env.BACKGROUND_JOBS_ENABLED;
       else process.env.BACKGROUND_JOBS_ENABLED = before;
     }
+  });
+
+  run("worker import mode requires both configuration flags", () => {
+    assert.equal(isImportWorkerModeAvailable({ backgroundJobsInfrastructure: false, importViaWorker: false, reviewReapplyViaWorker: false, groupApplyViaWorker: false }), false);
+    assert.equal(isImportWorkerModeAvailable({ backgroundJobsInfrastructure: true, importViaWorker: false, reviewReapplyViaWorker: false, groupApplyViaWorker: false }), false);
+    assert.equal(isImportWorkerModeAvailable({ backgroundJobsInfrastructure: false, importViaWorker: true, reviewReapplyViaWorker: false, groupApplyViaWorker: false }), false);
+    assert.equal(isImportWorkerModeAvailable({ backgroundJobsInfrastructure: true, importViaWorker: true, reviewReapplyViaWorker: false, groupApplyViaWorker: false }), true);
   });
 }
 

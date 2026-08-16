@@ -1,15 +1,18 @@
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   adminUsers,
   auditLogs,
+  backgroundJobs,
   catalogVersions,
   importBatches,
   importErrors
 } from "@/db/schema";
+import { hashBackgroundJobPayload } from "@/features/background-jobs/payload";
+import { validateBackgroundJobPayload } from "@/features/background-jobs/handlers";
 import { createDraftImport } from "@/features/import/draft-service";
 import {
   canCancelImportForUi,
@@ -108,6 +111,8 @@ export type AdminImportBatchSummary = {
   isBlockingDraft: boolean;
   isFinalized: boolean;
   fileHash: string | null;
+  publishJobId: string | null;
+  phase: string | null;
 };
 
 export type AdminImportRowError = {
@@ -131,6 +136,8 @@ type ImportBatchRecord = {
   fileHash: string | null;
   uploadedByName: string | null;
   uploadedByEmail: string | null;
+  publishJobId?: string | null;
+  phase?: string | null;
 };
 
 export async function createAdminDraftImportFromUpload({
@@ -150,7 +157,6 @@ export async function createAdminDraftImportFromUpload({
   try {
     const result = await createDraftImport({
       filePath: storedFile.filePath,
-      fileBuffer: storedFile.buffer,
       sourceFileName: storedFile.originalName,
       fileHash: storedFile.fileHash,
       uploadedBy: adminUserId,
@@ -198,6 +204,202 @@ export async function createAdminDraftImportFromUpload({
   }
 }
 
+/**
+ * Accepts the HTTP upload and reserves durable work only. Analysis deliberately
+ * happens in the independent background worker, never inside this request.
+ */
+export async function enqueueAdminImportFromUpload({
+  file,
+  adminUserId
+}: {
+  file: File | null;
+  adminUserId: string;
+}) {
+  const storedFile = await saveUploadedImportFile(file);
+  await assertImportCanStart(storedFile.fileHash);
+
+  try {
+    return await db.transaction(async (tx) => {
+      const [batch] = await tx
+        .insert(importBatches)
+        .values({
+          status: "uploaded",
+          sourceFileName: storedFile.originalName,
+          storagePath: storedFile.storagePath,
+          fileHash: storedFile.fileHash,
+          uploadedBy: adminUserId,
+          phase: "queued",
+          stage: "Файл принят",
+          progress: 0,
+          processingUpdatedAt: new Date()
+        })
+        .returning({ id: importBatches.id });
+
+      const payload = { batchId: batch.id };
+      const payloadVersion = validateBackgroundJobPayload("analyze_import", payload);
+      const [job] = await tx
+        .insert(backgroundJobs)
+        .values({
+          type: "analyze_import",
+          payload,
+          payloadHash: hashBackgroundJobPayload({ payload, payloadVersion }),
+          idempotencyKey: `analyze-import:${batch.id}`,
+          requestedBy: adminUserId,
+          correlationId: batch.id,
+          maxAttempts: 3
+        })
+        .returning({ id: backgroundJobs.id });
+
+      await tx
+        .update(importBatches)
+        .set({ analyzeJobId: job.id })
+        .where(eq(importBatches.id, batch.id));
+
+      await tx.insert(auditLogs).values({
+        adminUserId,
+        action: "import.accepted",
+        entityType: "import_batch",
+        entityId: batch.id,
+        metadata: {
+          sourceFileName: storedFile.originalName,
+          fileSizeBytes: storedFile.size,
+          backgroundJobId: job.id
+        }
+      });
+
+      return { importBatchId: batch.id, backgroundJobId: job.id };
+    });
+  } catch (error) {
+    if (isActiveWorkerImportConstraint(error)) {
+      throw new AdminImportError(
+        "import_in_progress",
+        "Сейчас уже обрабатывается другой прайс. Дождитесь его завершения."
+      );
+    }
+    throw error;
+  }
+}
+
+export async function enqueueAdminImportPublish({
+  importBatchId,
+  adminUserId
+}: {
+  importBatchId: string;
+  adminUserId: string;
+}) {
+  return db.transaction(async (tx) => {
+    const [batch] = await tx
+      .select({
+        id: importBatches.id,
+        status: importBatches.status,
+        catalogVersionId: importBatches.catalogVersionId,
+        report: importBatches.report,
+        publishJobId: importBatches.publishJobId,
+        phase: importBatches.phase
+      })
+      .from(importBatches)
+      .where(eq(importBatches.id, importBatchId))
+      .for("update")
+      .limit(1);
+
+    if (!batch) throw new AdminImportError("not_found", "Импорт не найден.");
+    const report = toStoredReport(batch.report);
+    if (!batch.catalogVersionId || batch.status !== "analyzed" || report?.safety?.canPublish !== true) {
+      throw new AdminImportError("not_ready", "Этот импорт пока нельзя опубликовать.");
+    }
+
+    if (batch.publishJobId) {
+      const [existingJob] = await tx
+        .select({ status: backgroundJobs.status })
+        .from(backgroundJobs)
+        .where(and(eq(backgroundJobs.id, batch.publishJobId), eq(backgroundJobs.type, "publish_import")))
+        .limit(1);
+
+      if (existingJob?.status === "failed") {
+        await tx
+          .update(backgroundJobs)
+          .set({
+            status: "pending",
+            progress: 0,
+            result: null,
+            error: null,
+            attemptCount: 0,
+            startedAt: null,
+            finishedAt: null,
+            lockedAt: null,
+            lockedBy: null,
+            leaseToken: null,
+            heartbeatAt: null,
+            availableAt: new Date(),
+            updatedAt: new Date()
+          })
+          .where(eq(backgroundJobs.id, batch.publishJobId));
+
+        await tx
+          .update(importBatches)
+          .set({
+            phase: "publish_queued",
+            stage: "Повторно проверяем изменения",
+            progress: 0,
+            lastErrorCode: null,
+            lastErrorMessage: null,
+            processingUpdatedAt: new Date()
+          })
+          .where(eq(importBatches.id, batch.id));
+
+        await tx.insert(auditLogs).values({
+          adminUserId,
+          action: "import.publish_retried",
+          entityType: "import_batch",
+          entityId: batch.id,
+          metadata: { backgroundJobId: batch.publishJobId }
+        });
+
+        return { importBatchId: batch.id, backgroundJobId: batch.publishJobId, created: true };
+      }
+      return { importBatchId: batch.id, backgroundJobId: batch.publishJobId, created: false };
+    }
+
+    const payload = { batchId: batch.id };
+    const payloadVersion = validateBackgroundJobPayload("publish_import", payload);
+    const [job] = await tx
+      .insert(backgroundJobs)
+      .values({
+        type: "publish_import",
+        payload,
+        payloadHash: hashBackgroundJobPayload({ payload, payloadVersion }),
+        idempotencyKey: `publish-import:${batch.id}`,
+        requestedBy: adminUserId,
+        correlationId: batch.id,
+        maxAttempts: 3
+      })
+      .returning({ id: backgroundJobs.id });
+
+    await tx
+      .update(importBatches)
+      .set({
+        publishJobId: job.id,
+        phase: "publish_queued",
+        stage: "Проверяем изменения",
+        progress: 0,
+        lastErrorCode: null,
+        lastErrorMessage: null,
+        processingUpdatedAt: new Date()
+      })
+      .where(eq(importBatches.id, batch.id));
+
+    await tx.insert(auditLogs).values({
+      adminUserId,
+      action: "import.publish_requested",
+      entityType: "import_batch",
+      entityId: batch.id,
+      metadata: { backgroundJobId: job.id }
+    });
+
+    return { importBatchId: batch.id, backgroundJobId: job.id, created: true };
+  });
+}
+
 export async function getAdminImportPageData(selectedBatchId?: string) {
   const batches = await db
     .select({
@@ -211,6 +413,8 @@ export async function getAdminImportPageData(selectedBatchId?: string) {
       report: importBatches.report,
       versionStatus: catalogVersions.status,
       fileHash: importBatches.fileHash,
+      publishJobId: importBatches.publishJobId,
+      phase: importBatches.phase,
       uploadedByName: adminUsers.fullName,
       uploadedByEmail: adminUsers.email
     })
@@ -438,8 +642,7 @@ async function saveUploadedImportFile(file: File | null) {
     storagePath: path.relative(process.cwd(), filePath),
     originalName: file.name,
     fileHash,
-    size: file.size,
-    buffer
+    size: file.size
   };
 }
 
@@ -464,6 +667,33 @@ async function assertImportCanStart(fileHash: string) {
 }
 
 export async function getImportStartBlocker(fileHash: string): Promise<ImportStartBlocker | null> {
+  const [runningWorkerImport] = await db
+    .select({
+      id: importBatches.id,
+      catalogVersionId: importBatches.catalogVersionId,
+      sourceFileName: importBatches.sourceFileName,
+      status: importBatches.status,
+      createdAt: importBatches.createdAt,
+      analyzedAt: importBatches.analyzedAt,
+      publishedAt: importBatches.publishedAt,
+      report: importBatches.report,
+      versionStatus: catalogVersions.status,
+      fileHash: importBatches.fileHash,
+      publishJobId: importBatches.publishJobId,
+      phase: importBatches.phase,
+      uploadedByName: adminUsers.fullName,
+      uploadedByEmail: adminUsers.email
+    })
+    .from(importBatches)
+    .leftJoin(catalogVersions, eq(catalogVersions.id, importBatches.catalogVersionId))
+    .leftJoin(adminUsers, eq(adminUsers.id, importBatches.uploadedBy))
+    .where(and(eq(importBatches.status, "uploaded"), inArray(importBatches.phase, ["queued", "analyzing", "retrying"])))
+    .limit(1);
+
+  if (runningWorkerImport) {
+    return { type: "blocking_draft", batch: runningWorkerImport };
+  }
+
   const blockingDraft = await getBlockingImportDraft();
   if (blockingDraft) {
     return {
@@ -481,6 +711,15 @@ export async function getImportStartBlocker(fileHash: string): Promise<ImportSta
   }
 
   return null;
+}
+
+function isActiveWorkerImportConstraint(error: unknown) {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "constraint_name" in error &&
+      (error as { constraint_name?: unknown }).constraint_name === "import_batches_one_active_worker_analyze"
+  );
 }
 
 export async function getBlockingImportDraft(exceptCatalogVersionId?: string) {
@@ -600,7 +839,13 @@ function toAdminImportBatchSummary(
   return {
     ...batch,
     report,
-    canPublish: canPublishImport(batch.status, batch.versionStatus, report),
+    publishJobId: batch.publishJobId ?? null,
+    phase: batch.phase ?? null,
+    canPublish:
+      canPublishImport(batch.status, batch.versionStatus, report) &&
+      (!batch.publishJobId || batch.phase === "failed") &&
+      batch.phase !== "publishing" &&
+      batch.phase !== "publish_queued",
     canCancel: canCancelImportForUi(state),
     canCancelStrict: canCancelImportStrict(state),
     canCancelForUi: canCancelImportForUi(state),
@@ -706,16 +951,7 @@ function normalizePriceChanges(report: Record<string, unknown>) {
     ),
     increasedCount: numberValue(priceChanges?.increasedCount, report.pricesIncreased),
     decreasedCount: numberValue(priceChanges?.decreasedCount, report.pricesDecreased),
-    unchangedCount: numberValue(priceChanges?.unchangedCount, report.pricesUnchanged),
-    maxIncreaseAmount: numberValue(priceChanges?.maxIncreaseAmount, report.maxIncrease),
-    maxIncreasePercent: numberValue(priceChanges?.maxIncreasePercent),
-    maxDecreaseAmount: numberValue(priceChanges?.maxDecreaseAmount, report.maxDecrease),
-    maxDecreasePercent: numberValue(priceChanges?.maxDecreasePercent),
-    averageChangeAmount: numberValue(priceChanges?.averageChangeAmount),
-    averageChangePercent: numberValue(
-      priceChanges?.averageChangePercent,
-      report.averagePercentChange
-    )
+    unchangedCount: numberValue(priceChanges?.unchangedCount, report.pricesUnchanged)
   };
 }
 

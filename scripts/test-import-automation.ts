@@ -118,7 +118,6 @@ run("existing product updates price and preserves name fallback", () => {
 
   assert.equal(priceChanges.existingPriceUpdatedCount, 1);
   assert.equal(priceChanges.increasedCount, 1);
-  assert.equal(priceChanges.maxIncreaseAmount, 25);
   assert.equal(resolveImportProductName(row({ name: null }), existing.get("A-1")), "Старое название");
 });
 
@@ -144,9 +143,6 @@ run("stored import report preserves new price and automation summaries", () => {
     pricesIncreased: 3,
     pricesDecreased: 1,
     pricesUnchanged: 2,
-    maxIncrease: 150,
-    maxDecrease: -40,
-    averagePercentChange: 0.12,
     existingInherited: 5,
     newHighConfidence: 6,
     newNeedsReview: 2,
@@ -159,9 +155,6 @@ run("stored import report preserves new price and automation summaries", () => {
   assert.equal(normalized.priceChanges.increasedCount, 3);
   assert.equal(normalized.priceChanges.decreasedCount, 1);
   assert.equal(normalized.priceChanges.unchangedCount, 2);
-  assert.equal(normalized.priceChanges.maxIncreaseAmount, 150);
-  assert.equal(normalized.priceChanges.maxDecreaseAmount, -40);
-  assert.equal(normalized.priceChanges.averageChangePercent, 0.12);
   assert.equal(normalized.autoCategorizationPreview?.existingCategoryPreserved, 5);
   assert.equal(normalized.autoCategorizationPreview?.shadowHigh, 6);
   assert.equal(normalized.autoCategorizationPreview?.wouldRequireReview, 2);
@@ -1276,17 +1269,20 @@ run("other-products search document uses aggregate public URL", () => {
   assert.match(document.searchText, /Прочие товары/);
 });
 
-run("publish prepares search index before active DB transaction", () => {
+run("publish prepares and checkpoints the search index before catalog activation", () => {
   const source = readFileSync(
     new URL("../src/features/import/publish-service.ts", import.meta.url),
     "utf8"
   );
-  const searchSyncIndex = source.indexOf("syncSearchIndexForCatalogVersion(catalogVersionId, perf)");
-  const transactionIndex = source.indexOf("db.transaction");
+  const prepareIndex = source.indexOf("prepareSearchIndexForCatalogVersion(catalogVersionId, perf)");
+  const swapIndex = source.indexOf("activatePreparedCatalogSearchIndex(preparedSearchIndex, perf)");
+  const activation = source.indexOf("activateCatalogVersionInDatabase(catalogVersionId)");
 
-  assert.ok(searchSyncIndex > -1);
-  assert.ok(transactionIndex > -1);
-  assert.ok(searchSyncIndex < transactionIndex);
+  assert.ok(prepareIndex > -1);
+  assert.ok(swapIndex > prepareIndex);
+  assert.ok(activation > swapIndex);
+  assert.match(source, /search_swap_started/);
+  assert.match(source, /search_swapped/);
 });
 
 run("search indexing failure message keeps old search explicit", () => {
@@ -1677,13 +1673,7 @@ function report(overrides: Partial<ImportPreviewReport> = {}): ImportPreviewRepo
       existingPriceUpdatedCount: 1,
       increasedCount: 1,
       decreasedCount: 0,
-      unchangedCount: 9,
-      maxIncreaseAmount: 10,
-      maxIncreasePercent: 0.1,
-      maxDecreaseAmount: 0,
-      maxDecreasePercent: 0,
-      averageChangeAmount: 1,
-      averageChangePercent: 0.01
+      unchangedCount: 9
     },
     examples: {
       valid: [],

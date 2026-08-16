@@ -12,7 +12,7 @@
     "jobs": "scripts/with-env.sh node --import tsx scripts/background-jobs.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx scripts/test-search-pagination.ts && node --import tsx scripts/test-import-automation.ts && node --import tsx scripts/test-import-draft-classification-reuse.ts && node --import tsx scripts/test-import-perf.ts && node --import tsx scripts/test-review-reapply.ts && node --import tsx scripts/test-review-group-apply.ts && node --import tsx scripts/test-background-jobs.ts",
+    "test": "node --import tsx scripts/test-search-pagination.ts && node --import tsx scripts/test-import-automation.ts && node --import tsx scripts/test-import-draft-classification-reuse.ts && node --import tsx scripts/test-import-perf.ts && node --import tsx scripts/test-review-reapply.ts && node --import tsx scripts/test-review-group-apply.ts && node --import tsx scripts/test-background-jobs.ts && node --import tsx scripts/test-import-worker-contracts.ts",
     "test:search-pagination": "node --import tsx scripts/test-search-pagination.ts",
     "test:background-jobs": "node --import tsx scripts/test-background-jobs.ts",
     "test:purchase-list-storage": "node --import tsx scripts/test-purchase-list-storage.ts",
@@ -56,6 +56,7 @@
     "postgres": "^3.4.7",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "tsx": "^4.20.0",
     "xlsx": "^0.18.5",
     "zod": "^3.25.0"
   },
@@ -72,7 +73,6 @@
     "eslint": "^9.25.0",
     "playwright-core": "1.61.1",
     "tailwindcss": "^4.1.0",
-    "tsx": "^4.20.0",
     "typescript": "^5.8.0"
   }
 }

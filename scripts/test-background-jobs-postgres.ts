@@ -317,9 +317,14 @@ async function rebuildCleanSchema() {
 }
 
 async function assertUpgradeFromPreviousSchema() {
-  console.log("[background-jobs-postgres] applying 0009 over previous test schema");
-  await sql.unsafe("DROP TABLE background_jobs; DROP TYPE background_job_status;");
-  await applyMigration("0009_background_jobs.sql");
+  console.log("[background-jobs-postgres] applying 0011 over the previous schema");
+  await sql.unsafe("DROP SCHEMA public CASCADE; CREATE SCHEMA public;");
+  const migrationDir = path.join(process.cwd(), "db", "migrations");
+  const files = (await readdir(migrationDir))
+    .filter((file) => file.endsWith(".sql") && file < "0011_import_worker.sql")
+    .sort();
+  for (const file of files) await applyMigration(file);
+  await applyMigration("0011_import_worker.sql");
   await assertMigrationContracts();
 }
 
@@ -357,10 +362,18 @@ async function assertMigrationContracts() {
   `;
   assert.ok(indexes.some((row) => row.indexname === "background_jobs_claim_idx"));
   assert.ok(indexes.some((row) => row.indexname === "background_jobs_type_idempotency_key_unique"));
+  const importColumns = await sql<{ column_name: string }[]>`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name = 'import_batches'
+  `;
+  const importColumnNames = new Set(importColumns.map((row) => row.column_name));
+  for (const column of ["analyze_job_id", "publish_job_id", "publish_checkpoint", "last_error_code"]) {
+    assert.ok(importColumnNames.has(column));
+  }
 }
 
 async function clearJobs() {
-  await sql.unsafe("TRUNCATE TABLE background_jobs;");
+  await sql.unsafe("TRUNCATE TABLE import_batches, background_jobs CASCADE;");
 }
 
 async function countJobs() {

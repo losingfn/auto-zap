@@ -218,13 +218,7 @@ function reportFixture(): ImportPreviewReport {
       existingPriceUpdatedCount: 0,
       increasedCount: 0,
       decreasedCount: 0,
-      unchangedCount: 0,
-      maxIncreaseAmount: 0,
-      maxIncreasePercent: 0,
-      maxDecreaseAmount: 0,
-      maxDecreasePercent: 0,
-      averageChangeAmount: 0,
-      averageChangePercent: 0
+      unchangedCount: 0
     },
     examples: { valid: [], needsReview: [], errors: [] }
   };

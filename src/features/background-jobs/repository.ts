@@ -80,6 +80,15 @@ export async function createBackgroundJob(input: CreateBackgroundJobInput) {
   return toBackgroundJob(existing);
 }
 
+export async function getBackgroundJobById(jobId: string) {
+  const [row] = await db
+    .select()
+    .from(backgroundJobs)
+    .where(eq(backgroundJobs.id, jobId))
+    .limit(1);
+  return row ? toBackgroundJob(row) : null;
+}
+
 export async function claimNextBackgroundJob(input: { workerId: string; now?: Date }) {
   if (!input.workerId.trim()) {
     throw new BackgroundJobRepositoryError("ownership_lost", "Background worker id is required.");

@@ -5,6 +5,7 @@ import {
   type BackgroundJobHandlerDefinition,
   type BackgroundJobHandlerResult
 } from "./types";
+import type { BackgroundJob, BackgroundJobError } from "./types";
 
 const healthCheckHandler: BackgroundJobHandlerDefinition = {
   payloadVersion: "health_check:v1",
@@ -36,8 +37,32 @@ const healthCheckHandler: BackgroundJobHandlerDefinition = {
   }
 };
 
+const analyzeImportHandler: BackgroundJobHandlerDefinition = {
+  payloadVersion: "analyze_import:v1",
+  validatePayload(payload) {
+    validateImportJobPayload(payload);
+  },
+  async execute(context) {
+    const { executeAnalyzeImportJob } = await import("@/features/import/worker-service");
+    return executeAnalyzeImportJob(context, payloadBatchId(context.job.payload));
+  }
+};
+
+const publishImportHandler: BackgroundJobHandlerDefinition = {
+  payloadVersion: "publish_import:v1",
+  validatePayload(payload) {
+    validateImportJobPayload(payload);
+  },
+  async execute(context) {
+    const { executePublishImportJob } = await import("@/features/import/worker-service");
+    return executePublishImportJob(context, payloadBatchId(context.job.payload));
+  }
+};
+
 const handlerRegistry: Record<string, BackgroundJobHandlerDefinition> = {
-  health_check: healthCheckHandler
+  health_check: healthCheckHandler,
+  analyze_import: analyzeImportHandler,
+  publish_import: publishImportHandler
 };
 
 export function getBackgroundJobHandler(type: string) {
@@ -70,6 +95,16 @@ export async function executeBackgroundJob(context: BackgroundJobHandlerContext)
   return handler.execute(context);
 }
 
+export async function handleBackgroundJobFailure(input: {
+  job: BackgroundJob;
+  error: BackgroundJobError;
+  willRetry: boolean;
+}) {
+  if (input.job.type !== "analyze_import" && input.job.type !== "publish_import") return;
+  const { markImportJobFailure } = await import("@/features/import/worker-service");
+  await markImportJobFailure(input);
+}
+
 function abortableDelay(delayMs: number, signal: AbortSignal) {
   if (signal.aborted) return Promise.reject(abortedError());
   if (delayMs === 0) return Promise.resolve();
@@ -90,4 +125,18 @@ function abortableDelay(delayMs: number, signal: AbortSignal) {
 
 function abortedError() {
   return new BackgroundJobExecutionError("job_aborted", "Background job was aborted during shutdown.", true);
+}
+
+function validateImportJobPayload(payload: Record<string, unknown>) {
+  if (Object.keys(payload).length !== 1 || typeof payload.batchId !== "string" || !isUuid(payload.batchId)) {
+    throw new BackgroundJobExecutionError("invalid_payload", "Background job payload is invalid.", false);
+  }
+}
+
+function payloadBatchId(payload: Record<string, unknown>) {
+  return payload.batchId as string;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }

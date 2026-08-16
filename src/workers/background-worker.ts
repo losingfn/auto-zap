@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import { isBackgroundJobsInfrastructureEnabled } from "@/lib/feature-flags";
-import { executeBackgroundJob } from "@/features/background-jobs/handlers";
+import { executeBackgroundJob, handleBackgroundJobFailure } from "@/features/background-jobs/handlers";
 import {
   claimNextBackgroundJob,
   completeBackgroundJob,
   failBackgroundJob,
+  getBackgroundJobById,
   heartbeatBackgroundJob,
   recoverStaleBackgroundJobs,
   requeueBackgroundJobAfterShutdown,
@@ -72,6 +73,16 @@ export async function runBackgroundWorker(options: BackgroundWorkerOptions = {})
       disabledLogged = false;
       const recovered = await recoverStaleBackgroundJobs({ leaseMs });
       for (const job of recovered) {
+        if (job.status === "failed") {
+          const recoveredJob = await getBackgroundJobById(job.id);
+          if (recoveredJob?.error) {
+            await handleBackgroundJobFailure({
+              job: recoveredJob,
+              error: recoveredJob.error,
+              willRetry: false
+            }).catch(() => undefined);
+          }
+        }
         logWorkerEvent({
           event: job.status === "retry_wait" ? "job_requeued_after_stale" : "job_failed_permanently",
           workerId,
@@ -245,6 +256,11 @@ export async function runClaimedBackgroundJob(input: {
         leaseToken,
         error: safeError
       });
+      await handleBackgroundJobFailure({
+        job: input.job,
+        error: safeError,
+        willRetry: failed.job.status === "retry_wait"
+      }).catch(() => undefined);
       logWorkerEvent({
         event: failed.job.status === "retry_wait" ? "job_retry_wait" : "job_failed_permanently",
         workerId: input.workerId,

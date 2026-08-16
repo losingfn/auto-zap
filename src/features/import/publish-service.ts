@@ -6,63 +6,47 @@ import { isBlockingImportDraft } from "@/features/import/import-state";
 import { assertImportSafety, evaluateImportSafety } from "@/features/import/safety";
 import type { ImportPerfLogger } from "@/lib/server/import-perf";
 import type { ImportPreviewReport, ImportSafetyReport } from "@/features/import/types";
-import { syncSearchIndexForCatalogVersion } from "@/features/search/indexing";
+import {
+  activatePreparedCatalogSearchIndex,
+  prepareSearchIndexForCatalogVersion,
+  syncSearchIndexForCatalogVersion
+} from "@/features/search/indexing";
 
 export interface PublishCatalogVersionInput {
   catalogVersionId: string;
   report: ImportPreviewReport;
   perf?: ImportPerfLogger;
+  onCheckpoint?: (
+    checkpoint: "prepared" | "search_index_built" | "search_swap_started" | "search_swapped" | "catalog_activated"
+  ) => Promise<void>;
 }
 
 export async function publishCatalogVersion({
   catalogVersionId,
   report,
-  perf
+  perf,
+  onCheckpoint
 }: PublishCatalogVersionInput) {
   const safety = await getPublishSafetyReport({ catalogVersionId, report });
   assertImportSafety(safety);
 
   const previousActiveVersionId = await getActiveCatalogVersionId(catalogVersionId);
-  const searchResult = await syncSearchIndexForCatalogVersion(catalogVersionId, perf);
+  await onCheckpoint?.("prepared");
+  const preparedSearchIndex = await prepareSearchIndexForCatalogVersion(catalogVersionId, perf);
+  await onCheckpoint?.("search_index_built");
+  await onCheckpoint?.("search_swap_started");
+  const searchResult = await activatePreparedCatalogSearchIndex(preparedSearchIndex, perf);
+  await onCheckpoint?.("search_swapped");
 
   try {
-    const switchActiveCatalogVersion = () => db.transaction(async (tx) => {
-      const now = new Date();
-
-      await tx
-        .update(catalogVersions)
-        .set({
-          status: "archived"
-        })
-        .where(and(eq(catalogVersions.status, "active"), ne(catalogVersions.id, catalogVersionId)));
-
-      const [publishedVersion] = await tx
-        .update(catalogVersions)
-        .set({
-          status: "active",
-          publishedAt: now
-        })
-        .where(eq(catalogVersions.id, catalogVersionId))
-        .returning({ id: catalogVersions.id });
-
-      if (!publishedVersion) {
-        throw new Error("Версия каталога для публикации не найдена.");
-      }
-
-      await tx
-        .update(importBatches)
-        .set({
-          status: "published",
-          publishedAt: now
-        })
-        .where(eq(importBatches.catalogVersionId, catalogVersionId));
-    });
+    const switchActiveCatalogVersion = () => activateCatalogVersionInDatabase(catalogVersionId);
 
     if (perf) {
       await perf.measure("switch_active_catalog_version", switchActiveCatalogVersion);
     } else {
       await switchActiveCatalogVersion();
     }
+    await onCheckpoint?.("catalog_activated");
   } catch (error) {
     if (previousActiveVersionId) {
       await syncSearchIndexForCatalogVersion(previousActiveVersionId, perf).catch((restoreError) => {
@@ -81,6 +65,26 @@ export async function publishCatalogVersion({
     previousActiveVersionId,
     safety
   };
+}
+
+export async function activateCatalogVersionInDatabase(catalogVersionId: string) {
+  return db.transaction(async (tx) => {
+    const now = new Date();
+    await tx
+      .update(catalogVersions)
+      .set({ status: "archived" })
+      .where(and(eq(catalogVersions.status, "active"), ne(catalogVersions.id, catalogVersionId)));
+    const [publishedVersion] = await tx
+      .update(catalogVersions)
+      .set({ status: "active", publishedAt: now })
+      .where(eq(catalogVersions.id, catalogVersionId))
+      .returning({ id: catalogVersions.id });
+    if (!publishedVersion) throw new Error("Версия каталога для публикации не найдена.");
+    await tx
+      .update(importBatches)
+      .set({ status: "published", publishedAt: now })
+      .where(eq(importBatches.catalogVersionId, catalogVersionId));
+  });
 }
 
 export async function getPublishSafetyReport({

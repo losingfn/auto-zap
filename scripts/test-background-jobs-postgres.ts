@@ -24,6 +24,7 @@ async function main() {
   const worker = await import("../src/workers/background-worker");
   const adminImports = await import("../src/features/admin/imports");
   const publish = await import("../src/features/import/publish-service");
+  const importStorage = await import("../src/features/import/storage");
   const workerService = await import("../src/features/import/worker-service");
 
   await run("atomic claim gives one job to exactly one concurrent worker", async () => {
@@ -450,7 +451,7 @@ async function main() {
 
   await run("rejected worker upload removes its newly stored orphan file", async () => {
     await clearImportFixtures();
-    const uploadDir = path.join(process.cwd(), "data", "imports", "uploads");
+    const uploadDir = importStorage.getImportUploadDir();
     await mkdir(uploadDir, { recursive: true });
     const file = new File([Buffer.from("duplicate worker upload")], "duplicate.xlsx", {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -484,7 +485,7 @@ async function main() {
 
   await run("concurrent colliding uploads retain the accepted file and clean only the rejected file", async () => {
     await clearImportFixtures();
-    const uploadDir = path.join(process.cwd(), "data", "imports", "uploads");
+    const uploadDir = importStorage.getImportUploadDir();
     await mkdir(uploadDir, { recursive: true });
     const before = new Set(await readdir(uploadDir));
     const contents = Buffer.from("same timestamp, name, and content");
@@ -526,7 +527,7 @@ async function main() {
       `;
       assert.ok(acceptedBatch);
       assert.equal(acceptedBatch.file_hash, fileHash);
-      acceptedFilePath = path.resolve(process.cwd(), acceptedBatch.storage_path);
+      acceptedFilePath = importStorage.resolveImportStoragePath(acceptedBatch.storage_path);
       assert.equal(path.dirname(acceptedFilePath), uploadDir);
       assert.deepEqual(await readFile(acceptedFilePath), contents);
       assert.deepEqual(

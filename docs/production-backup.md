@@ -78,8 +78,8 @@ pnpm search:sync
 pm2 start ecosystem.config.cjs
 ```
 
-После запуска проверьте, что PM2 использует `/var/www/autozap/.next/standalone/server.js`,
-и выполните health checks из `docs/deployment.md`. Не выполняйте `pm2 save`, пока
+После запуска проверьте, что PM2 использует `/var/www/autozap/scripts/with-env.sh` с аргументом
+`node .next/standalone/server.js`, и выполните health checks из `docs/deployment.md`. Не выполняйте `pm2 save`, пока
 проверки не прошли успешно.
 
 ## Backup проекта

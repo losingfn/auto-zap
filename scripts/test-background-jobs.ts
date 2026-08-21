@@ -133,6 +133,8 @@ async function main() {
 
   run("web PM2 config cannot start the worker", () => {
     assert.doesNotMatch(mainEcosystemSource, /autozap-worker/);
+    assert.match(mainEcosystemSource, /script: "scripts\/with-env\.sh"/);
+    assert.match(mainEcosystemSource, /args: "node \.next\/standalone\/server\.js"/);
     assert.match(workerEcosystemSource, /autozap-worker/);
     assert.match(workerEcosystemSource, /WORKER_GRACEFUL_SHUTDOWN_MS: "10000"/);
     assert.match(workerEcosystemSource, /kill_timeout: 15000/);

@@ -29,6 +29,7 @@ import {
 import { publishCatalogVersion } from "@/features/import/publish-service";
 import { writeImportAuditSafely } from "@/features/import/audit";
 import { ImportSafetyError } from "@/features/import/safety";
+import { getImportStoragePath, getImportUploadDir, getImportUploadFilePath } from "@/features/import/storage";
 import type { ImportPerfLogger } from "@/lib/server/import-perf";
 import type { ImportPreviewReport, ImportSafetyCheckStatus } from "@/features/import/types";
 import { isImportWorkerModeAvailable } from "@/lib/feature-flags";
@@ -45,7 +46,6 @@ export {
 };
 
 const MAX_IMPORT_FILE_SIZE_BYTES = 25 * 1024 * 1024;
-const IMPORT_UPLOAD_DIR = path.join(process.cwd(), "data", "imports", "uploads");
 const ALLOWED_EXTENSIONS = new Set([".xls", ".xlsx"]);
 const ALLOWED_MIME_TYPES = new Set([
   "application/vnd.ms-excel",
@@ -714,14 +714,15 @@ async function saveUploadedImportFile(file: File | null) {
     originalName: file.name,
     fileHash
   });
-  const filePath = path.join(IMPORT_UPLOAD_DIR, storedFileName);
+  const uploadDir = getImportUploadDir();
+  const filePath = getImportUploadFilePath(storedFileName);
 
-  await mkdir(IMPORT_UPLOAD_DIR, { recursive: true });
+  await mkdir(uploadDir, { recursive: true });
   await writeFile(filePath, buffer);
 
   return {
     filePath,
-    storagePath: path.relative(process.cwd(), filePath),
+    storagePath: getImportStoragePath(filePath),
     originalName: file.name,
     fileHash,
     size: file.size

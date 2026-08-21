@@ -3,7 +3,9 @@ module.exports = {
     {
       name: "autozap",
       cwd: "/var/www/autozap",
-      script: ".next/standalone/server.js",
+      script: "scripts/with-env.sh",
+      args: "node .next/standalone/server.js",
+      interpreter: "none",
       env: {
         NODE_ENV: "production",
         HOSTNAME: "127.0.0.1",

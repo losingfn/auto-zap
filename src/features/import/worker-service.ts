@@ -1,5 +1,3 @@
-import { access } from "node:fs/promises";
-import path from "node:path";
 import { and, eq, exists, inArray, ne } from "drizzle-orm";
 import { db } from "@/db/client";
 import { backgroundJobs, importBatches } from "@/db/schema";
@@ -17,6 +15,7 @@ import { BackgroundJobExecutionError } from "@/features/background-jobs/types";
 import { getActiveCatalogVersionId } from "@/features/search/documents";
 import { syncSearchIndexForCatalogVersion } from "@/features/search/indexing";
 import { writeImportAuditSafely } from "./audit";
+import { resolveExistingImportStoragePath } from "./storage";
 
 type ImportJobBatch = {
   id: string;
@@ -66,9 +65,9 @@ export async function executeAnalyzeImportJob(
     throw new BackgroundJobExecutionError("FILE_NOT_FOUND", "Сохранённый Excel-файл не найден.", false);
   }
 
-  const filePath = resolveStoredImportPath(batch.storagePath);
+  let filePath: string;
   try {
-    await access(filePath);
+    filePath = await resolveExistingImportStoragePath(batch.storagePath);
   } catch {
     throw new BackgroundJobExecutionError("FILE_NOT_FOUND", "Сохранённый Excel-файл не найден.", false);
   }
@@ -329,15 +328,6 @@ async function setImportProgress(
   }
   await context.assertLease();
   throw new BackgroundJobExecutionError("DATABASE_TEMPORARY_ERROR", "Не удалось обновить состояние импорта.", true);
-}
-
-function resolveStoredImportPath(storagePath: string) {
-  const root = path.resolve(process.cwd(), "data", "imports", "uploads");
-  const candidate = path.resolve(process.cwd(), storagePath);
-  if (!candidate.startsWith(`${root}${path.sep}`)) {
-    throw new BackgroundJobExecutionError("FILE_NOT_FOUND", "Сохранённый Excel-файл не найден.", false);
-  }
-  return candidate;
 }
 
 function toImportJobError(error: unknown, fallbackCode: string, fallbackMessage: string) {

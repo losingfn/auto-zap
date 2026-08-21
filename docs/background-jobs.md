@@ -48,6 +48,20 @@ All flags are read centrally in `src/lib/feature-flags.ts`. Missing, malformed, 
 
 Turning any flag off does not alter existing business semantics; it keeps the legacy path active.
 
+## Persistent import upload storage
+
+The web process and `autozap-worker` must share one persistent directory for the source Excel files. Set this in the production `/var/www/autozap/.env`:
+
+```bash
+IMPORT_STORAGE_ROOT=/var/www/autozap
+```
+
+Both PM2 definitions load that `.env` through `scripts/with-env.sh`, then use `/var/www/autozap/data/imports/uploads`; the application creates that directory with `mkdir(..., { recursive: true })`. The `autozap` Linux user must retain read/write access to it. `storage_path` stays relative (`data/imports/uploads/<file>`), so existing DB rows remain portable. As a backwards-compatible read fallback, batches created by the old standalone runtime can still be read from `.next/standalone/data/imports/uploads` while that file exists; new uploads are never written there.
+
+For local development/tests, the resolver falls back to the project cwd and recognizes `<project>/.next/standalone` as the same project root. Never set `IMPORT_STORAGE_ROOT` to a relative path.
+
+Before the first production `pnpm build` containing this change, stop web and worker, then run `pnpm import:migrate-legacy-storage`. It moves legacy files from `.next/standalone/data/imports/uploads` into the persistent directory with `rename`, never copies them, and refuses target collisions. This preserves old queued/retryable batch files before Next clears `.next` during the build.
+
 ## Local operation
 
 Use a local or dedicated test database. Both the integration suite and benchmark require localhost, a test/integration database name, a non-production `NODE_ENV`, and an explicit opt-in variable.

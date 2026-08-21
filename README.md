@@ -43,6 +43,7 @@ pnpm dev
 - `APP_URL=https://autozapchast-taldom.ru`;
 - `NODE_ENV=production`;
 - `DATABASE_URL` для PostgreSQL базы `autozap`;
+- `IMPORT_STORAGE_ROOT=/var/www/autozap` для shared persistent-хранилища Excel-импортов;
 - `MEILI_HOST=http://127.0.0.1:7700` или фактический локальный адрес Meilisearch;
 - `MEILI_MASTER_KEY`;
 - `SESSION_SECRET`;
@@ -85,13 +86,13 @@ production всегда работает через PM2 с `ecosystem.config.cjs
 Полная production-инструкция находится в `docs/deployment.md`.
 
 Критично: проект использует Next.js `output: "standalone"`. Production PM2 должен
-запускать только:
+запускать `scripts/with-env.sh` с единственным Node entrypoint:
 
 ```bash
-/var/www/autozap/.next/standalone/server.js
+node .next/standalone/server.js
 ```
 
-через `ecosystem.config.cjs`.
+через `ecosystem.config.cjs`, чтобы standalone-сервер получил runtime-переменные из `.env`.
 
 `next start` в production запрещён. `pnpm build` нельзя запускать при работающем PM2
 в том же каталоге `/var/www/autozap`, потому что build меняет `.next` и может

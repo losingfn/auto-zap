@@ -11,7 +11,7 @@
 - Next.js собирается с `output: "standalone"`;
 - корректный production entrypoint: `/var/www/autozap/.next/standalone/server.js`.
 
-Важно: `next start` для этого проекта запрещён в production. Ранее PM2 был запущен через `next start`, хотя проект уже использовал standalone. При in-place деплое это могло приводить к смешиванию старой и новой сборки: часть пользователей видела страницу без CSS, без изображений, с ошибкой `Failed to find Server Action` или с бесконечной загрузкой. Сейчас это исправлено: PM2 должен запускаться только из `ecosystem.config.cjs`, через `/var/www/autozap/.next/standalone/server.js`.
+Важно: `next start` для этого проекта запрещён в production. Ранее PM2 был запущен через `next start`, хотя проект уже использовал standalone. При in-place деплое это могло приводить к смешиванию старой и новой сборки: часть пользователей видела страницу без CSS, без изображений, с ошибкой `Failed to find Server Action` или с бесконечной загрузкой. Сейчас это исправлено: PM2 должен запускаться только из `ecosystem.config.cjs`, через `scripts/with-env.sh node .next/standalone/server.js`. Обёртка загружает `/var/www/autozap/.env` до запуска standalone-сервера.
 
 ## 1. Общее Устройство Production
 
@@ -33,7 +33,7 @@ Production-стек:
 
 - `output: "standalone"` в `next.config.mjs` создаёт самодостаточный серверный релиз в `.next/standalone`;
 - production-процессу не нужно запускать Next CLI;
-- PM2 стартует обычный Node.js файл `/var/www/autozap/.next/standalone/server.js`;
+- PM2 запускает `scripts/with-env.sh node .next/standalone/server.js`, поэтому standalone-сервер получает runtime-переменные из `.env`;
 - этот способ соответствует предупреждению Next.js: при standalone нельзя использовать `next start`.
 
 Что нельзя делать:
@@ -181,6 +181,7 @@ Production-значения должны включать:
 - `APP_URL=https://autozapchast-taldom.ru`;
 - `NODE_ENV=production`;
 - `DATABASE_URL` для базы `autozap`;
+- `IMPORT_STORAGE_ROOT=/var/www/autozap` для общего persistent-хранилища исходных Excel-файлов web-процесса и worker;
 - `MEILI_HOST=http://127.0.0.1:7700` или фактический локальный адрес Meilisearch;
 - `MEILI_MASTER_KEY`;
 - `SESSION_SECRET` длиной не менее 32 случайных символов;
@@ -269,7 +270,9 @@ pm2 start ecosystem.config.cjs
 
 ```text
 cwd: /var/www/autozap
-script: .next/standalone/server.js
+script: scripts/with-env.sh
+args: node .next/standalone/server.js
+interpreter: none
 NODE_ENV: production
 HOSTNAME: 127.0.0.1
 PORT: 3000
@@ -293,16 +296,17 @@ console.log("NODE_ENV=" + value("NODE_ENV"));
 console.log("HOSTNAME=" + value("HOSTNAME"));
 console.log("PORT=" + value("PORT"));
 if ((env.pm_cwd || "") !== "/var/www/autozap") process.exit(3);
-if (!String(env.pm_exec_path || "").endsWith(".next/standalone/server.js")) process.exit(4);
-if (JSON.stringify(env.args || []).includes("next start")) process.exit(5);
-if (value("NODE_ENV") !== "production") process.exit(6);
-if (value("HOSTNAME") !== "127.0.0.1") process.exit(7);
-if (String(value("PORT")) !== "3000") process.exit(8);
+if (!String(env.pm_exec_path || "").endsWith("scripts/with-env.sh")) process.exit(4);
+if (!JSON.stringify(env.args || []).includes(".next/standalone/server.js")) process.exit(5);
+if (JSON.stringify(env.args || []).includes("next start")) process.exit(6);
+if (value("NODE_ENV") !== "production") process.exit(7);
+if (value("HOSTNAME") !== "127.0.0.1") process.exit(8);
+if (String(value("PORT")) !== "3000") process.exit(9);
 '
 rm -f /tmp/autozap-pm2-jlist.json
 ```
 
-Успешно: script указывает на `/var/www/autozap/.next/standalone/server.js`, args не содержат `next start`.
+Успешно: script указывает на `/var/www/autozap/scripts/with-env.sh`, а args — на `/var/www/autozap/.next/standalone/server.js`; args не содержат `next start`.
 
 Сохранять PM2 process list можно только после health checks:
 
@@ -449,7 +453,7 @@ cd /var/www/autozap
 pm2 show autozap
 ```
 
-Успешно: script path содержит `/var/www/autozap/.next/standalone/server.js`. Если виден `next start`, сначала исправить PM2 entrypoint и не выполнять deploy.
+Успешно: script path содержит `/var/www/autozap/scripts/with-env.sh`, а args — `.next/standalone/server.js`. Если виден `next start`, сначала исправить PM2 entrypoint и не выполнять deploy.
 
 Проверить git:
 
@@ -520,10 +524,19 @@ pnpm typecheck
 ### 8.5. Начало Downtime
 
 ```bash
+pm2 stop autozap-worker
 pm2 stop autozap
 ```
 
 Если команда не прошла, остановиться. Не запускать build.
+
+Для первого релиза с `IMPORT_STORAGE_ROOT` до `pnpm build` переместите legacy Excel-файлы из старого standalone-каталога в persistent storage:
+
+```bash
+pnpm import:migrate-legacy-storage
+```
+
+Команда использует `rename`, не копирует файлы и останавливается при collision. После успешного build web запускается через `ecosystem.config.cjs`, а worker — отдельным `pm2 restart autozap-worker --update-env`.
 
 Если зависимости менялись:
 
@@ -603,11 +616,12 @@ console.log("NODE_ENV=" + value("NODE_ENV"));
 console.log("HOSTNAME=" + value("HOSTNAME"));
 console.log("PORT=" + value("PORT"));
 if ((env.pm_cwd || "") !== "/var/www/autozap") process.exit(3);
-if (!String(env.pm_exec_path || "").endsWith(".next/standalone/server.js")) process.exit(4);
-if (JSON.stringify(env.args || []).includes("next start")) process.exit(5);
-if (value("NODE_ENV") !== "production") process.exit(6);
-if (value("HOSTNAME") !== "127.0.0.1") process.exit(7);
-if (String(value("PORT")) !== "3000") process.exit(8);
+if (!String(env.pm_exec_path || "").endsWith("scripts/with-env.sh")) process.exit(4);
+if (!JSON.stringify(env.args || []).includes(".next/standalone/server.js")) process.exit(5);
+if (JSON.stringify(env.args || []).includes("next start")) process.exit(6);
+if (value("NODE_ENV") !== "production") process.exit(7);
+if (value("HOSTNAME") !== "127.0.0.1") process.exit(8);
+if (String(value("PORT")) !== "3000") process.exit(9);
 ' "$BACKUP_DIR/pm2-jlist.after-start.json"
 ```
 
@@ -703,7 +717,7 @@ process.stdin.on("end", () => {
 '
 ```
 
-Успешно: путь содержит `/var/www/autozap/.next/standalone/server.js`, args не содержат `next start`.
+Успешно: script указывает на `/var/www/autozap/scripts/with-env.sh`, args содержат `/var/www/autozap/.next/standalone/server.js` и не содержат `next start`.
 
 ## 10. Rollback
 
@@ -875,7 +889,7 @@ find /var/www/autozap/.next -maxdepth 2 ! -user autozap -print | head
 - [ ] Я работаю под пользователем `autozap`, не root.
 - [ ] Каталог: `/var/www/autozap`.
 - [ ] `git status --short` пустой.
-- [ ] PM2 сейчас запускает `/var/www/autozap/.next/standalone/server.js`, не `next start`.
+- [ ] PM2 запускает `scripts/with-env.sh` с аргументом `.next/standalone/server.js`, не `next start`.
 - [ ] Есть доступ к `/var/backups/autozap`.
 - [ ] Создан backup `.next` и PM2 dump.
 - [ ] Понятно, менялись ли `package.json` или `pnpm-lock.yaml`.
@@ -886,7 +900,7 @@ find /var/www/autozap/.next -maxdepth 2 ! -user autozap -print | head
 ## 13. Чек-Лист После Деплоя
 
 - [ ] `pm2 status` показывает `autozap online`.
-- [ ] `pm2 show autozap` показывает `/var/www/autozap/.next/standalone/server.js`.
+- [ ] `pm2 show autozap` показывает `/var/www/autozap/scripts/with-env.sh`; args содержат `.next/standalone/server.js`.
 - [ ] Args не содержат `next start`.
 - [ ] `NODE_ENV=production`, `HOSTNAME=127.0.0.1`, `PORT=3000`.
 - [ ] `http://127.0.0.1:3000/` возвращает HTTP 200.

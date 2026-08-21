@@ -16,6 +16,7 @@ const pageSource = readFileSync("src/app/admin/(panel)/import/page.tsx", "utf8")
 const uploadSource = readFileSync("src/app/admin/(panel)/import/import-upload-form.tsx", "utf8");
 const navSource = readFileSync("src/app/admin/(panel)/admin-nav.tsx", "utf8");
 const migrationSource = readFileSync("db/migrations/0011_import_worker.sql", "utf8");
+const nextConfigSource = readFileSync("next.config.mjs", "utf8");
 
 function main() {
   run("only durable batch identifiers are accepted in import job payloads", () => {
@@ -131,6 +132,14 @@ function main() {
   run("admin navigation determines its active state from the current pathname", () => {
     assert.match(navSource, /usePathname/);
     assert.match(navSource, /aria-current/);
+  });
+
+  run("local images stay static for iPhone-compatible standalone delivery", () => {
+    const imagesConfig = nextConfigSource.slice(
+      nextConfigSource.indexOf("images:"),
+      nextConfigSource.indexOf("async headers")
+    );
+    assert.match(imagesConfig, /unoptimized:\s*true/);
   });
 
   run("background worker infrastructure remains fail-closed", () => {

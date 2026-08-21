@@ -15,11 +15,11 @@ const sql = postgres(databaseUrl, { max: 1 });
 
 const TEST_MEILI_PORT = 17700;
 const TEST_MEILI_HOST = `http://127.0.0.1:${TEST_MEILI_PORT}`;
-const BASE_PRODUCT_COUNT = 27_000;
-const SURVIVING_SAFE_COUNT = 21_698;
-const CONFLICT_CODES = [21_699, 21_700] as const;
+const BASE_PRODUCT_COUNT = 32_000;
+const SURVIVING_SAFE_COUNT = 26_698;
+const CONFLICT_CODES = [26_699, 26_700] as const;
 const NEW_PRODUCT_COUNT = 3_300;
-const REAPPEARING_PRODUCT_NUMBER = 27_000;
+const REAPPEARING_PRODUCT_NUMBER = 32_000;
 const ADMIN_ID = "99999999-9999-4999-8999-999999999999";
 const VERSION_ARCHIVE = "aaaaaaaa-0000-4000-8000-000000000001";
 const VERSION_ONE = "aaaaaaaa-0000-4000-8000-000000000002";
@@ -96,7 +96,7 @@ async function main() {
       })
     );
     v2Perf?.setImportBatchId(v2Draft.importBatchId);
-    assert.equal(v2Draft.report.productCandidateRows, 25_000);
+    assert.equal(v2Draft.report.productCandidateRows, 30_000);
     assert.equal(v2Draft.report.addedCount, NEW_PRODUCT_COUNT);
     assert.equal(v2Draft.report.archivedCount, 5_300);
     assert.equal(v2Draft.report.reviewRows, 2);
@@ -206,7 +206,7 @@ async function main() {
       })
     );
     v4Perf?.setImportBatchId(v4Draft.importBatchId);
-    assert.equal(v4Draft.report.productCandidateRows, 25_001);
+    assert.equal(v4Draft.report.productCandidateRows, 30_001);
     assert.equal(v4Draft.report.addedCount, 1, "Only reappearing shopCode must be a current-catalog new item.");
     assert.equal(v4Draft.report.reviewRows, 0);
     assert.equal(v4Draft.report.safety?.canPublish, true);
@@ -241,7 +241,7 @@ async function main() {
     console.log(`[stage3] metrics=${JSON.stringify(metrics)}`);
     console.log(
       `[stage3] result=${JSON.stringify({
-        activeProducts: 25_001,
+        activeProducts: 30_001,
         historicalReappearanceContinuity: "intentionally_not_implemented_for_safety",
         meili: "isolated_http_stub_only_no_real_test_meilisearch_available"
       })}`
@@ -416,7 +416,7 @@ async function loadControls(catalogVersionId: string) {
     INNER JOIN categories c ON c.id = p.category_id
     INNER JOIN subcategories s ON s.id = p.subcategory_id
     WHERE p.catalog_version_id = ${catalogVersionId}
-      AND p.shop_code IN (${shopCode(1)}, ${shopCode(8_000)}, ${shopCode(18_001)}, ${shopCode(21_699)}, ${shopCode(REAPPEARING_PRODUCT_NUMBER)})
+      AND p.shop_code IN (${shopCode(1)}, ${shopCode(8_000)}, ${shopCode(18_001)}, ${shopCode(CONFLICT_CODES[0])}, ${shopCode(REAPPEARING_PRODUCT_NUMBER)})
     ORDER BY p.shop_code
   `;
 }
@@ -444,7 +444,7 @@ function buildVersionTwoRows(): SnapshotProduct[] {
       price: 240 + (number % 800)
     });
   }
-  assert.equal(rows.length, 25_000);
+  assert.equal(rows.length, 30_000);
   return rows;
 }
 
@@ -512,7 +512,7 @@ async function assertVersionTwoPublished(
   const [activeCount] = await sql<{ count: number }[]>`
     SELECT count(*)::int AS count FROM products WHERE catalog_version_id = ${catalogVersionId} AND status = 'active'
   `;
-  assert.equal(activeCount?.count, 24_998);
+  assert.equal(activeCount?.count, 29_998);
 
   const afterUpdate = await loadPurchaseList(post, savedIdentityIds);
   assert.equal(afterUpdate.length, 70, "Absent identities must not resolve through archived V1.");
@@ -551,7 +551,7 @@ async function assertReviewPublication(
   const [activeCount] = await sql<{ count: number }[]>`
     SELECT count(*)::int AS count FROM products WHERE catalog_version_id = ${catalogVersionId} AND status = 'active'
   `;
-  assert.equal(activeCount?.count, 25_000);
+  assert.equal(activeCount?.count, 30_000);
   const rows = await sql<Array<{ shop_code: string; product_identity_id: string }>>`
     SELECT shop_code, product_identity_id
     FROM products
@@ -659,13 +659,7 @@ function minimalPublishReport(): import("../src/features/import/types").ImportPr
       existingPriceUpdatedCount: 0,
       increasedCount: 0,
       decreasedCount: 0,
-      unchangedCount: 1,
-      maxIncreaseAmount: 0,
-      maxIncreasePercent: 0,
-      maxDecreaseAmount: 0,
-      maxDecreasePercent: 0,
-      averageChangeAmount: 0,
-      averageChangePercent: 0
+      unchangedCount: 1
     },
     examples: {
       valid: [],
@@ -706,7 +700,7 @@ async function buildVersionFourRows(sourceVersionId: string): Promise<SnapshotPr
     WHERE catalog_version_id = ${sourceVersionId} AND status = 'active'
     ORDER BY shop_code
   `;
-  assert.equal(rows.length, 25_000);
+  assert.equal(rows.length, 30_000);
   const result = rows.map((row, index) => ({
     shopCode: row.shop_code,
     name: row.name,
@@ -874,7 +868,7 @@ async function verifyFinalIntegrity({
     WHERE catalog_version_id = ${finalVersionId} AND status IN ('needs_review', 'invalid')
   `;
   assert.equal(activeVersions?.count, 1);
-  assert.equal(activeProducts?.count, 25_001);
+  assert.equal(activeProducts?.count, 30_001);
   assert.equal(missingIdentity?.count, 0);
   assert.equal(unresolvedPublic?.count, 0);
 

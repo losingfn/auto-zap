@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readdir, readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, readdir, readFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import postgres from "postgres";
 import { assertLocalTestDatabase } from "../src/lib/server/local-db-safety";
@@ -9,16 +10,21 @@ const { databaseUrl, databaseName } = assertLocalTestDatabase({
   purpose: "Background jobs PostgreSQL integration test"
 });
 const sql = postgres(databaseUrl, { max: 1 });
+const TEST_ADMIN_ID = "00000000-0000-4000-8000-000000000001";
 
 async function main() {
   console.log(`[background-jobs-postgres] test database: ${databaseName}`);
   await rebuildCleanSchema();
   await assertMigrationContracts();
   await assertUpgradeFromPreviousSchema();
+  await ensureTestAdmin();
 
   const repository = await import("../src/features/background-jobs/repository");
   const types = await import("../src/features/background-jobs/types");
   const worker = await import("../src/workers/background-worker");
+  const adminImports = await import("../src/features/admin/imports");
+  const publish = await import("../src/features/import/publish-service");
+  const workerService = await import("../src/features/import/worker-service");
 
   await run("atomic claim gives one job to exactly one concurrent worker", async () => {
     await clearJobs();
@@ -308,6 +314,250 @@ async function main() {
     await withTimeout(workerPromise, 3_000);
     assert.equal((await jobRow(second.id)).status, "succeeded");
   });
+
+  await run("publish reservation rejects cancellation and guarded activation publishes once", async () => {
+    const fixture = await createPublishFixture(repository, { reservePublishJob: true });
+    await assert.rejects(
+      () => adminImports.cancelAdminImportBatch({ importBatchId: fixture.batchId, adminUserId: TEST_ADMIN_ID }),
+      (error: unknown) => error instanceof adminImports.AdminImportError && error.code === "already_finalized"
+    );
+    await publish.activateCatalogVersionInDatabase(fixture.targetVersionId, {
+      importBatchId: fixture.batchId,
+      publishJob: {
+        id: fixture.job!.id,
+        workerId: "publish-worker",
+        leaseToken: fixture.job!.leaseToken!
+      }
+    });
+    assert.deepEqual(await catalogAndBatchState(fixture), {
+      activeCatalogVersionId: fixture.targetVersionId,
+      batchStatus: "published",
+      targetVersionStatus: "active"
+    });
+  });
+
+  await run("cancelled draft cannot later activate and cancelled analyze stays cancelled", async () => {
+    const fixture = await createPublishFixture(repository);
+    await adminImports.cancelAdminImportBatch({ importBatchId: fixture.batchId, adminUserId: TEST_ADMIN_ID });
+    await assert.rejects(
+      () => publish.activateCatalogVersionInDatabase(fixture.targetVersionId, { importBatchId: fixture.batchId }),
+      publish.CatalogActivationGuardError
+    );
+    await workerService.markImportJobFailure({
+      job: { type: "analyze_import", payload: { batchId: fixture.batchId } },
+      error: { code: "ANALYSIS_FAILED", message: "safe", retryable: false },
+      willRetry: false
+    });
+    assert.deepEqual(await catalogAndBatchState(fixture), {
+      activeCatalogVersionId: fixture.oldVersionId,
+      batchStatus: "cancelled",
+      targetVersionStatus: "rolled_back"
+    });
+  });
+
+  await run("double publish request shares one job and blocks a later cancel", async () => {
+    const fixture = await createPublishFixture(repository);
+    const previousBackground = process.env.BACKGROUND_JOBS_ENABLED;
+    const previousImport = process.env.IMPORT_VIA_WORKER_ENABLED;
+    process.env.BACKGROUND_JOBS_ENABLED = "true";
+    process.env.IMPORT_VIA_WORKER_ENABLED = "true";
+    try {
+      const [first, second] = await Promise.all([
+        adminImports.enqueueAdminImportPublish({ importBatchId: fixture.batchId, adminUserId: TEST_ADMIN_ID }),
+        adminImports.enqueueAdminImportPublish({ importBatchId: fixture.batchId, adminUserId: TEST_ADMIN_ID })
+      ]);
+      assert.equal(first.backgroundJobId, second.backgroundJobId);
+      assert.equal(await countImportJobs(fixture.batchId, "publish_import"), 1);
+      await assert.rejects(
+        () => adminImports.cancelAdminImportBatch({ importBatchId: fixture.batchId, adminUserId: TEST_ADMIN_ID }),
+        (error: unknown) => error instanceof adminImports.AdminImportError && error.code === "already_finalized"
+      );
+    } finally {
+      restoreEnvironment("BACKGROUND_JOBS_ENABLED", previousBackground);
+      restoreEnvironment("IMPORT_VIA_WORKER_ENABLED", previousImport);
+    }
+  });
+
+  await run("published catalog retries failed search reconciliation without reopening cancellation", async () => {
+    const fixture = await createPublishFixture(repository, { reservePublishJob: true });
+    await publish.activateCatalogVersionInDatabase(fixture.targetVersionId, {
+      importBatchId: fixture.batchId,
+      publishJob: {
+        id: fixture.job!.id,
+        workerId: "publish-worker",
+        leaseToken: fixture.job!.leaseToken!
+      }
+    });
+    const error = { code: "SEARCH_TEMPORARY_ERROR", message: "safe", retryable: false };
+    await repository.failBackgroundJob({
+      job: fixture.job!,
+      workerId: "publish-worker",
+      leaseToken: fixture.job!.leaseToken!,
+      error
+    });
+    await workerService.markImportJobFailure({
+      job: { type: "publish_import", payload: { batchId: fixture.batchId } },
+      error,
+      willRetry: false
+    });
+
+    const previousBackground = process.env.BACKGROUND_JOBS_ENABLED;
+    const previousImport = process.env.IMPORT_VIA_WORKER_ENABLED;
+    process.env.BACKGROUND_JOBS_ENABLED = "true";
+    process.env.IMPORT_VIA_WORKER_ENABLED = "true";
+    try {
+      const retried = await adminImports.enqueueAdminImportPublish({
+        importBatchId: fixture.batchId,
+        adminUserId: TEST_ADMIN_ID
+      });
+      assert.equal(retried.created, true);
+      assert.equal(retried.backgroundJobId, fixture.job!.id);
+      assert.equal((await jobRow(fixture.job!.id)).status, "pending");
+      assert.deepEqual(await catalogAndBatchState(fixture), {
+        activeCatalogVersionId: fixture.targetVersionId,
+        batchStatus: "published",
+        targetVersionStatus: "active"
+      });
+      await assert.rejects(
+        () => adminImports.cancelAdminImportBatch({ importBatchId: fixture.batchId, adminUserId: TEST_ADMIN_ID }),
+        (failure: unknown) => failure instanceof adminImports.AdminImportError && failure.code === "already_finalized"
+      );
+    } finally {
+      restoreEnvironment("BACKGROUND_JOBS_ENABLED", previousBackground);
+      restoreEnvironment("IMPORT_VIA_WORKER_ENABLED", previousImport);
+    }
+  });
+
+  await run("audit failure after a committed cancellation stays best-effort", async () => {
+    const fixture = await createPublishFixture(repository);
+    await sql.unsafe(`
+      CREATE OR REPLACE FUNCTION test_import_audit_failure() RETURNS trigger AS $$
+      BEGIN
+        RAISE EXCEPTION 'test audit failure';
+      END;
+      $$ LANGUAGE plpgsql;
+      CREATE TRIGGER test_import_audit_failure
+      BEFORE INSERT ON audit_logs
+      FOR EACH ROW EXECUTE FUNCTION test_import_audit_failure();
+    `);
+    try {
+      await adminImports.cancelAdminImportBatch({ importBatchId: fixture.batchId, adminUserId: TEST_ADMIN_ID });
+      assert.equal((await importBatchRow(fixture.batchId)).status, "cancelled");
+    } finally {
+      await sql.unsafe("DROP TRIGGER IF EXISTS test_import_audit_failure ON audit_logs; DROP FUNCTION IF EXISTS test_import_audit_failure();");
+    }
+  });
+
+  await run("rejected worker upload removes its newly stored orphan file", async () => {
+    await clearImportFixtures();
+    const uploadDir = path.join(process.cwd(), "data", "imports", "uploads");
+    await mkdir(uploadDir, { recursive: true });
+    const file = new File([Buffer.from("duplicate worker upload")], "duplicate.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+    const fileHash = createHash("sha256").update(Buffer.from("duplicate worker upload")).digest("hex");
+    const [version] = await sql<{ id: string }[]>`
+      INSERT INTO catalog_versions (status, source_file_name)
+      VALUES ('draft', 'duplicate.xlsx')
+      RETURNING id
+    `;
+    await sql`
+      INSERT INTO import_batches (catalog_version_id, status, source_file_name, file_hash, report)
+      VALUES (${version.id}, 'analyzed', 'duplicate.xlsx', ${fileHash}, ${JSON.stringify(publishableReport())}::jsonb)
+    `;
+    const before = new Set(await readdir(uploadDir));
+    const previousBackground = process.env.BACKGROUND_JOBS_ENABLED;
+    const previousImport = process.env.IMPORT_VIA_WORKER_ENABLED;
+    process.env.BACKGROUND_JOBS_ENABLED = "true";
+    process.env.IMPORT_VIA_WORKER_ENABLED = "true";
+    try {
+      await assert.rejects(
+        () => adminImports.enqueueAdminImportFromUpload({ file, adminUserId: TEST_ADMIN_ID }),
+        (error: unknown) => error instanceof adminImports.AdminImportError && error.code === "import_in_progress"
+      );
+      assert.deepEqual(new Set(await readdir(uploadDir)), before);
+    } finally {
+      restoreEnvironment("BACKGROUND_JOBS_ENABLED", previousBackground);
+      restoreEnvironment("IMPORT_VIA_WORKER_ENABLED", previousImport);
+    }
+  });
+
+  await run("concurrent colliding uploads retain the accepted file and clean only the rejected file", async () => {
+    await clearImportFixtures();
+    const uploadDir = path.join(process.cwd(), "data", "imports", "uploads");
+    await mkdir(uploadDir, { recursive: true });
+    const before = new Set(await readdir(uploadDir));
+    const contents = Buffer.from("same timestamp, name, and content");
+    const fileHash = createHash("sha256").update(contents).digest("hex");
+    const firstFile = new File([contents], "same-catalog.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+    const secondFile = new File([contents], "same-catalog.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+    const originalDateNow = Date.now;
+    const previousBackground = process.env.BACKGROUND_JOBS_ENABLED;
+    const previousImport = process.env.IMPORT_VIA_WORKER_ENABLED;
+    let acceptedFilePath: string | null = null;
+
+    Date.now = () => 1_725_000_000_000;
+    process.env.BACKGROUND_JOBS_ENABLED = "true";
+    process.env.IMPORT_VIA_WORKER_ENABLED = "true";
+    try {
+      const attempts = await Promise.allSettled([
+        adminImports.enqueueAdminImportFromUpload({ file: firstFile, adminUserId: TEST_ADMIN_ID }),
+        adminImports.enqueueAdminImportFromUpload({ file: secondFile, adminUserId: TEST_ADMIN_ID })
+      ]);
+      const accepted = attempts.filter(
+        (attempt): attempt is PromiseFulfilledResult<{ importBatchId: string; backgroundJobId: string }> =>
+          attempt.status === "fulfilled"
+      );
+      const rejected = attempts.filter((attempt): attempt is PromiseRejectedResult => attempt.status === "rejected");
+
+      assert.equal(accepted.length, 1);
+      assert.equal(rejected.length, 1);
+      assert.ok(rejected[0]?.reason instanceof adminImports.AdminImportError);
+      assert.equal(rejected[0]?.reason.code, "import_in_progress");
+
+      const [acceptedBatch] = await sql<{ id: string; storage_path: string; file_hash: string }[]>`
+        SELECT id, storage_path, file_hash
+        FROM import_batches
+        WHERE id = ${accepted[0]!.value.importBatchId}
+      `;
+      assert.ok(acceptedBatch);
+      assert.equal(acceptedBatch.file_hash, fileHash);
+      acceptedFilePath = path.resolve(process.cwd(), acceptedBatch.storage_path);
+      assert.equal(path.dirname(acceptedFilePath), uploadDir);
+      assert.deepEqual(await readFile(acceptedFilePath), contents);
+      assert.deepEqual(
+        (await readdir(uploadDir)).filter((fileName) => !before.has(fileName)).sort(),
+        [path.basename(acceptedFilePath)]
+      );
+    } finally {
+      Date.now = originalDateNow;
+      restoreEnvironment("BACKGROUND_JOBS_ENABLED", previousBackground);
+      restoreEnvironment("IMPORT_VIA_WORKER_ENABLED", previousImport);
+      if (acceptedFilePath) await unlink(acceptedFilePath);
+    }
+  });
+
+  await run("worker import mode fails closed when background processing is disabled", async () => {
+    await clearImportFixtures();
+    const previousBackground = process.env.BACKGROUND_JOBS_ENABLED;
+    const previousImport = process.env.IMPORT_VIA_WORKER_ENABLED;
+    process.env.BACKGROUND_JOBS_ENABLED = "false";
+    process.env.IMPORT_VIA_WORKER_ENABLED = "true";
+    try {
+      await assert.rejects(
+        () => adminImports.enqueueAdminImportFromUpload({ file: null, adminUserId: TEST_ADMIN_ID }),
+        (error: unknown) => error instanceof adminImports.AdminImportError && error.code === "worker_unavailable"
+      );
+      assert.equal(await countJobs(), 0);
+    } finally {
+      restoreEnvironment("BACKGROUND_JOBS_ENABLED", previousBackground);
+      restoreEnvironment("IMPORT_VIA_WORKER_ENABLED", previousImport);
+    }
+  });
 }
 
 async function rebuildCleanSchema() {
@@ -317,9 +567,14 @@ async function rebuildCleanSchema() {
 }
 
 async function assertUpgradeFromPreviousSchema() {
-  console.log("[background-jobs-postgres] applying 0009 over previous test schema");
-  await sql.unsafe("DROP TABLE background_jobs; DROP TYPE background_job_status;");
-  await applyMigration("0009_background_jobs.sql");
+  console.log("[background-jobs-postgres] applying 0011 over the previous schema");
+  await sql.unsafe("DROP SCHEMA public CASCADE; CREATE SCHEMA public;");
+  const migrationDir = path.join(process.cwd(), "db", "migrations");
+  const files = (await readdir(migrationDir))
+    .filter((file) => file.endsWith(".sql") && file < "0011_import_worker.sql")
+    .sort();
+  for (const file of files) await applyMigration(file);
+  await applyMigration("0011_import_worker.sql");
   await assertMigrationContracts();
 }
 
@@ -357,10 +612,132 @@ async function assertMigrationContracts() {
   `;
   assert.ok(indexes.some((row) => row.indexname === "background_jobs_claim_idx"));
   assert.ok(indexes.some((row) => row.indexname === "background_jobs_type_idempotency_key_unique"));
+  const importColumns = await sql<{ column_name: string }[]>`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name = 'import_batches'
+  `;
+  const importColumnNames = new Set(importColumns.map((row) => row.column_name));
+  for (const column of ["analyze_job_id", "publish_job_id", "publish_checkpoint", "last_error_code"]) {
+    assert.ok(importColumnNames.has(column));
+  }
+}
+
+async function ensureTestAdmin() {
+  await sql`
+    INSERT INTO admin_users (id, email, full_name, password_hash, role, is_active)
+    VALUES (${TEST_ADMIN_ID}, 'integration-admin@example.test', 'Integration Admin', 'not-used', 'owner', true)
+    ON CONFLICT (id) DO NOTHING
+  `;
+}
+
+type PublishFixture = {
+  oldVersionId: string;
+  targetVersionId: string;
+  batchId: string;
+  job: Awaited<ReturnType<typeof import("../src/features/background-jobs/repository").claimNextBackgroundJob>>;
+};
+
+async function createPublishFixture(
+  repository: typeof import("../src/features/background-jobs/repository"),
+  options: { reservePublishJob?: boolean } = {}
+): Promise<PublishFixture> {
+  await clearImportFixtures();
+  const [oldVersion] = await sql<{ id: string }[]>`
+    INSERT INTO catalog_versions (status, source_file_name, published_at)
+    VALUES ('active', 'old.xlsx', now())
+    RETURNING id
+  `;
+  const [targetVersion] = await sql<{ id: string }[]>`
+    INSERT INTO catalog_versions (status, source_file_name)
+    VALUES ('draft', 'new.xlsx')
+    RETURNING id
+  `;
+  const [batch] = await sql<{ id: string }[]>`
+    INSERT INTO import_batches (catalog_version_id, status, source_file_name, report, phase)
+    VALUES (${targetVersion.id}, 'analyzed', 'new.xlsx', ${JSON.stringify(publishableReport())}::jsonb, 'analyzed')
+    RETURNING id
+  `;
+
+  if (!options.reservePublishJob) {
+    return {
+      oldVersionId: oldVersion.id,
+      targetVersionId: targetVersion.id,
+      batchId: batch.id,
+      job: null
+    };
+  }
+
+  const created = await repository.createBackgroundJob({
+    type: "publish_import",
+    payload: { batchId: batch.id },
+    idempotencyKey: `test-publish:${batch.id}`
+  });
+  await sql`
+    UPDATE import_batches
+    SET publish_job_id = ${created.id}, phase = 'publish_queued', stage = 'Публикация поставлена в очередь'
+    WHERE id = ${batch.id}
+  `;
+  const job = await repository.claimNextBackgroundJob({ workerId: "publish-worker" });
+  assert.equal(job?.id, created.id);
+
+  return {
+    oldVersionId: oldVersion.id,
+    targetVersionId: targetVersion.id,
+    batchId: batch.id,
+    job
+  };
+}
+
+function publishableReport() {
+  return {
+    addedCount: 0,
+    updatedCount: 0,
+    archivedCount: 0,
+    errorRows: 0,
+    reviewRows: 0,
+    safety: { canPublish: true }
+  };
+}
+
+async function catalogAndBatchState(fixture: PublishFixture) {
+  const [active] = await sql<{ id: string }[]>`
+    SELECT id FROM catalog_versions WHERE status = 'active' ORDER BY published_at DESC NULLS LAST LIMIT 1
+  `;
+  const [batch] = await sql<{ status: string }[]>`SELECT status FROM import_batches WHERE id = ${fixture.batchId}`;
+  const [target] = await sql<{ status: string }[]>`SELECT status FROM catalog_versions WHERE id = ${fixture.targetVersionId}`;
+  return {
+    activeCatalogVersionId: active?.id ?? null,
+    batchStatus: batch?.status ?? null,
+    targetVersionStatus: target?.status ?? null
+  };
+}
+
+async function importBatchRow(id: string) {
+  const [row] = await sql<{ status: string }[]>`SELECT status FROM import_batches WHERE id = ${id}`;
+  assert.ok(row, `Missing import batch ${id}`);
+  return row;
+}
+
+async function countImportJobs(batchId: string, type: string) {
+  const [row] = await sql<{ count: number }[]>`
+    SELECT count(*)::int AS count
+    FROM background_jobs
+    WHERE type = ${type} AND payload ->> 'batchId' = ${batchId}
+  `;
+  return Number(row.count);
+}
+
+async function clearImportFixtures() {
+  await sql.unsafe("TRUNCATE TABLE import_batches, background_jobs, catalog_versions CASCADE;");
+}
+
+function restoreEnvironment(key: string, value: string | undefined) {
+  if (value === undefined) delete process.env[key];
+  else process.env[key] = value;
 }
 
 async function clearJobs() {
-  await sql.unsafe("TRUNCATE TABLE background_jobs;");
+  await sql.unsafe("TRUNCATE TABLE import_batches, background_jobs CASCADE;");
 }
 
 async function countJobs() {

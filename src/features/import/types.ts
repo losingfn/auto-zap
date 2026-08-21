@@ -152,12 +152,6 @@ export interface ImportPriceChangeReport {
   increasedCount: number;
   decreasedCount: number;
   unchangedCount: number;
-  maxIncreaseAmount: number;
-  maxIncreasePercent: number;
-  maxDecreaseAmount: number;
-  maxDecreasePercent: number;
-  averageChangeAmount: number;
-  averageChangePercent: number;
 }
 
 export type ImportSafetyCheckStatus = "passed" | "warning" | "blocked";

@@ -1,62 +1,64 @@
 import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { getPublicTaxonomyTargets } from "@/config/public-taxonomy";
 import { db } from "@/db/client";
-import { catalogVersions, categories, importBatches, products, subcategories } from "@/db/schema";
+import { backgroundJobs, catalogVersions, categories, importBatches, products, subcategories } from "@/db/schema";
 import { isBlockingImportDraft } from "@/features/import/import-state";
 import { assertImportSafety, evaluateImportSafety } from "@/features/import/safety";
 import type { ImportPerfLogger } from "@/lib/server/import-perf";
 import type { ImportPreviewReport, ImportSafetyReport } from "@/features/import/types";
-import { syncSearchIndexForCatalogVersion } from "@/features/search/indexing";
+import {
+  activatePreparedCatalogSearchIndex,
+  prepareSearchIndexForCatalogVersion,
+  syncSearchIndexForCatalogVersion
+} from "@/features/search/indexing";
 
 export interface PublishCatalogVersionInput {
   catalogVersionId: string;
   report: ImportPreviewReport;
   perf?: ImportPerfLogger;
+  activation?: CatalogVersionActivationInput;
+  onCheckpoint?: (
+    checkpoint: "prepared" | "search_index_built" | "search_swap_started" | "search_swapped" | "catalog_activated"
+  ) => Promise<void>;
+}
+
+export type CatalogVersionActivationInput = {
+  importBatchId?: string;
+  publishJob?: {
+    id: string;
+    workerId: string;
+    leaseToken: string;
+  };
+};
+
+export class CatalogActivationGuardError extends Error {
+  constructor(message = "Состояние публикации изменилось до переключения каталога.") {
+    super(message);
+    this.name = "CatalogActivationGuardError";
+  }
 }
 
 export async function publishCatalogVersion({
   catalogVersionId,
   report,
-  perf
+  perf,
+  activation,
+  onCheckpoint
 }: PublishCatalogVersionInput) {
   const safety = await getPublishSafetyReport({ catalogVersionId, report });
   assertImportSafety(safety);
 
   const previousActiveVersionId = await getActiveCatalogVersionId(catalogVersionId);
-  const searchResult = await syncSearchIndexForCatalogVersion(catalogVersionId, perf);
+  await onCheckpoint?.("prepared");
+  const preparedSearchIndex = await prepareSearchIndexForCatalogVersion(catalogVersionId, perf);
+  await onCheckpoint?.("search_index_built");
+  await onCheckpoint?.("search_swap_started");
+  const searchResult = await activatePreparedCatalogSearchIndex(preparedSearchIndex, perf);
+  await onCheckpoint?.("search_swapped");
 
   try {
-    const switchActiveCatalogVersion = () => db.transaction(async (tx) => {
-      const now = new Date();
-
-      await tx
-        .update(catalogVersions)
-        .set({
-          status: "archived"
-        })
-        .where(and(eq(catalogVersions.status, "active"), ne(catalogVersions.id, catalogVersionId)));
-
-      const [publishedVersion] = await tx
-        .update(catalogVersions)
-        .set({
-          status: "active",
-          publishedAt: now
-        })
-        .where(eq(catalogVersions.id, catalogVersionId))
-        .returning({ id: catalogVersions.id });
-
-      if (!publishedVersion) {
-        throw new Error("Версия каталога для публикации не найдена.");
-      }
-
-      await tx
-        .update(importBatches)
-        .set({
-          status: "published",
-          publishedAt: now
-        })
-        .where(eq(importBatches.catalogVersionId, catalogVersionId));
-    });
+    const switchActiveCatalogVersion = () =>
+      activateCatalogVersionInDatabase(catalogVersionId, activation);
 
     if (perf) {
       await perf.measure("switch_active_catalog_version", switchActiveCatalogVersion);
@@ -76,11 +78,106 @@ export async function publishCatalogVersion({
     throw error;
   }
 
+  // PostgreSQL is now the source of truth. A failed post-commit checkpoint
+  // must never restore an older search index.
+  await onCheckpoint?.("catalog_activated");
+
   return {
     ...searchResult,
     previousActiveVersionId,
     safety
   };
+}
+
+export async function activateCatalogVersionInDatabase(
+  catalogVersionId: string,
+  activation: CatalogVersionActivationInput = {}
+) {
+  return db.transaction(async (tx) => {
+    const now = new Date();
+    const [batch] = await tx
+      .select({
+        id: importBatches.id,
+        status: importBatches.status,
+        catalogVersionId: importBatches.catalogVersionId,
+        publishJobId: importBatches.publishJobId,
+        phase: importBatches.phase
+      })
+      .from(importBatches)
+      .where(
+        and(
+          eq(importBatches.catalogVersionId, catalogVersionId),
+          ...(activation.importBatchId ? [eq(importBatches.id, activation.importBatchId)] : [])
+        )
+      )
+      .for("update")
+      .limit(1);
+
+    if (!batch || batch.status !== "analyzed" || batch.catalogVersionId !== catalogVersionId) {
+      throw new CatalogActivationGuardError();
+    }
+
+    if (activation.publishJob) {
+      if (
+        batch.publishJobId !== activation.publishJob.id ||
+        !["publish_queued", "publishing", "publish_retrying"].includes(batch.phase ?? "")
+      ) {
+        throw new CatalogActivationGuardError();
+      }
+      const [job] = await tx
+        .select({
+          id: backgroundJobs.id,
+          status: backgroundJobs.status,
+          lockedBy: backgroundJobs.lockedBy,
+          leaseToken: backgroundJobs.leaseToken,
+          type: backgroundJobs.type
+        })
+        .from(backgroundJobs)
+        .where(eq(backgroundJobs.id, activation.publishJob.id))
+        .for("update")
+        .limit(1);
+      if (
+        !job ||
+        job.type !== "publish_import" ||
+        job.status !== "running" ||
+        job.lockedBy !== activation.publishJob.workerId ||
+        job.leaseToken !== activation.publishJob.leaseToken
+      ) {
+        throw new CatalogActivationGuardError();
+      }
+    } else if (batch.publishJobId) {
+      // Legacy publishing is never allowed to race a reserved worker publish.
+      throw new CatalogActivationGuardError();
+    }
+
+    const [publishedVersion] = await tx
+      .update(catalogVersions)
+      .set({ status: "active", publishedAt: now })
+      .where(and(eq(catalogVersions.id, catalogVersionId), eq(catalogVersions.status, "draft")))
+      .returning({ id: catalogVersions.id });
+    if (!publishedVersion) throw new CatalogActivationGuardError();
+
+    await tx
+      .update(catalogVersions)
+      .set({ status: "archived" })
+      .where(and(eq(catalogVersions.status, "active"), ne(catalogVersions.id, catalogVersionId)));
+    const [publishedBatch] = await tx
+      .update(importBatches)
+      .set({
+        status: "published",
+        phase: "published",
+        stage: "Опубликовано",
+        progress: 100,
+        publishCheckpoint: "catalog_activated",
+        lastErrorCode: null,
+        lastErrorMessage: null,
+        processingUpdatedAt: now,
+        publishedAt: now
+      })
+      .where(and(eq(importBatches.id, batch.id), eq(importBatches.status, "analyzed")))
+      .returning({ id: importBatches.id });
+    if (!publishedBatch) throw new CatalogActivationGuardError();
+  });
 }
 
 export async function getPublishSafetyReport({

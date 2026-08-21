@@ -5,13 +5,6 @@ import { useFormStatus } from "react-dom";
 
 const maxFileSizeBytes = 25 * 1024 * 1024;
 const allowedExtensions = new Set(["xls", "xlsx"]);
-const waitingStages = [
-  "Загружаем файл",
-  "Проверяем структуру Excel",
-  "Сопоставляем товары",
-  "Проверяем safety",
-  "Обновляем каталог и поиск"
-];
 
 type ImportUploadFormProps = {
   action: (formData: FormData) => void | Promise<void>;
@@ -87,7 +80,7 @@ export function ImportUploadForm({
       aria-labelledby="new-import-title"
     >
       <h2 id="new-import-title" className="text-lg font-semibold">
-        Новый импорт
+        Новый прайс
       </h2>
       <form
         id={formId}
@@ -141,27 +134,13 @@ function ImportUploadFields({
 }) {
   const { pending } = useFormStatus();
   const busy = pending || isSubmitting;
-  const [activeStage, setActiveStage] = useState(0);
   const liveMessage = busy
-    ? `${waitingStages[activeStage]}. Не закрывайте страницу.`
+    ? "Загружаем файл."
     : visibleError
       ? visibleError
       : selectedFile
         ? `Выбран файл ${selectedFile.name}.`
         : "Выберите Excel-файл.";
-
-  useEffect(() => {
-    if (!busy) {
-      setActiveStage(0);
-      return;
-    }
-
-    const timer = window.setInterval(() => {
-      setActiveStage((current) => (current + 1) % waitingStages.length);
-    }, 1600);
-
-    return () => window.clearInterval(timer);
-  }, [busy]);
 
   return (
     <div className="grid gap-4">
@@ -188,7 +167,7 @@ function ImportUploadFields({
           className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-card bg-[#73A0F5] px-5 text-sm font-semibold text-[#07101F] transition hover:bg-[#9DBDFB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#93C5FD] active:translate-y-px disabled:cursor-not-allowed disabled:bg-[#334155] disabled:text-[#94A3B8] lg:w-auto"
         >
           {busy ? <Spinner /> : null}
-          {busy ? "Обновляем каталог..." : "Обновить каталог"}
+          {busy ? "Загружаем файл..." : "Загрузить и проверить прайс"}
         </button>
       </div>
 
@@ -216,41 +195,23 @@ function ImportUploadFields({
         </div>
       ) : null}
 
-      {busy ? <WaitingStages activeStage={activeStage} /> : null}
+      {busy ? <UploadAccepting /> : null}
     </div>
   );
 }
 
-function WaitingStages({ activeStage }: { activeStage: number }) {
+function UploadAccepting() {
   return (
     <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4" aria-live="polite">
       <div className="flex items-start gap-3">
         <Spinner />
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-[#C8D1DF]">Идёт обработка файла</p>
+          <p className="text-sm font-semibold text-[#C8D1DF]">Загружаем файл</p>
           <p className="mt-1 text-sm leading-6 text-[#8FA1B8]">
-            Не закрывайте страницу. Обработка большого прайса может занять некоторое время.
+            После приёма файла обработка продолжится на сервере.
           </p>
         </div>
       </div>
-      <ol className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-        {waitingStages.map((stage, index) => (
-          <li
-            key={stage}
-            className={[
-              "rounded-card border px-3 py-2 text-sm transition",
-              index === activeStage
-                ? "border-[#73A0F5] bg-[#17263F] text-white"
-                : "border-[#243249] bg-[#101827] text-[#8FA1B8]"
-            ].join(" ")}
-          >
-            {stage}
-          </li>
-        ))}
-      </ol>
-      <p className="mt-3 text-xs leading-5 text-[#8FA1B8]">
-        Это индикатор ожидания: сервер сообщит итог после завершения обновления.
-      </p>
     </div>
   );
 }

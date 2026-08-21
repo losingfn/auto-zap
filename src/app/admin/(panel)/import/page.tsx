@@ -3,114 +3,53 @@ import Link from "next/link";
 import { getAdminImportPageData, type StoredImportReport } from "@/features/admin/imports";
 import { publishImportAction, uploadImportAction } from "./actions";
 import { ImportCancelButton } from "./import-cancel-button";
+import { ImportProgressCard } from "./import-progress-card";
 import { ImportUploadForm } from "./import-upload-form";
+import { PublishImportButton } from "./publish-import-button";
 
-export const metadata: Metadata = {
-  title: "Импорт Excel"
-};
+export const metadata: Metadata = { title: "Импорт Excel" };
 
 type ImportPageProps = {
   searchParams: Promise<{
     batch?: string;
     error?: string;
-    uploaded?: string;
+    accepted?: string;
+    analyzed?: string;
     published?: string;
+    publish_requested?: string;
     cancelled?: string;
   }>;
 };
 
 const numberFormatter = new Intl.NumberFormat("ru-RU");
-const percentFormatter = new Intl.NumberFormat("ru-RU", {
-  style: "percent",
-  maximumFractionDigits: 1
-});
-const moneyFormatter = new Intl.NumberFormat("ru-RU", {
-  style: "currency",
-  currency: "RUB",
-  maximumFractionDigits: 2
-});
 const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
   dateStyle: "medium",
   timeStyle: "short",
   timeZone: "Europe/Moscow"
 });
 const importFormId = "admin-import-upload-form";
-
 const statusLabels: Record<string, string> = {
-  uploaded: "Загружен",
-  analyzed: "Предварительный отчёт готов",
+  uploaded: "Обрабатывается",
+  analyzed: "Готов к публикации",
   published: "Опубликован",
   cancelled: "Отменён",
-  failed: "Ошибка",
-  draft: "Черновик",
-  active: "Активная версия",
-  archived: "Архив",
-  rolled_back: "Отменён"
+  failed: "Ошибка"
 };
-
 const errorMessages: Record<string, string> = {
   missing_file: "Выберите Excel-файл для загрузки.",
   empty_file: "Файл пустой.",
   file_too_large: "Файл слишком большой. Максимальный размер — 25 МБ.",
   invalid_extension: "Загрузить можно только .xls или .xlsx.",
   invalid_type: "Тип файла не похож на Excel-документ.",
-  analysis_failed: "Не удалось прочитать Excel-файл или подготовить отчёт импорта.",
-  publish_failed: "Не удалось опубликовать импорт.",
-  safety_blocked: "Публикация заблокирована safety checks. Проверьте отчёт ниже.",
+  analysis_failed: "Не удалось обработать Excel-файл.",
+  publish_failed: "Не удалось опубликовать изменения.",
+  safety_blocked: "Проверка перед публикацией не пройдена.",
   duplicate_file: "Файл с таким содержимым уже загружался.",
-  import_in_progress: "Сначала опубликуйте или отмените уже подготовленный черновик импорта.",
+  import_in_progress: "Сейчас уже обрабатывается другой прайс. Дождитесь его завершения.",
   cancel_failed: "Не удалось отменить импорт.",
-  not_found: "Черновик импорта не найден.",
-  not_ready: "Перед публикацией нужен предварительный отчёт.",
-  already_finalized: "Этот импорт уже опубликован или отменён.",
-  upload_failed: "Ошибка загрузки файла. Попробуйте повторить загрузку.",
-  server_error: "Серверная ошибка. Попробуйте повторить действие позже.",
-  unexpected_response: "Неожиданный ответ сервера. Обновите страницу и попробуйте ещё раз."
-};
-
-const uploadErrorCodes = new Set([
-  "missing_file",
-  "empty_file",
-  "file_too_large",
-  "invalid_extension",
-  "invalid_type",
-  "analysis_failed",
-  "duplicate_file",
-  "import_in_progress",
-  "upload_failed",
-  "server_error",
-  "unexpected_response"
-]);
-
-const metricDescriptions = {
-  addedCount: "Новые артикулы, которых не было в текущем каталоге.",
-  updatedCount: "Товары с существующим артикулом и изменёнными данными.",
-  archivedCount: "Активные товары, отсутствующие в новом прайсе. Они не удалены окончательно.",
-  reviewRows: "Система не смогла определить категорию или обнаружила проблему в данных.",
-  errorRows: "Строки, которые не удалось корректно обработать.",
-  skippedRows: "Служебные или неподходящие строки, которые не участвуют в импорте.",
-  totalRows: "Все строки выбранного листа, которые прошли предварительный анализ.",
-  parsedRows: "Строки, где найден внутренний артикул товара.",
-  priceUpdated: "Существующие товары, у которых новая цена отличается от текущей.",
-  priceIncreased: "Существующие товары с повышением цены.",
-  priceDecreased: "Существующие товары со снижением цены.",
-  priceUnchanged: "Существующие товары, где цена осталась прежней."
-};
-
-const safetyCheckLabels: Record<string, string> = {
-  active_version_exists: "Активная версия",
-  no_parallel_import: "Параллельный импорт",
-  new_active_count: "Активные товары",
-  catalog_shrink_ratio: "Размер каталога",
-  archive_ratio: "Архивация",
-  parse_error_ratio: "Ошибки разбора",
-  missing_price_ratio: "Пропущенные цены",
-  missing_name_ratio: "Пустые названия",
-  duplicate_shop_code: "Дубли артикулов",
-  invalid_category: "Категории",
-  existing_category_loss: "Старые категории",
-  review_items: "Товары на проверку",
-  meilisearch_available: "Meilisearch"
+  not_found: "Импорт не найден.",
+  not_ready: "Этот импорт пока нельзя опубликовать.",
+  worker_unavailable: "Фоновая обработка импорта сейчас недоступна. Попробуйте позже."
 };
 
 type SelectedImportBatch = NonNullable<
@@ -120,1000 +59,205 @@ type SelectedImportBatch = NonNullable<
 export default async function AdminImportPage({ searchParams }: ImportPageProps) {
   const params = await searchParams;
   const data = await getAdminImportPageData(params.batch);
-  const report = data.selected?.report ?? null;
-  const uploadErrorMessage =
-    params.error && uploadErrorCodes.has(params.error)
-      ? errorMessages[params.error] ?? errorMessages.unexpected_response
-      : null;
+  const selected = data.selected;
+  const report = selected?.report ?? null;
+  const current = data.batches.find(
+    (batch) => batch.status === "published" && batch.versionStatus === "active"
+  );
+  const error = params.error
+    ? errorMessages[params.error] ?? "Не удалось выполнить действие. Попробуйте ещё раз."
+    : null;
 
   return (
     <div>
-      <div className="mb-8 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#9DBDFB]">
-            Импорт Excel
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold">Загрузка каталога</h1>
-          <p className="mt-3 max-w-2xl text-[#C8D1DF]">
-            Загрузите .xls или .xlsx: система обновит цены, сохранит старые категории,
-            проверит безопасность, опубликует каталог и пересоберёт поиск.
-          </p>
-        </div>
-      </div>
+      <header className="mb-8">
+        <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#9DBDFB]">Импорт Excel</p>
+        <h1 className="mt-2 text-3xl font-semibold">Загрузка каталога</h1>
+        <p className="mt-3 max-w-3xl text-[#C8D1DF]">
+          Загрузите новый Excel-прайс. Система автоматически сравнит его с текущим каталогом,
+          обновит цены, добавит новые товары и подготовит изменения к публикации.
+        </p>
+      </header>
 
-      {params.error && !uploadErrorMessage ? (
-        <Notice tone="danger">{errorMessages[params.error] ?? errorMessages.analysis_failed}</Notice>
-      ) : null}
-      {params.uploaded ? (
-        <Notice>Файл загружен, безопасный отчёт создан.</Notice>
-      ) : null}
-      {params.published ? <Notice>Каталог успешно обновлён, поисковый индекс пересобран.</Notice> : null}
-      {params.cancelled ? (
-        <Notice>Черновик отменён. Теперь можно загрузить новый Excel.</Notice>
-      ) : null}
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {params.accepted ? <Notice>Файл принят. Обработка выполняется на сервере.</Notice> : null}
+      {params.analyzed ? <Notice>Прайс проверен и готов к публикации.</Notice> : null}
+      {params.publish_requested ? <Notice>Публикация запущена на сервере.</Notice> : null}
+      {params.published ? <Notice>Изменения опубликованы.</Notice> : null}
+      {params.cancelled ? <Notice>Импорт отменён. Можно загрузить другой файл.</Notice> : null}
 
-      <ImportUploadForm
-        action={uploadImportAction}
-        formId={importFormId}
-        initialErrorMessage={uploadErrorMessage}
-      />
-
-      {data.blockingDraft ? (
-        <BlockingDraftNotice
-          batch={data.blockingDraft}
-          isSelected={data.selected?.id === data.blockingDraft.id}
-        />
-      ) : null}
+      <ImportUploadForm action={uploadImportAction} formId={importFormId} initialErrorMessage={error} />
+      {current ? <CurrentPrice batch={current} /> : null}
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[1fr_320px]">
         <section className="space-y-6">
-          {data.selected ? (
+          {selected ? (
             <>
-              <ImportHeader batch={data.selected} />
-
-              {report ? (
-                <>
-                  <ImportResultSummary batch={data.selected} report={report} />
-                  <ImportActions
-                    batchId={data.selected.id}
-                    canPublish={data.selected.canPublish}
-                    canCancel={data.selected.canCancel}
-                    isLegacyDraft={isLegacyDraft(data.selected, report)}
-                  />
-                  <TechnicalDetails errors={data.errors} report={report} />
-                </>
-              ) : (
-                <>
-                  <div className="rounded-card border border-[#243249] bg-[#101827] p-5 text-[#C8D1DF]">
-                    Предварительный отчёт ещё не создан. Публикация недоступна.
-                  </div>
-                  <ImportActions
-                    batchId={data.selected.id}
-                    canPublish={false}
-                    canCancel={data.selected.canCancel}
-                    isLegacyDraft={isLegacyDraft(data.selected, report)}
-                  />
-                </>
-              )}
+              <ImportHeader batch={selected} />
+              <ImportProgressCard batchId={selected.id} />
+              {report ? <ImportReport batch={selected} report={report} /> : <EmptyReport />}
+              <ImportActions batch={selected} />
             </>
           ) : (
-            <div className="rounded-card border border-[#243249] bg-[#101827] p-8 text-[#C8D1DF]">
-              Импортов пока нет. Загрузите Excel-файл, чтобы увидеть отчёт.
-            </div>
+            <EmptyReport />
           )}
         </section>
-
-        <aside className="rounded-card border border-[#243249] bg-[#101827] p-5">
-          <h2 className="text-lg font-semibold">Последние импорты</h2>
-          {data.batches.length > 0 ? (
-            <div className="mt-4 space-y-3">
-              {data.batches.map((batch) => (
-                <Link
-                  key={batch.id}
-                  href={`/admin/import?batch=${batch.id}`}
-                  className={[
-                    "block rounded-card border p-4 transition",
-                    data.selected?.id === batch.id
-                      ? "border-[#73A0F5] bg-[#18253A]"
-                      : "border-[#243249] bg-[#0B1220] hover:border-[#4169A8]"
-                  ].join(" ")}
-                >
-                  <p className="line-clamp-2 text-sm font-semibold">{batch.sourceFileName}</p>
-                  <p className="mt-2 text-xs text-[#8FA1B8]">{formatDate(batch.createdAt)}</p>
-                  <p className="mt-2 text-xs text-[#C8D1DF]">
-                    {statusLabels[batch.status] ?? batch.status}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-4 text-sm text-[#8FA1B8]">История появится после первой загрузки.</p>
-          )}
-        </aside>
+        <RecentImports batches={data.batches} selectedId={selected?.id} />
       </div>
     </div>
+  );
+}
+
+function CurrentPrice({ batch }: { batch: SelectedImportBatch }) {
+  return (
+    <section className="mt-6 rounded-card border border-[#243249] bg-[#101827] p-5">
+      <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#9DBDFB]">Актуальный прайс</p>
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <p className="font-semibold">{batch.sourceFileName}</p>
+        <span className="rounded-full bg-[#10231A] px-3 py-1 text-sm text-[#BBF7D0]">● Опубликован</span>
+      </div>
+      <p className="mt-2 text-sm text-[#8FA1B8]">Загружен: {formatDate(batch.createdAt)}</p>
+    </section>
   );
 }
 
 function ImportHeader({ batch }: { batch: SelectedImportBatch }) {
   return (
     <section className="rounded-card border border-[#243249] bg-[#101827] p-5">
-      <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">{batch.sourceFileName}</h2>
-          <p className="mt-2 text-sm text-[#8FA1B8]">
-            Загружено: {formatDate(batch.createdAt)}
-            {batch.uploadedByName || batch.uploadedByEmail
-              ? ` · ${batch.uploadedByName ?? batch.uploadedByEmail}`
-              : ""}
-          </p>
+          <h2 className="break-words text-xl font-semibold">{batch.sourceFileName}</h2>
+          <p className="mt-2 text-sm text-[#8FA1B8]">Загружен: {formatDate(batch.createdAt)}</p>
         </div>
-        <div className="flex flex-wrap gap-2 lg:justify-end">
-          <Badge>{statusLabels[batch.status] ?? batch.status}</Badge>
-          {batch.versionStatus ? (
-            <Badge>{statusLabels[batch.versionStatus] ?? batch.versionStatus}</Badge>
-          ) : null}
-        </div>
+        <StatusBadge status={batch.status} phase={batch.phase} />
       </div>
     </section>
   );
 }
 
-function BlockingDraftNotice({
-  batch,
-  isSelected
-}: {
-  batch: SelectedImportBatch;
-  isSelected: boolean;
-}) {
-  return (
-    <section className="mt-6 rounded-card border border-[#854D0E] bg-[#2A2113] p-5 text-[#FDE68A]">
-      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-        <div>
-          <h2 className="text-base font-semibold">
-            Найден незавершённый черновик, который блокирует загрузку нового Excel
-          </h2>
-          <p className="mt-2 text-sm leading-6">
-            Его можно безопасно отменить. Активный каталог и поиск не изменятся.
-          </p>
-          <p className="mt-2 text-xs leading-5 text-[#FDE68A]">
-            {batch.sourceFileName} · {statusLabels[batch.status] ?? batch.status}
-          </p>
-        </div>
-
-        {isSelected ? null : (
-          <ImportCancelButton batchId={batch.id} disabled={!batch.canCancelForUi} />
-        )}
-      </div>
-    </section>
-  );
-}
-
-function ImportResultSummary({
-  batch,
-  report
-}: {
-  batch: SelectedImportBatch;
-  report: StoredImportReport;
-}) {
-  const missingNameCount = report.issueCounts.missing_name ?? 0;
-
+function ImportReport({ batch, report }: { batch: SelectedImportBatch; report: StoredImportReport }) {
+  const missingNames = report.issueCounts.missing_name ?? 0;
   return (
     <section className="rounded-card border border-[#243249] bg-[#101827]">
-      <div className="border-b border-[#243249] px-4 py-4 sm:px-5">
-        <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#9DBDFB]">
-          Импорт проанализирован
-        </p>
-        <h2 className="mt-2 break-words text-2xl font-semibold">{batch.sourceFileName}</h2>
-        <p className="mt-2 text-sm text-[#8FA1B8]">
-          Дата анализа: {formatDate(batch.analyzedAt ?? batch.createdAt)}
-        </p>
+      <div className="border-b border-[#243249] px-5 py-4">
+        <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#9DBDFB]">Импорт проанализирован</p>
+        <h2 className="mt-2 text-2xl font-semibold">{batch.sourceFileName}</h2>
       </div>
-
-      <div className="space-y-5 p-4 sm:p-5">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            description={metricDescriptions.addedCount}
-            label="Добавлено"
-            value={report.addedCount}
-          />
-          <StatCard
-            description={metricDescriptions.updatedCount}
-            label="Обновлено"
-            value={report.updatedCount}
-          />
-          <StatCard
-            description={metricDescriptions.archivedCount}
-            label="Архивировано"
-            value={report.archivedCount}
-          />
-          <StatCard
-            description={metricDescriptions.reviewRows}
-            label="Требуют проверки"
-            tone={report.reviewRows > 0 ? "warning" : "default"}
-            value={report.reviewRows}
-          />
-          <StatCard
-            description={metricDescriptions.errorRows}
-            label="Ошибки"
-            tone={report.errorRows > 0 ? "danger" : "default"}
-            value={report.errorRows}
-          />
-          <StatCard
-            description={metricDescriptions.skippedRows}
-            label="Пропущено"
-            value={report.skippedRows}
-          />
-          <StatCard
-            description={metricDescriptions.totalRows}
-            label="Всего строк"
-            value={report.totalRows}
-          />
-          <StatCard
-            description={metricDescriptions.parsedRows}
-            label="Товаров с артикулом"
-            value={report.parsedRows}
-          />
+      <div className="space-y-5 p-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric label="Добавлено" value={report.addedCount} />
+          <Metric label="Обновлено" value={report.updatedCount} />
+          <Metric label="Архивировано" value={report.archivedCount} />
+          <Metric label="Требуют проверки" value={report.reviewRows} warning={report.reviewRows > 0} />
+          <Metric label="Ошибки" value={report.errorRows} warning={report.errorRows > 0} />
+          <Metric label="Пропущено" value={report.skippedRows} />
+          <Metric label="Всего строк" value={report.totalRows} />
+          <Metric label="Товаров с артикулом" value={report.parsedRows} />
         </div>
-
-        <PriceChangeSummary report={report} />
+        <PriceSummary report={report} />
         {report.safety ? <SafetySummary safety={report.safety} /> : null}
-        {report.autoCategorizationPreview ? <AutoCategorizationSummary report={report} /> : null}
-
-        {report.reviewRows > 0 ? <ReviewWarning count={report.reviewRows} /> : null}
-        {missingNameCount > 0 ? <MissingNameNotice count={missingNameCount} /> : null}
-        {report.errorRows > 0 ? <ErrorSummary count={report.errorRows} /> : null}
-
-        <ResultActions />
+        {report.reviewRows > 0 ? <ReviewNotice count={report.reviewRows} /> : null}
+        {missingNames > 0 ? (
+          <Notice tone="warning">
+            В файле найдено {numberFormatter.format(missingNames)} строк без названия товара. Они не
+            будут автоматически опубликованы и требуют проверки.
+          </Notice>
+        ) : null}
       </div>
     </section>
   );
 }
 
-function PriceChangeSummary({ report }: { report: StoredImportReport }) {
-  const priceChanges = report.priceChanges;
-
+function PriceSummary({ report }: { report: StoredImportReport }) {
+  const price = report.priceChanges;
   return (
-    <section className="rounded-card border border-[#243249] bg-[#0B1220] p-4 sm:p-5">
-      <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
-        <div>
-          <h3 className="text-lg font-semibold">Обновление цен</h3>
-          <p className="mt-2 text-sm leading-6 text-[#8FA1B8]">
-            Цена обновляется независимо от категоризации. Существующие товары сохраняют старую
-            категорию, если она уже была назначена в активном каталоге.
-          </p>
-        </div>
-        <Badge>{numberFormatter.format(priceChanges.existingWithPriceCount)} существующих</Badge>
-      </div>
-
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          description={metricDescriptions.priceUpdated}
-          label="Цены изменены"
-          value={priceChanges.existingPriceUpdatedCount}
-        />
-        <StatCard
-          description={metricDescriptions.priceIncreased}
-          label="Повышены"
-          value={priceChanges.increasedCount}
-        />
-        <StatCard
-          description={metricDescriptions.priceDecreased}
-          label="Снижены"
-          value={priceChanges.decreasedCount}
-        />
-        <StatCard
-          description={metricDescriptions.priceUnchanged}
-          label="Без изменений"
-          value={priceChanges.unchangedCount}
-        />
-        <StatCard
-          description="Самое большое повышение среди существующих товаров."
-          label="Макс. повышение"
-          value={`${formatMoney(priceChanges.maxIncreaseAmount)} (${formatPercent(
-            priceChanges.maxIncreasePercent
-          )})`}
-        />
-        <StatCard
-          description="Самое большое снижение среди существующих товаров."
-          label="Макс. снижение"
-          value={`${formatMoney(priceChanges.maxDecreaseAmount)} (${formatPercent(
-            priceChanges.maxDecreasePercent
-          )})`}
-        />
-        <StatCard
-          description="Среднее изменение цены по товарам, которые уже были в каталоге."
-          label="Среднее изменение"
-          value={`${formatMoney(priceChanges.averageChangeAmount)} (${formatPercent(
-            priceChanges.averageChangePercent
-          )})`}
-        />
+    <section className="rounded-card border border-[#243249] bg-[#0B1220] p-4">
+      <h3 className="text-lg font-semibold">Обновление цен</h3>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric label="Цены изменены" value={price.existingPriceUpdatedCount} />
+        <Metric label="Повышены" value={price.increasedCount} />
+        <Metric label="Снижены" value={price.decreasedCount} />
+        <Metric label="Без изменений" value={price.unchangedCount} />
       </div>
     </section>
   );
 }
 
-function SafetySummary({
-  safety
-}: {
-  safety: NonNullable<StoredImportReport["safety"]>;
-}) {
+function SafetySummary({ safety }: { safety: NonNullable<StoredImportReport["safety"]> }) {
+  const blocked = safety.checks.filter((check) => check.status === "blocked");
   return (
-    <section className="rounded-card border border-[#243249] bg-[#0B1220] p-4 sm:p-5">
-      <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
-        <div>
-          <h3 className="text-lg font-semibold">Safety checks</h3>
-          <p className="mt-2 text-sm leading-6 text-[#8FA1B8]">
-            Публикация разрешается только если нет блокирующих проверок. Товары на проверку
-            остаются в draft/review и не попадают в поисковый индекс.
-          </p>
-        </div>
-        <Badge>
-          {safety.canPublish
-            ? "Публикация разрешена"
-            : `${numberFormatter.format(safety.blockingCount)} блокируют`}
-        </Badge>
-      </div>
-
-      <div className="mt-4">
-        {safety.canPublish ? (
-          <InlineNotice>
-            Черновик можно публиковать: активные товары пройдут в каталог, спорные останутся на
-            проверке.
-          </InlineNotice>
-        ) : (
-          <InlineNotice tone="danger">
-            Публикация временно заблокирована. Исправьте файл или отмените черновик и загрузите
-            обновлённый Excel.
-          </InlineNotice>
-        )}
-      </div>
-
-      <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        {safety.checks.map((check) => (
-          <div
-            key={check.code}
-            className={[
-              "rounded-card border p-4 text-sm",
-              check.status === "blocked"
-                ? "border-[#7F1D1D] bg-[#2A1218]"
-                : check.status === "warning"
-                  ? "border-[#854D0E] bg-[#2A2113]"
-                  : "border-[#243249] bg-[#101827]"
-            ].join(" ")}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <h4 className="font-semibold">{safetyCheckLabels[check.code] ?? check.code}</h4>
-              <SafetyStatusBadge status={check.status} />
-            </div>
-            <p className="mt-2 leading-6 text-[#8FA1B8]">{check.message}</p>
-            <p className="mt-2 text-xs text-[#8FA1B8]">
-              Значение: {formatSafetyValue(check.currentValue)}
-              {typeof check.threshold === "number"
-                ? ` · Порог: ${formatSafetyValue(check.threshold)}`
-                : ""}
-            </p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function AutoCategorizationSummary({ report }: { report: StoredImportReport }) {
-  const preview = report.autoCategorizationPreview;
-  if (!preview) {
-    return null;
-  }
-
-  return (
-    <section className="rounded-card border border-[#243249] bg-[#0B1220] p-4 sm:p-5">
-      <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
-        <div>
-          <h3 className="text-lg font-semibold">Автоматическая категоризация</h3>
-          <p className="mt-2 text-sm leading-6 text-[#8FA1B8]">
-            Существующие товары сохраняют старую категорию. Новые товары с высокой уверенностью
-            публикуются активными, а спорные остаются в проверке.
-          </p>
-        </div>
-        <Badge>Порог {formatPercent(preview.threshold)}</Badge>
-      </div>
-
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          description="Текущее поведение: товар получил категорию по прежним правилам."
-          label="Legacy matched"
-          value={preview.legacyMatched}
-        />
-        <StatCard
-          description="Текущее поведение: правило не нашлось, товар уйдёт в проверку."
-          label="Legacy needs review"
-          tone={preview.legacyNeedsReview > 0 ? "warning" : "default"}
-          value={preview.legacyNeedsReview}
-        />
-        <StatCard
-          description="Shadow preview: confidence выше или равен порогу."
-          label="Shadow high"
-          value={preview.shadowHigh}
-        />
-        <StatCard
-          description="Shadow preview: средний confidence."
-          label="Shadow medium"
-          value={preview.shadowMedium}
-        />
-        <StatCard
-          description="Shadow preview: низкий confidence или нет правила."
-          label="Shadow low"
-          tone={preview.shadowLow > 0 ? "warning" : "default"}
-          value={preview.shadowLow}
-        />
-        <StatCard
-          description="Shadow preview: будущая автопубликация при текущем пороге."
-          label="Would auto-publish"
-          value={preview.wouldAutoPublish}
-        />
-        <StatCard
-          description="Shadow preview: будущая ручная проверка при текущем пороге."
-          label="Would require review"
-          tone={preview.wouldRequireReview > 0 ? "warning" : "default"}
-          value={preview.wouldRequireReview}
-        />
-        <StatCard
-          description="Среднее значение confidence по кандидатам."
-          label="Средняя уверенность"
-          value={formatPercent(preview.averageConfidence)}
-        />
-      </div>
-
-      <details className="mt-4 rounded-card border border-[#243249] bg-[#101827]">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold transition hover:text-[#9DBDFB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#93C5FD]">
-          Показать технические примеры
-        </summary>
-        <div className="space-y-5 border-t border-[#243249] p-4">
-          <div className="grid gap-4 lg:grid-cols-3">
-            <PreviewMetricList
-              title="Уровни уверенности"
-              items={[
-                ["Высокая", preview.highConfidence],
-                ["Средняя", preview.mediumConfidence],
-                ["Низкая", preview.lowConfidence],
-                ["Старая категория", preview.existingCategoryPreserved],
-                ["Would auto-publish", preview.wouldAutoPublish],
-                ["Would require review", preview.wouldRequireReview],
-                ["Пустое название", preview.emptyName]
-              ]}
-            />
-            <PreviewMetricList
-              title="Источники"
-              items={preview.sources.map((source) => [
-                sourceLabel(source.source),
-                source.count
-              ])}
-            />
-            <PreviewGroupList title="Группы внимания" groups={preview.topUnresolvedGroups} />
-          </div>
-
-          {preview.dangerousGroups.length > 0 ? (
-            <PreviewGroupList title="Опасные сигналы" groups={preview.dangerousGroups} />
-          ) : null}
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <PreviewExamples title="Высокая уверенность" examples={preview.highConfidenceExamples} />
-            <PreviewExamples title="Низкая уверенность" examples={preview.lowConfidenceExamples} />
-          </div>
-        </div>
-      </details>
-    </section>
-  );
-}
-
-function PreviewMetricList({
-  items,
-  title
-}: {
-  items: Array<[string, number]>;
-  title: string;
-}) {
-  return (
-    <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4">
-      <h4 className="text-sm font-semibold">{title}</h4>
-      {items.length > 0 ? (
-        <dl className="mt-3 space-y-2 text-sm">
-          {items.map(([label, value]) => (
-            <div key={label} className="flex items-center justify-between gap-3">
-              <dt className="text-[#8FA1B8]">{label}</dt>
-              <dd className="font-semibold">{numberFormatter.format(value)}</dd>
-            </div>
-          ))}
-        </dl>
+    <section className="rounded-card border border-[#243249] bg-[#0B1220] p-4">
+      <h3 className="text-lg font-semibold">Проверка перед публикацией</h3>
+      {safety.canPublish ? (
+        <p className="mt-2 text-sm text-[#BBF7D0]">✓ Файл проверен. Можно публиковать изменения.</p>
       ) : (
-        <p className="mt-3 text-sm text-[#8FA1B8]">Нет данных.</p>
+        <>
+          <p className="mt-2 text-sm text-[#FDE68A]">⚠ Нужна проверка перед публикацией</p>
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[#C8D1DF]">
+            {blocked.map((check) => <li key={check.code}>{safetyReason(check.code)}</li>)}
+          </ul>
+        </>
       )}
-    </div>
+    </section>
   );
 }
 
-function PreviewGroupList({
-  groups,
-  title
-}: {
-  groups: NonNullable<
-    StoredImportReport["autoCategorizationPreview"]
-  >["topUnresolvedGroups"];
-  title: string;
-}) {
+function ReviewNotice({ count }: { count: number }) {
   return (
-    <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4">
-      <h4 className="text-sm font-semibold">{title}</h4>
-      {groups.length > 0 ? (
-        <div className="mt-3 space-y-3">
-          {groups.slice(0, 6).map((group) => (
-            <div key={group.key}>
-              <p className="text-sm font-semibold">
-                {group.label}: {numberFormatter.format(group.count)}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-[#8FA1B8]">
-                {group.examples.slice(0, 2).join("; ")}
-              </p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-3 text-sm text-[#8FA1B8]">Нет данных.</p>
-      )}
-    </div>
-  );
-}
-
-function PreviewExamples({
-  examples,
-  title
-}: {
-  examples: NonNullable<
-    StoredImportReport["autoCategorizationPreview"]
-  >["highConfidenceExamples"];
-  title: string;
-}) {
-  return (
-    <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4">
-      <h4 className="text-sm font-semibold">{title}</h4>
-      {examples.length > 0 ? (
-        <div className="mt-3 space-y-3">
-          {examples.slice(0, 5).map((example) => (
-            <div key={`${example.rowNumber}-${example.shopCode}`}>
-              <p className="text-sm font-semibold">
-                Строка {example.rowNumber}: {example.shopCode} {example.name || example.rawName}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-[#8FA1B8]">
-                {formatPercent(example.confidence)} · {sourceLabel(example.source)} ·{" "}
-                {example.reason}
-              </p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-3 text-sm text-[#8FA1B8]">Нет примеров.</p>
-      )}
-    </div>
-  );
-}
-
-function ReviewWarning({ count }: { count: number }) {
-  return (
-    <div className="rounded-card border border-[#854D0E] bg-[#2A2113] p-4 text-[#FDE68A]">
-      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+    <section className="rounded-card border border-[#854D0E] bg-[#2A2113] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-base font-semibold">
-            {numberFormatter.format(count)} товаров требуют проверки
-          </h3>
-          <p className="mt-2 text-sm leading-6">
-            Система не смогла уверенно определить категорию или обнаружила проблему в данных.
-            Перейдите в проверку товаров, чтобы распределить их вручную или создать правила для
-            похожих товаров.
-          </p>
+          <h3 className="font-semibold text-[#FDE68A]">{numberFormatter.format(count)} товара требуют проверки</h3>
+          <p className="mt-2 text-sm text-[#FDE68A]">Система не смогла уверенно определить категорию для этих товаров. Они не будут опубликованы, пока не будут проверены.</p>
         </div>
         <ActionLink href="/admin/review">Перейти к проверке товаров</ActionLink>
       </div>
-    </div>
+    </section>
   );
 }
 
-function MissingNameNotice({ count }: { count: number }) {
+function ImportActions({ batch }: { batch: SelectedImportBatch }) {
+  async function publish(formData: FormData) {
+    "use server";
+    formData.set("batchId", batch.id);
+    await publishImportAction(formData);
+  }
   return (
-    <div className="rounded-card border border-[#854D0E] bg-[#2A2113] px-4 py-3 text-sm leading-6 text-[#FDE68A]">
-      В файле найдены строки, где после артикула отсутствует название товара:{" "}
-      {numberFormatter.format(count)}. Такие строки требуют проверки и не должны автоматически
-      попадать в каталог без уточнения.
-    </div>
-  );
-}
-
-function ErrorSummary({ count }: { count: number }) {
-  return (
-    <div className="rounded-card border border-[#7F1D1D] bg-[#2A1218] px-4 py-3 text-sm leading-6 text-[#FECACA]">
-      Найдены строки с ошибками: {numberFormatter.format(count)}. Их технические детали доступны
-      в раскрываемом блоке ниже.
-    </div>
-  );
-}
-
-function ResultActions() {
-  return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-      <ActionLink href="/admin/review">Перейти к проверке товаров</ActionLink>
+    <div className="flex flex-wrap gap-3">
+      <PublishImportButton
+        disabled={!batch.canPublish}
+        formAction={publish}
+        recovery={batch.status === "published" && batch.versionStatus === "active" && batch.phase === "failed"}
+      />
+      <ImportCancelButton batchId={batch.id} disabled={!batch.canCancel} />
       <ActionLink href="/admin/catalog">Открыть каталог</ActionLink>
-      <ResetFormButton />
+      <ActionLink href="#new-import">Загрузить другой файл</ActionLink>
     </div>
   );
 }
 
-function ActionLink({ href, children }: { href: string; children: React.ReactNode }) {
+function RecentImports({ batches, selectedId }: { batches: Awaited<ReturnType<typeof getAdminImportPageData>>["batches"]; selectedId?: string }) {
   return (
-    <Link
-      href={href}
-      className="inline-flex min-h-11 items-center justify-center rounded-card border border-[#4169A8] px-5 text-sm font-semibold text-white transition hover:border-[#73A0F5] hover:bg-[#1A2740] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#93C5FD] active:translate-y-px"
-    >
-      {children}
-    </Link>
+    <aside className="rounded-card border border-[#243249] bg-[#101827] p-5">
+      <h2 className="text-lg font-semibold">Последние импорты</h2>
+      {batches.length ? <div className="mt-4 space-y-3">{batches.map((batch) => (
+        <Link key={batch.id} href={`/admin/import?batch=${batch.id}`} className={`block rounded-card border p-4 transition hover:border-[#4169A8] active:translate-y-px ${selectedId === batch.id ? "border-[#73A0F5] bg-[#18253A]" : "border-[#243249] bg-[#0B1220]"}`}>
+          <p className="line-clamp-2 text-sm font-semibold">{batch.sourceFileName}</p>
+          <p className="mt-2 text-xs text-[#8FA1B8]">{formatDate(batch.createdAt)}</p>
+          <div className="mt-2"><StatusBadge status={batch.status} phase={batch.phase} /></div>
+        </Link>
+      ))}</div> : <p className="mt-4 text-sm text-[#8FA1B8]">История появится после первой загрузки.</p>}
+    </aside>
   );
 }
 
-function ResetFormButton() {
-  return (
-    <button
-      type="reset"
-      form={importFormId}
-      className="inline-flex min-h-11 items-center justify-center rounded-card border border-[#4169A8] px-5 text-sm font-semibold text-white transition hover:border-[#73A0F5] hover:bg-[#1A2740] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#93C5FD] active:translate-y-px"
-    >
-      Загрузить другой файл
-    </button>
-  );
+function EmptyReport() { return <section className="rounded-card border border-[#243249] bg-[#101827] p-8 text-[#C8D1DF]">Импортов пока нет. Загрузите Excel-файл, чтобы увидеть результат проверки.</section>; }
+function Metric({ label, value, warning }: { label: string; value: number; warning?: boolean }) { return <div className={`rounded-card border p-4 ${warning ? "border-[#854D0E] bg-[#2A2113]" : "border-[#243249] bg-[#0B1220]"}`}><p className="text-sm text-[#8FA1B8]">{label}</p><p className="mt-2 text-2xl font-semibold">{numberFormatter.format(value)}</p></div>; }
+function StatusBadge({ status, phase }: { status: string; phase?: string | null }) {
+  const label = phase === "failed" ? "Ошибка" : phase === "publishing" || phase === "publish_queued" || phase === "publish_retrying" ? "Обрабатывается" : statusLabels[status] ?? status;
+  return <span className="inline-flex rounded-full bg-[#243249] px-3 py-1 text-xs font-semibold text-[#C8D1DF]">{label}</span>;
 }
-
-function TechnicalDetails({
-  errors,
-  report
-}: {
-  errors: Awaited<ReturnType<typeof getAdminImportPageData>>["errors"];
-  report: StoredImportReport;
-}) {
-  const hasReviewExamples = report.examples.needsReview.length > 0;
-  const hasErrors = errors.length > 0;
-
-  return (
-    <details className="rounded-card border border-[#243249] bg-[#101827]">
-      <summary className="cursor-pointer px-5 py-4 text-lg font-semibold transition hover:text-[#9DBDFB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#93C5FD]">
-        Показать технические детали
-      </summary>
-      <div className="space-y-6 border-t border-[#243249] p-5">
-        <p className="text-sm leading-6 text-[#8FA1B8]">
-          Здесь показаны строки, причины проверки, ошибки и структура Excel. Эти данные скрыты до
-          раскрытия блока, чтобы основной итог импорта оставался компактным.
-        </p>
-        <SheetSummary report={report} />
-        {hasErrors ? (
-          <RowErrors errors={errors} totalErrors={report.errorRows} />
-        ) : (
-          <TechnicalEmptyState>Ошибок в строках не найдено.</TechnicalEmptyState>
-        )}
-        {hasReviewExamples ? (
-          <ReviewExamples report={report} />
-        ) : (
-          <TechnicalEmptyState>Нет примеров строк, требующих ручной проверки.</TechnicalEmptyState>
-        )}
-      </div>
-    </details>
-  );
-}
-
-function TechnicalEmptyState({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-card border border-[#243249] bg-[#0B1220] p-4 text-sm text-[#C8D1DF]">
-      {children}
-    </div>
-  );
-}
-
-function ImportActions({
-  batchId,
-  canPublish,
-  canCancel,
-  isLegacyDraft
-}: {
-  batchId: string;
-  canPublish: boolean;
-  canCancel: boolean;
-  isLegacyDraft: boolean;
-}) {
-  return (
-    <section className="rounded-card border border-[#243249] bg-[#101827] p-5">
-      {isLegacyDraft ? (
-        <div className="mb-4 rounded-card border border-[#854D0E] bg-[#2A2113] px-4 py-3 text-sm leading-6 text-[#FDE68A]">
-          Этот черновик создан предыдущей версией импорта. Его нельзя публиковать. Отмените его и
-          загрузите Excel заново.
-        </div>
-      ) : null}
-
-      <div className="grid gap-3 sm:grid-cols-[auto_auto_1fr] sm:items-center">
-        <form action={publishImportAction}>
-          <input type="hidden" name="batchId" value={batchId} />
-          <button
-            type="submit"
-            disabled={!canPublish}
-            className="inline-flex h-11 items-center justify-center rounded-card bg-[#73A0F5] px-5 text-sm font-semibold text-[#07101F] transition hover:bg-[#9DBDFB] disabled:cursor-not-allowed disabled:bg-[#334155] disabled:text-[#94A3B8]"
-          >
-            Опубликовать изменения
-          </button>
-        </form>
-
-        <ImportCancelButton batchId={batchId} disabled={!canCancel} />
-
-        <p className="text-sm text-[#8FA1B8]">
-          Публикация доступна только для draft-версии, которая прошла safety checks.
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function isLegacyDraft(batch: SelectedImportBatch, report: StoredImportReport | null) {
-  return batch.isBlockingDraft && !report?.safety;
-}
-
-function SheetSummary({ report }: { report: StoredImportReport }) {
-  return (
-    <section className="rounded-card border border-[#243249] bg-[#101827]">
-      <div className="border-b border-[#243249] px-5 py-4">
-        <h2 className="text-lg font-semibold">Структура Excel</h2>
-        <p className="mt-1 text-sm text-[#8FA1B8]">Выбран лист: {report.selectedSheetName}</p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead className="text-[#8FA1B8]">
-            <tr>
-              <th className="px-5 py-3 font-medium">Лист</th>
-              <th className="px-5 py-3 font-medium">Диапазон</th>
-              <th className="px-5 py-3 font-medium">Строк</th>
-              <th className="px-5 py-3 font-medium">Товар</th>
-              <th className="px-5 py-3 font-medium">Цена</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#243249]">
-            {report.sheets.map((sheet) => (
-              <tr key={sheet.name}>
-                <td className="px-5 py-3 font-medium">{sheet.name}</td>
-                <td className="px-5 py-3 text-[#C8D1DF]">{sheet.range ?? "пусто"}</td>
-                <td className="px-5 py-3 text-[#C8D1DF]">
-                  {numberFormatter.format(sheet.rowCount)}
-                </td>
-                <td className="px-5 py-3 text-[#C8D1DF]">
-                  {formatColumn(sheet.detectedColumns.rawNameColumn)}
-                </td>
-                <td className="px-5 py-3 text-[#C8D1DF]">
-                  {formatColumn(sheet.detectedColumns.priceColumn)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
-
-function RowErrors({
-  errors,
-  totalErrors
-}: {
-  errors: Awaited<ReturnType<typeof getAdminImportPageData>>["errors"];
-  totalErrors: number;
-}) {
-  return (
-    <section className="rounded-card border border-[#243249] bg-[#101827]">
-      <div className="border-b border-[#243249] px-5 py-4">
-        <h2 className="text-lg font-semibold">Ошибки по строкам</h2>
-        <p className="mt-1 text-sm text-[#8FA1B8]">
-          Показано {numberFormatter.format(errors.length)} из {numberFormatter.format(totalErrors)}.
-        </p>
-      </div>
-      {errors.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="text-[#8FA1B8]">
-              <tr>
-                <th className="px-5 py-3 font-medium">Строка</th>
-                <th className="px-5 py-3 font-medium">Поле</th>
-                <th className="px-5 py-3 font-medium">Код</th>
-                <th className="px-5 py-3 font-medium">Описание</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#243249]">
-              {errors.map((error) => (
-                <tr key={error.id}>
-                  <td className="px-5 py-3 font-medium">{error.rowNumber ?? "—"}</td>
-                  <td className="px-5 py-3 text-[#C8D1DF]">{error.fieldName ?? "—"}</td>
-                  <td className="px-5 py-3 text-[#C8D1DF]">{error.code}</td>
-                  <td className="px-5 py-3 text-[#C8D1DF]">{error.message}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p className="px-5 py-8 text-[#C8D1DF]">Ошибок в строках не найдено.</p>
-      )}
-    </section>
-  );
-}
-
-function ReviewExamples({ report }: { report: StoredImportReport }) {
-  return (
-    <section className="rounded-card border border-[#243249] bg-[#101827] p-5">
-      <h2 className="text-lg font-semibold">Примеры строк, требующих проверки</h2>
-      {report.examples.needsReview.length > 0 ? (
-        <div className="mt-4 space-y-3">
-          {report.examples.needsReview.map((row) => (
-            <div
-              key={`${row.sheetName}-${row.rowNumber}`}
-              className="rounded-card border border-[#243249] bg-[#0B1220] p-4"
-            >
-              <p className="text-sm font-semibold">
-                Строка {row.rowNumber}: {row.rawName}
-              </p>
-              <p className="mt-1 text-sm text-[#8FA1B8]">
-                {row.issues.map((issue) => issue.message).join("; ") ||
-                  "Требуется ручная категоризация."}
-              </p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-3 text-[#C8D1DF]">Нет строк, требующих ручной проверки.</p>
-      )}
-    </section>
-  );
-}
-
-function StatCard({
-  description,
-  label,
-  tone = "default",
-  value
-}: {
-  description: string;
-  label: string;
-  tone?: "default" | "warning" | "danger";
-  value: number | string;
-}) {
-  const toneClass =
-    tone === "danger"
-      ? "border-[#7F1D1D] bg-[#2A1218]"
-      : tone === "warning"
-        ? "border-[#854D0E] bg-[#2A2113]"
-        : "border-[#243249] bg-[#0B1220]";
-
-  return (
-    <article className={`rounded-card border p-5 ${toneClass}`}>
-      <p className="text-sm text-[#8FA1B8]">{label}</p>
-      <p className="mt-3 text-3xl font-semibold">
-        {typeof value === "number" ? numberFormatter.format(value) : value}
-      </p>
-      <p className="mt-3 text-sm leading-6 text-[#8FA1B8]">{description}</p>
-    </article>
-  );
-}
-
-function InlineNotice({
-  children,
-  tone = "success"
-}: {
-  children: React.ReactNode;
-  tone?: "success" | "danger" | "warning";
-}) {
-  const toneClass =
-    tone === "danger"
-      ? "border-[#7F1D1D] bg-[#2A1218] text-[#FECACA]"
-      : tone === "warning"
-        ? "border-[#854D0E] bg-[#2A2113] text-[#FDE68A]"
-        : "border-[#1D4E89] bg-[#10233D] text-[#BFDBFE]";
-
-  return (
-    <div className={`rounded-card border px-4 py-3 text-sm leading-6 ${toneClass}`}>
-      {children}
-    </div>
-  );
-}
-
-function Notice({
-  children,
-  tone = "success"
-}: {
-  children: React.ReactNode;
-  tone?: "success" | "danger";
-}) {
-  return (
-    <div className="mb-5">
-      <InlineNotice tone={tone}>{children}</InlineNotice>
-    </div>
-  );
-}
-
-function Badge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex min-h-8 items-center rounded-card border border-[#4169A8] px-3 text-xs font-semibold text-[#C8D1DF]">
-      {children}
-    </span>
-  );
-}
-
-function SafetyStatusBadge({
-  status
-}: {
-  status: NonNullable<StoredImportReport["safety"]>["checks"][number]["status"];
-}) {
-  const labels = {
-    passed: "OK",
-    warning: "Внимание",
-    blocked: "Блок"
-  } as const;
-
-  return (
-    <span className="inline-flex min-h-7 shrink-0 items-center rounded-card border border-[#4169A8] px-2 text-xs font-semibold text-[#C8D1DF]">
-      {labels[status]}
-    </span>
-  );
-}
-
-function formatColumn(index: number | null) {
-  return index === null ? "не найдена" : `колонка ${index + 1}`;
-}
-
-function formatDate(date: Date | null) {
-  return date ? dateFormatter.format(date) : "—";
-}
-
-function formatPercent(value: number) {
-  return percentFormatter.format(value);
-}
-
-function formatMoney(value: number) {
-  return moneyFormatter.format(value);
-}
-
-function formatSafetyValue(value: number | boolean) {
-  if (typeof value === "boolean") {
-    return value ? "да" : "нет";
-  }
-
-  if (Math.abs(value) > 0 && Math.abs(value) < 1) {
-    return formatPercent(value);
-  }
-
-  return numberFormatter.format(value);
-}
-
-function sourceLabel(source: string) {
-  const labels: Record<string, string> = {
-    existing_product_category: "Старая категория",
-    exact_article_rule: "Точное правило",
-    exact_prefix_rule: "Префикс артикула",
-    verified_learning_rule: "Проверенное правило",
-    strong_multi_token: "Многословное правило",
-    single_strong_token: "Один сильный токен",
-    ambiguous_token: "Неоднозначный токен",
-    family_rule: "Семейство",
-    domain_dictionary: "Словарь домена",
-    aggregated_signals: "Сигналы",
-    blocked_conflict: "Конфликт",
-    weak_group_candidate: "Группа подтверждения",
-    other_products_fallback: "Прочие товары",
-    do_not_publish: "Не публиковать",
-    empty_name: "Пустое название",
-    invalid_name: "Некорректное название",
-    invalid_taxonomy_target: "Недоступная категория",
-    similarity: "Похожие товары",
-    no_match: "Нет правила"
-  };
-
-  return labels[source] ?? source;
-}
+function Notice({ children, tone = "info" }: { children: React.ReactNode; tone?: "info" | "danger" | "warning" }) { const style = tone === "danger" ? "border-[#7F1D1D] bg-[#2A1218] text-[#FECACA]" : tone === "warning" ? "border-[#854D0E] bg-[#2A2113] text-[#FDE68A]" : "border-[#14532D] bg-[#10231A] text-[#BBF7D0]"; return <p className={`mb-5 rounded-card border px-4 py-3 text-sm ${style}`}>{children}</p>; }
+function ActionLink({ href, children }: { href: string; children: React.ReactNode }) { return <Link href={href} className="inline-flex min-h-11 items-center justify-center rounded-card border border-[#4169A8] px-5 text-sm font-semibold text-white transition hover:border-[#73A0F5] hover:bg-[#1A2740] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#93C5FD] active:translate-y-px">{children}</Link>; }
+function safetyReason(code: string) { const reasons: Record<string, string> = { new_active_count: "В новом файле слишком мало товаров по сравнению с текущим каталогом.", catalog_shrink_ratio: "Слишком много товаров исчезло из нового прайса.", archive_ratio: "Слишком много товаров будет перенесено в архив.", missing_price_ratio: "В некоторых строках отсутствуют цены.", duplicate_shop_code: "Найдены повторяющиеся артикулы.", invalid_category: "Есть товары без корректной категории.", parse_error_ratio: "В файле слишком много строк с ошибками.", missing_name_ratio: "В файле слишком много строк без названия товара." }; return reasons[code] ?? "Файл требует дополнительной проверки перед публикацией."; }
+function formatDate(value: Date | null) { return value ? dateFormatter.format(value) : "—"; }

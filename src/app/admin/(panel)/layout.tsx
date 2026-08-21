@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
+import { publicBrandLogoSrc } from "@/config/public-brand";
 import { requireAdminSession } from "@/features/admin/auth";
+import { AdminNav } from "./admin-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -27,11 +28,11 @@ export default async function AdminPanelLayout({
           <div className="flex w-full items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <Image
-              src="/assets/brand/logo.svg"
+              src={publicBrandLogoSrc}
               alt="Автозапчасти на Салтыкова-Щедрина"
               width={44}
               height={44}
-              className="h-11 w-11"
+              className="h-11 w-11 object-contain"
             />
             <div className="min-w-0">
               <p className="truncate text-sm text-[#9DBDFB]">Админ-панель</p>
@@ -59,110 +60,7 @@ export default async function AdminPanelLayout({
           </div>
           </div>
 
-          <nav className="flex gap-2 overflow-x-auto text-sm">
-            <Link
-              href="/admin"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/admin/import"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              Импорт Excel
-            </Link>
-            <Link
-              href="/admin/review"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              Проверка товаров
-            </Link>
-            <Link
-              href="/admin/content"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              Главная
-            </Link>
-            <Link
-              href="/admin/contacts"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              Контакты
-            </Link>
-            <Link
-              href="/admin/hours"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              График
-            </Link>
-            <Link
-              href="/admin/photos"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              Фото
-            </Link>
-            <Link
-              href="/admin/vacancies"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              Вакансии
-            </Link>
-            <Link
-              href="/admin/brand"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              Бренд
-            </Link>
-            <Link
-              href="/admin/category-icons"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              Иконки
-            </Link>
-            <Link
-              href="/admin/catalog"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              Товары
-            </Link>
-            <Link
-              href="/admin/categories"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              Категории
-            </Link>
-            <Link
-              href="/admin/subcategories"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              Подкатегории
-            </Link>
-            <Link
-              href="/admin/rules"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              Правила
-            </Link>
-            <Link
-              href="/admin/synonyms"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              Синонимы
-            </Link>
-            <Link
-              href="/admin/backups"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              Резервные копии
-            </Link>
-            <Link
-              href="/admin/security"
-              className="inline-flex h-9 items-center rounded-card border border-[#243249] px-3 font-semibold text-[#C8D1DF] transition hover:border-[#73A0F5] hover:text-white"
-            >
-              Безопасность
-            </Link>
-          </nav>
+          <AdminNav />
         </div>
       </header>
 

@@ -10,6 +10,8 @@ export type ImportStateBatch = {
   status: string;
   versionStatus: string | null;
   fileHash?: string | null;
+  publishJobId?: string | null;
+  phase?: string | null;
   report?: unknown;
 };
 
@@ -67,6 +69,16 @@ export function isBlockingImportDraft(batch: ImportStateBatch) {
 
 export function canCancelImportStrict(batch: ImportStateBatch) {
   if (isFinalizedImport(batch)) {
+    return false;
+  }
+
+  // A publish reservation is the point of no return for cancellation. This
+  // applies server-side as well as in the UI so an in-flight worker cannot
+  // later activate a version the user was told had been cancelled.
+  if (
+    batch.publishJobId ||
+    ["publish_queued", "publishing", "publish_retrying"].includes(batch.phase ?? "")
+  ) {
     return false;
   }
 

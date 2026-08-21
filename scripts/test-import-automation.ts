@@ -20,8 +20,10 @@ import {
   canCancelImportForUi,
   canCancelImportStrict,
   canPublishImport,
+  buildImportUploadStorageFileName,
   isBlockingDuplicateFileImport,
   isBlockingImportDraft,
+  isDuplicateFileBlockerForHash,
   isFinalizedImport,
   normalizeStoredImportReport
 } from "../src/features/admin/imports";
@@ -118,7 +120,6 @@ run("existing product updates price and preserves name fallback", () => {
 
   assert.equal(priceChanges.existingPriceUpdatedCount, 1);
   assert.equal(priceChanges.increasedCount, 1);
-  assert.equal(priceChanges.maxIncreaseAmount, 25);
   assert.equal(resolveImportProductName(row({ name: null }), existing.get("A-1")), "Старое название");
 });
 
@@ -144,9 +145,6 @@ run("stored import report preserves new price and automation summaries", () => {
     pricesIncreased: 3,
     pricesDecreased: 1,
     pricesUnchanged: 2,
-    maxIncrease: 150,
-    maxDecrease: -40,
-    averagePercentChange: 0.12,
     existingInherited: 5,
     newHighConfidence: 6,
     newNeedsReview: 2,
@@ -159,9 +157,6 @@ run("stored import report preserves new price and automation summaries", () => {
   assert.equal(normalized.priceChanges.increasedCount, 3);
   assert.equal(normalized.priceChanges.decreasedCount, 1);
   assert.equal(normalized.priceChanges.unchangedCount, 2);
-  assert.equal(normalized.priceChanges.maxIncreaseAmount, 150);
-  assert.equal(normalized.priceChanges.maxDecreaseAmount, -40);
-  assert.equal(normalized.priceChanges.averageChangePercent, 0.12);
   assert.equal(normalized.autoCategorizationPreview?.existingCategoryPreserved, 5);
   assert.equal(normalized.autoCategorizationPreview?.shadowHigh, 6);
   assert.equal(normalized.autoCategorizationPreview?.wouldRequireReview, 2);
@@ -230,6 +225,34 @@ run("same file hash from active unfinished draft still blocks duplicate upload",
   assert.equal(isBlockingDuplicateFileImport(importState({ status: "failed" })), false);
 });
 
+run("matching concurrent uploads receive distinct storage paths while hash protection stays content-based", () => {
+  const shared = {
+    originalName: "same-catalog.xlsx",
+    fileHash: "a".repeat(64),
+    timestamp: 1_725_000_000_000
+  };
+  const first = buildImportUploadStorageFileName({
+    ...shared,
+    storageId: "11111111-1111-4111-8111-111111111111"
+  });
+  const second = buildImportUploadStorageFileName({
+    ...shared,
+    storageId: "22222222-2222-4222-8222-222222222222"
+  });
+
+  assert.notEqual(first, second);
+  assert.match(first, /^1725000000000-11111111-1111-4111-8111-111111111111-aaaaaaaaaaaa-same-catalog\.xlsx$/);
+  assert.match(second, /^1725000000000-22222222-2222-4222-8222-222222222222-aaaaaaaaaaaa-same-catalog\.xlsx$/);
+  assert.equal(
+    isDuplicateFileBlockerForHash(importState({ status: "analyzed", fileHash: shared.fileHash }), shared.fileHash),
+    true
+  );
+  assert.equal(
+    isDuplicateFileBlockerForHash(importState({ status: "analyzed", fileHash: shared.fileHash }), "b".repeat(64)),
+    false
+  );
+});
+
 run("cancelled and rolled back draft state is no longer blocking", () => {
   const before = importState({ status: "analyzed", versionStatus: "draft" });
   const after = importState({ status: "cancelled", versionStatus: "rolled_back" });
@@ -251,6 +274,23 @@ run("active published and archived imports cannot be cancelled", () => {
   );
   assert.equal(
     canCancelImportStrict(importState({ status: "archived", versionStatus: "draft" })),
+    false
+  );
+});
+
+run("publish reservation disables cancellation before a worker starts", () => {
+  assert.equal(
+    canCancelImportStrict(
+      importState({ publishJobId: "publish-job-1", phase: "publish_queued" })
+    ),
+    false
+  );
+  assert.equal(
+    canCancelImportStrict(importState({ phase: "publishing" })),
+    false
+  );
+  assert.equal(
+    canCancelImportStrict(importState({ phase: "publish_retrying" })),
     false
   );
 });
@@ -1276,17 +1316,22 @@ run("other-products search document uses aggregate public URL", () => {
   assert.match(document.searchText, /Прочие товары/);
 });
 
-run("publish prepares search index before active DB transaction", () => {
+run("publish prepares and checkpoints the search index before catalog activation", () => {
   const source = readFileSync(
     new URL("../src/features/import/publish-service.ts", import.meta.url),
     "utf8"
   );
-  const searchSyncIndex = source.indexOf("syncSearchIndexForCatalogVersion(catalogVersionId, perf)");
-  const transactionIndex = source.indexOf("db.transaction");
+  const prepareIndex = source.indexOf("prepareSearchIndexForCatalogVersion(catalogVersionId, perf)");
+  const swapIndex = source.indexOf("activatePreparedCatalogSearchIndex(preparedSearchIndex, perf)");
+  const activation = source.indexOf("activateCatalogVersionInDatabase(catalogVersionId, activation)");
 
-  assert.ok(searchSyncIndex > -1);
-  assert.ok(transactionIndex > -1);
-  assert.ok(searchSyncIndex < transactionIndex);
+  assert.ok(prepareIndex > -1);
+  assert.ok(swapIndex > prepareIndex);
+  assert.ok(activation > swapIndex);
+  assert.match(source, /search_swap_started/);
+  assert.match(source, /search_swapped/);
+  assert.match(source, /eq\(catalogVersions\.status, "draft"\)/);
+  assert.match(source, /CatalogActivationGuardError/);
 });
 
 run("search indexing failure message keeps old search explicit", () => {
@@ -1677,13 +1722,7 @@ function report(overrides: Partial<ImportPreviewReport> = {}): ImportPreviewRepo
       existingPriceUpdatedCount: 1,
       increasedCount: 1,
       decreasedCount: 0,
-      unchangedCount: 9,
-      maxIncreaseAmount: 10,
-      maxIncreasePercent: 0.1,
-      maxDecreaseAmount: 0,
-      maxDecreasePercent: 0,
-      averageChangeAmount: 1,
-      averageChangePercent: 0.01
+      unchangedCount: 9
     },
     examples: {
       valid: [],

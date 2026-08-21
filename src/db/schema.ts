@@ -302,13 +302,32 @@ export const importBatches = pgTable(
     fileHash: varchar("file_hash", { length: 128 }),
     uploadedBy: uuid("uploaded_by").references(() => adminUsers.id, { onDelete: "set null" }),
     report: jsonb("report").notNull().default(sql`'{}'::jsonb`),
+    analyzeJobId: uuid("analyze_job_id").references(() => backgroundJobs.id, {
+      onDelete: "set null"
+    }),
+    publishJobId: uuid("publish_job_id").references(() => backgroundJobs.id, {
+      onDelete: "set null"
+    }),
+    phase: varchar("phase", { length: 40 }),
+    stage: varchar("stage", { length: 255 }),
+    progress: integer("progress"),
+    publishCheckpoint: varchar("publish_checkpoint", { length: 80 }),
+    lastErrorCode: varchar("last_error_code", { length: 120 }),
+    lastErrorMessage: text("last_error_message"),
+    processingUpdatedAt: timestamp("processing_updated_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     analyzedAt: timestamp("analyzed_at", { withTimezone: true }),
     publishedAt: timestamp("published_at", { withTimezone: true })
   },
   (table) => ({
     statusIdx: index("import_batches_status_idx").on(table.status),
-    createdIdx: index("import_batches_created_idx").on(table.createdAt)
+    createdIdx: index("import_batches_created_idx").on(table.createdAt),
+    analyzeJobIdx: uniqueIndex("import_batches_analyze_job_unique")
+      .on(table.analyzeJobId)
+      .where(sql`${table.analyzeJobId} IS NOT NULL`),
+    publishJobIdx: uniqueIndex("import_batches_publish_job_unique")
+      .on(table.publishJobId)
+      .where(sql`${table.publishJobId} IS NOT NULL`)
   })
 );
 

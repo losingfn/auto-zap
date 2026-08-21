@@ -44,6 +44,16 @@ export interface SearchIndex<T> {
   getStats(): Promise<{ numberOfDocuments: number }>;
 }
 
+/** Reads only the catalog marker carried by indexed documents for publish recovery. */
+export async function getLiveSearchCatalogVersionId() {
+  const index = getSearchIndex() as unknown as {
+    getDocuments(options: { limit: number; fields: string[] }): Promise<{ results: Array<{ catalogVersionId?: unknown }> }>;
+  };
+  const response = await index.getDocuments({ limit: 1, fields: ["catalogVersionId"] });
+  const value = response.results[0]?.catalogVersionId;
+  return typeof value === "string" ? value : null;
+}
+
 export interface ReplaceSearchIndexOptions {
   expectedDocumentCount?: number;
   stagingIndexUid?: string;

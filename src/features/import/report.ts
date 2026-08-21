@@ -98,12 +98,6 @@ export function buildPriceChangeReport(
   let increasedCount = 0;
   let decreasedCount = 0;
   let unchangedCount = 0;
-  let maxIncreaseAmount = 0;
-  let maxIncreasePercent = 0;
-  let maxDecreaseAmount = 0;
-  let maxDecreasePercent = 0;
-  let totalChangeAmount = 0;
-  let totalChangePercent = 0;
 
   for (const row of rows) {
     if (!row.shopCode || row.price === null || row.status === "error" || row.status === "skipped") {
@@ -117,10 +111,6 @@ export function buildPriceChangeReport(
 
     existingWithPriceCount += 1;
     const changeAmount = row.price - existing.price;
-    const changePercent = changeAmount / existing.price;
-    totalChangeAmount += changeAmount;
-    totalChangePercent += changePercent;
-
     if (Math.abs(changeAmount) <= 0.009) {
       unchangedCount += 1;
       continue;
@@ -129,12 +119,8 @@ export function buildPriceChangeReport(
     existingPriceUpdatedCount += 1;
     if (changeAmount > 0) {
       increasedCount += 1;
-      maxIncreaseAmount = Math.max(maxIncreaseAmount, changeAmount);
-      maxIncreasePercent = Math.max(maxIncreasePercent, changePercent);
     } else {
       decreasedCount += 1;
-      maxDecreaseAmount = Math.min(maxDecreaseAmount, changeAmount);
-      maxDecreasePercent = Math.min(maxDecreasePercent, changePercent);
     }
   }
 
@@ -143,14 +129,6 @@ export function buildPriceChangeReport(
     existingPriceUpdatedCount,
     increasedCount,
     decreasedCount,
-    unchangedCount,
-    maxIncreaseAmount,
-    maxIncreasePercent,
-    maxDecreaseAmount,
-    maxDecreasePercent,
-    averageChangeAmount:
-      existingWithPriceCount > 0 ? totalChangeAmount / existingWithPriceCount : 0,
-    averageChangePercent:
-      existingWithPriceCount > 0 ? totalChangePercent / existingWithPriceCount : 0
+    unchangedCount
   };
 }

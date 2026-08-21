@@ -1,4 +1,4 @@
-export const BACKGROUND_JOB_TYPES = ["health_check"] as const;
+export const BACKGROUND_JOB_TYPES = ["health_check", "analyze_import", "publish_import"] as const;
 
 export type BackgroundJobType = (typeof BACKGROUND_JOB_TYPES)[number];
 export type BackgroundJobStatus =

@@ -7,8 +7,11 @@ import {
   AdminImportError,
   cancelAdminImportBatch,
   createAdminDraftImportFromUpload,
+  enqueueAdminImportFromUpload,
+  enqueueAdminImportPublish,
   publishAdminImportBatch
 } from "@/features/admin/imports";
+import { getFeatureFlags } from "@/lib/feature-flags";
 import { createImportPerfLogger } from "@/lib/server/import-perf";
 
 export async function uploadImportAction(formData: FormData) {
@@ -21,23 +24,25 @@ export async function uploadImportAction(formData: FormData) {
   let actionStatus: "success" | "error" = "success";
 
   try {
-    const result = await createAdminDraftImportFromUpload({
-      file: file instanceof File ? file : null,
-      adminUserId: session.user.id,
-      perf
-    });
-    importBatchId = result.importBatchId;
-    perf?.setImportBatchId(importBatchId);
-
-    await publishAdminImportBatch({
-      importBatchId: result.importBatchId,
-      adminUserId: session.user.id,
-      perf
-    });
-
+    if (getFeatureFlags().importViaWorker) {
+      const result = await enqueueAdminImportFromUpload({
+        file: file instanceof File ? file : null,
+        adminUserId: session.user.id
+      });
+      importBatchId = result.importBatchId;
+      target = `/admin/import?batch=${encodeURIComponent(result.importBatchId)}&accepted=1`;
+    } else {
+      const result = await createAdminDraftImportFromUpload({
+        file: file instanceof File ? file : null,
+        adminUserId: session.user.id,
+        perf
+      });
+      importBatchId = result.importBatchId;
+      perf?.setImportBatchId(importBatchId);
+      target = `/admin/import?batch=${encodeURIComponent(result.importBatchId)}&analyzed=1`;
+    }
     revalidatePath("/admin");
     revalidatePath("/admin/import");
-    target = `/admin/import?batch=${encodeURIComponent(result.importBatchId)}&published=1`;
   } catch (error) {
     actionStatus = "error";
     const errorCode = getErrorCode(error, importBatchId ? "publish_failed" : "analysis_failed");
@@ -61,15 +66,19 @@ export async function publishImportAction(formData: FormData) {
   let target = `/admin/import?batch=${encodeURIComponent(importBatchId)}`;
 
   try {
-    await publishAdminImportBatch({
-      importBatchId,
-      adminUserId: session.user.id,
-      perf
-    });
-
+    if (getFeatureFlags().importViaWorker) {
+      await enqueueAdminImportPublish({ importBatchId, adminUserId: session.user.id });
+      target = `/admin/import?batch=${encodeURIComponent(importBatchId)}&publish_requested=1`;
+    } else {
+      await publishAdminImportBatch({
+        importBatchId,
+        adminUserId: session.user.id,
+        perf
+      });
+      target = `/admin/import?batch=${encodeURIComponent(importBatchId)}&published=1`;
+    }
     revalidatePath("/admin/import");
     revalidatePath("/admin");
-    target = `/admin/import?batch=${encodeURIComponent(importBatchId)}&published=1`;
   } catch (error) {
     target = `/admin/import?batch=${encodeURIComponent(importBatchId)}&error=${getErrorCode(error, "publish_failed")}`;
   }

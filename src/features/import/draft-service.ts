@@ -50,6 +50,10 @@ export interface CreateDraftImportInput {
   fileHash?: string;
   uploadedBy?: string;
   storagePath?: string;
+  /** Existing worker reservation. Supplying it makes the draft commit idempotent. */
+  importBatchId?: string;
+  onProgress?: (stage: string, progress: number) => Promise<void>;
+  assertCanContinue?: () => Promise<void>;
   perf?: ImportPerfLogger;
 }
 
@@ -63,6 +67,8 @@ export async function createDraftImport(
   input: CreateDraftImportInput
 ): Promise<CreateDraftImportResult> {
   const perf = input.perf;
+  await input.onProgress?.("Читаем Excel", 18);
+  await input.assertCanContinue?.();
   const prepared = perf
     ? await perf.measure("prepare_input_data", async () => {
         const existingProducts = await getActiveProducts();
@@ -92,8 +98,10 @@ export async function createDraftImport(
     : analyzeImportFile(input.filePath, {
         existingProducts: prepared.existingProducts,
         fileBuffer: input.fileBuffer,
-        fileName: input.sourceFileName
-      });
+      fileName: input.sourceFileName
+    });
+  await input.onProgress?.("Сравниваем с текущим каталогом", 35);
+  await input.assertCanContinue?.();
   const identityResolutionRun = createProductIdentityResolutionRun({
     rows: analysis.rows,
     existingProducts: prepared.existingProducts
@@ -108,6 +116,7 @@ export async function createDraftImport(
   let classificationRun: DraftClassificationRun;
 
   try {
+    await input.onProgress?.("Распределяем новые товары", 52);
     classificationRun = perf
       ? await perf.measure(
           "classification",
@@ -132,6 +141,8 @@ export async function createDraftImport(
     await classificationObserver?.log("error");
     throw error;
   }
+  await input.onProgress?.("Готовим изменения", 68);
+  await input.assertCanContinue?.();
 
   const reportMeasurement = perf?.start();
   let reportStatus: "success" | "error" = "success";
@@ -168,6 +179,7 @@ export async function createDraftImport(
     }
   }
 
+  await input.onProgress?.("Сохраняем черновик", 76);
   const createDraft = () => db.transaction(async (tx) => {
     const [version] = await tx
       .insert(catalogVersions)
@@ -186,19 +198,9 @@ export async function createDraftImport(
       })
       .returning({ id: catalogVersions.id });
 
-    const [batch] = await tx
-      .insert(importBatches)
-      .values({
-        catalogVersionId: version.id,
-        status: "analyzed",
-        sourceFileName: input.sourceFileName,
-        storagePath: input.storagePath,
-        fileHash: input.fileHash,
-        uploadedBy: input.uploadedBy,
-        report,
-        analyzedAt: new Date()
-      })
-      .returning({ id: importBatches.id });
+    const batch = input.importBatchId
+      ? await updateReservedImportBatch(tx, input.importBatchId, version.id, report)
+      : await createImportBatch(tx, version.id, input, report);
 
     await insertImportRows(tx, batch.id, analysis.rows, perf);
     await insertImportErrors(tx, batch.id, analysis.rows);
@@ -221,8 +223,59 @@ export async function createDraftImport(
   });
 
   return perf
-    ? perf.measure("draft_transaction", createDraft, { rows: analysis.rows.length })
-    : createDraft();
+    ? await perf.measure("draft_transaction", createDraft, { rows: analysis.rows.length })
+    : await createDraft();
+}
+
+async function createImportBatch(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  catalogVersionId: string,
+  input: CreateDraftImportInput,
+  report: ReturnType<typeof analyzeImportFile>["report"]
+) {
+  const [batch] = await tx
+    .insert(importBatches)
+    .values({
+      catalogVersionId,
+      status: "analyzed",
+      sourceFileName: input.sourceFileName,
+      storagePath: input.storagePath,
+      fileHash: input.fileHash,
+      uploadedBy: input.uploadedBy,
+      report,
+      analyzedAt: new Date()
+    })
+    .returning({ id: importBatches.id });
+  return batch;
+}
+
+async function updateReservedImportBatch(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  importBatchId: string,
+  catalogVersionId: string,
+  report: ReturnType<typeof analyzeImportFile>["report"]
+) {
+  const [batch] = await tx
+    .update(importBatches)
+    .set({
+      catalogVersionId,
+      status: "analyzed",
+      phase: "analyzed",
+      stage: "Готово",
+      progress: 100,
+      report,
+      analyzedAt: new Date(),
+      lastErrorCode: null,
+      lastErrorMessage: null,
+      processingUpdatedAt: new Date()
+    })
+    .where(and(eq(importBatches.id, importBatchId), eq(importBatches.status, "uploaded")))
+    .returning({ id: importBatches.id });
+
+  if (!batch) {
+    throw new Error("Резерв импорта больше недоступен.");
+  }
+  return batch;
 }
 
 async function getActiveProducts(): Promise<ExistingProductSnapshot[]> {

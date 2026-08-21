@@ -2,9 +2,9 @@
 
 ## Scope and safety
 
-PR 2A adds a PostgreSQL-backed job queue and a separately runnable worker. It does **not** switch import, review reapply, or “Применить к группе” to the worker. Their legacy paths and business rules remain unchanged.
+The PostgreSQL-backed worker is separately runnable. It handles import analysis and explicit publication behind a feature flag; review reapply and “Применить к группе” retain their existing paths.
 
-The only registered handler is `health_check`. It has no admin endpoint, does not accept arbitrary handler names, and does not change catalogue, import, review, publication, or search data. The worker idles without claiming jobs unless `BACKGROUND_JOBS_ENABLED=1` (or `true`).
+Registered handlers are `health_check`, `analyze_import`, and `publish_import`. Payload validation does not accept arbitrary handler names or Excel buffers. The worker idles without claiming jobs unless `BACKGROUND_JOBS_ENABLED=1` (or `true`).
 
 ## Database model
 
@@ -33,7 +33,7 @@ Application rollback must leave the table in place. Older application code ignor
 
 The unique type/idempotency key returns the existing job only when its canonical SHA-256 `payload_hash` is identical. The same key with a different payload fails with `idempotency_conflict` and never modifies the existing row. Callers must include their business entity/actor scope in the key when needed. The worker increments `attempt_count` at claim time, writes `heartbeat_at` every 15 seconds, and recovers a running job whose heartbeat/lock is older than two minutes. Retries use bounded exponential delay: 1s, 2s, 4s, …, at most five minutes; default `max_attempts` is three.
 
-On `SIGTERM`/`SIGINT` the worker stops claiming new work, aborts the current handler through `AbortSignal`, and waits up to `WORKER_GRACEFUL_SHUTDOWN_MS` (default 10 seconds). An abortable handler is requeued only while its lease is still owned. At the timeout the process exits without a success write; the running job is later recovered by lease expiry. Future non-abortable handlers must not claim that their business work was cancelled. No handler in this PR mutates production business data.
+On `SIGTERM`/`SIGINT` the worker stops claiming new work, aborts the current handler through `AbortSignal`, and waits up to `WORKER_GRACEFUL_SHUTDOWN_MS` (default 10 seconds). An abortable handler is requeued only while its lease is still owned. At the timeout the process exits without a success write; the running job is later recovered by lease expiry. Import handlers persist their own business checkpoints and only run when the import flag is explicitly enabled.
 
 ## Feature flags
 
@@ -42,7 +42,7 @@ All flags are read centrally in `src/lib/feature-flags.ts`. Missing, malformed, 
 | Variable | Default | PR 2A behavior |
 | --- | --- | --- |
 | `BACKGROUND_JOBS_ENABLED` | false | Permits the worker to claim registered jobs. |
-| `IMPORT_VIA_WORKER_ENABLED` | false | Reserved; import remains synchronous legacy flow. |
+| `IMPORT_VIA_WORKER_ENABLED` | false | New imports enqueue durable analyze/publish jobs; false retains the legacy synchronous draft path. |
 | `REVIEW_REAPPLY_VIA_WORKER_ENABLED` | false | Reserved; CLI processor remains required. |
 | `GROUP_APPLY_VIA_WORKER_ENABLED` | false | Reserved; group apply remains a server action. |
 
@@ -83,7 +83,7 @@ pm2 stop autozap-worker
 pm2 delete autozap-worker
 ```
 
-Start the worker only after a staged validation and only with an explicit `BACKGROUND_JOBS_ENABLED=1` environment. It may stay stopped permanently in PR 2A. Do not use root’s PM2 daemon or change the web process to run the worker.
+Start the worker only after a staged validation and only with an explicit `BACKGROUND_JOBS_ENABLED=1` environment. Keep `IMPORT_VIA_WORKER_ENABLED` false until a controlled worker health check has passed. Do not use root’s PM2 daemon or change the web process to run the worker.
 
 ## Group-apply diagnostics
 
@@ -126,7 +126,7 @@ NODE_ENV=test ALLOW_LOCAL_DB_INTEGRATION_TESTS=1 DATABASE_URL=postgresql://autoz
 docker compose -f docker-compose.test.yml down -v
 ```
 
-The suite first recreates only the dedicated test schema and applies migrations `0001`–`0009` to verify a clean migration. It then drops only `background_jobs` and its enum in that same test DB, reapplies `0009`, and verifies the upgrade path from the previous schema. It covers actual PostgreSQL concurrent claim, idempotency races, lease ownership/fencing, stale recovery, retry limits, and the worker lease-loss regression.
+The suite first recreates only the dedicated test schema and applies all migrations to verify a clean migration. It then rebuilds the previous schema, applies `0011_import_worker.sql`, and verifies the additive upgrade path. It covers actual PostgreSQL concurrent claim, idempotency races, lease ownership/fencing, stale recovery, retry limits, and the worker lease-loss regression.
 
 ## Rollback
 

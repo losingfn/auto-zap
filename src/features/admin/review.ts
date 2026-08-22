@@ -47,8 +47,8 @@ import type { GroupApplyPerfCategory, GroupApplyPerfLogger } from "@/lib/server/
 
 export const REVIEW_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 const REVIEWABLE_PRODUCT_STATUSES = ["needs_review", "invalid"] as const;
-const REVIEW_PRIMARY_PREFETCH_SIZE = 5;
-const REVIEW_SIMILAR_GROUP_LIMIT = 50;
+export const REVIEW_PRIMARY_PREFETCH_SIZE = 5;
+export const REVIEW_SIMILAR_GROUP_LIMIT = 50;
 
 type ClassificationStats = {
   calls: number;
@@ -214,6 +214,7 @@ export type AdminReviewPrimaryData = {
     total: number;
   };
   canUndo: boolean;
+  focusItemUnavailable: boolean;
 };
 
 export type AdminReviewListData = {
@@ -483,6 +484,33 @@ export function normalizeAdminReviewParams(input: Partial<Record<string, string 
   };
 }
 
+export function getReviewPageWindow(page: number, pageSize: number) {
+  const safePage = Math.max(1, page);
+  const safePageSize = Math.max(1, pageSize);
+  return { limit: safePageSize, offset: (safePage - 1) * safePageSize };
+}
+
+export function buildReviewPagination(page: number, pageSize: number, total: number) {
+  const { limit, offset } = getReviewPageWindow(page, pageSize);
+  const safeTotal = Math.max(0, total);
+  return {
+    page: Math.max(1, page),
+    pageSize: limit,
+    total: safeTotal,
+    from: safeTotal === 0 ? 0 : offset + 1,
+    to: Math.min(offset + limit, safeTotal),
+    pageCount: Math.max(1, Math.ceil(safeTotal / limit))
+  };
+}
+
+export function buildPrimaryReviewSummary(
+  remaining: number,
+  workspace: Pick<ReviewWorkspaceSummary, "preparedProductCount" | "excludedProductCount">
+) {
+  const reviewed = workspace.preparedProductCount + workspace.excludedProductCount;
+  return { remaining, reviewed, total: remaining + reviewed };
+}
+
 export async function getAdminReviewPageData(
   rawParams: Partial<Record<string, string | string[] | undefined>> = {},
   options: {
@@ -737,11 +765,18 @@ export async function getAdminReviewPrimaryData(
     });
   }
 
+  let focusItemUnavailable = false;
   if (options.focusReviewId) {
-    const focusedRows = await getRowsByReviewIds([options.focusReviewId], workspace.id);
+    const focusedRows = await getRowsByReviewIds(
+      [options.focusReviewId],
+      workspace.id,
+      versionContext.activeVersion?.id ?? null
+    );
     const focused = focusedRows.find((row) => row.workspaceItemStatus !== "pending" && row.workspaceItemStatus !== "excluded");
     if (focused) {
       rows = [focused, ...rows.filter((row) => row.reviewId !== focused.reviewId)].slice(0, REVIEW_PRIMARY_PREFETCH_SIZE);
+    } else {
+      focusItemUnavailable = true;
     }
   }
 
@@ -789,12 +824,9 @@ export async function getAdminReviewPrimaryData(
     item,
     prefetchedItems: items.slice(1),
     similarGroup,
-    summary: {
-      remaining: queueStats.total,
-      reviewed: workspace.preparedProductCount,
-      total: queueStats.total + workspace.preparedProductCount
-    },
-    canUndo: Boolean(workspace.lastActionId)
+    summary: buildPrimaryReviewSummary(queueStats.total, workspace),
+    canUndo: Boolean(workspace.lastActionId),
+    focusItemUnavailable
   };
 }
 
@@ -815,9 +847,10 @@ export async function getAdminReviewListData(
   const categoryById = new Map(categoryRows.map((category) => [category.id, category]));
   const subcategoryById = new Map(subcategoryRows.map((subcategory) => [subcategory.id, subcategory]));
   let workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null, perf);
+  const pageWindow = getReviewPageWindow(params.page, params.pageSize);
   let rows = await getWorkspaceReviewRows(versionContext, workspace.id, {
-    limit: params.pageSize,
-    offset: (params.page - 1) * params.pageSize,
+    limit: pageWindow.limit,
+    offset: pageWindow.offset,
     query: params.query,
     perf,
     stage: "list_review_rows_sql"
@@ -827,8 +860,8 @@ export async function getAdminReviewListData(
     await ensureReviewWorkspace(versionContext.activeVersion?.id ?? null, options.adminUserId);
     workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null, perf);
     rows = await getWorkspaceReviewRows(versionContext, workspace.id, {
-      limit: params.pageSize,
-      offset: (params.page - 1) * params.pageSize,
+      limit: pageWindow.limit,
+      offset: pageWindow.offset,
       query: params.query,
       perf,
       stage: "list_review_rows_sql"
@@ -843,19 +876,11 @@ export async function getAdminReviewListData(
       )
     : rows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug));
   const total = await getReviewListCount(versionContext, params.query, perf);
-  const offset = (params.page - 1) * params.pageSize;
 
   return {
     categories,
     items: enrichedRows.map((row) => mapReviewItem(row, categoryById, subcategoryById)),
-    pagination: {
-      page: params.page,
-      pageSize: params.pageSize,
-      total,
-      from: total === 0 ? 0 : offset + 1,
-      to: Math.min(offset + params.pageSize, total),
-      pageCount: Math.max(1, Math.ceil(total / params.pageSize))
-    }
+    pagination: buildReviewPagination(params.page, params.pageSize, total)
   };
 }
 
@@ -2131,7 +2156,7 @@ async function getActionRows(
         groupApplyPerf,
         "load_selected_review_items",
         { category: "database", sqlOperations: 1, itemCount: reviewQueueIds.length },
-        () => getRowsByReviewIds(reviewQueueIds, workspace.id)
+        () => getRowsByReviewIds(reviewQueueIds, workspace.id, versionContext.activeVersion?.id ?? null)
       )
     : await measureGroupApplyStage(
         groupApplyPerf,
@@ -2179,8 +2204,12 @@ async function measureGroupApplyStage<T>(
   return perf ? perf.measure(name, options, operation) : operation();
 }
 
-async function getRowsByReviewIds(reviewQueueIds: string[], workspaceId: string | null) {
-  if (reviewQueueIds.length === 0) return [];
+async function getRowsByReviewIds(
+  reviewQueueIds: string[],
+  workspaceId: string | null,
+  activeVersionId: string | null
+) {
+  if (reviewQueueIds.length === 0 || !activeVersionId) return [];
 
   return db
     .select({
@@ -2221,6 +2250,7 @@ async function getRowsByReviewIds(reviewQueueIds: string[], workspaceId: string 
     .where(
       and(
         eq(reviewQueue.status, "open"),
+        eq(reviewQueue.catalogVersionId, activeVersionId),
         inArray(products.status, REVIEWABLE_PRODUCT_STATUSES),
         inArray(reviewQueue.id, reviewQueueIds)
       )

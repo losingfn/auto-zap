@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { requireAdminSession } from "@/features/admin/auth";
 import { env } from "@/lib/env";
 import { createGroupApplyPerfLogger } from "@/lib/server/group-apply-perf";
+import { applyReviewActionWithOptionalRule } from "@/features/admin/review-rule-fallback";
 import {
   AdminReviewBulkSafetyError,
   applyManualReviewCorrection,
@@ -132,32 +133,18 @@ export async function undoLastReviewWorkspaceInlineAction(input: { skippedReview
 async function applyManualReviewWithOptionalLearning(
   input: InlineReviewInput & { adminUserId: string }
 ) {
-  try {
-    return await applyManualReviewCorrection({
+  const apply = (learnRule: boolean) =>
+    applyManualReviewCorrection({
       reviewQueueId: input.reviewQueueId,
       productId: input.productId,
       categoryId: input.categoryId,
       subcategoryId: input.subcategoryId,
       adminUserId: input.adminUserId,
-      learnRule: input.learnRule,
-      rulePattern: input.learnRule ? input.rulePattern ?? undefined : undefined,
+      learnRule,
+      rulePattern: learnRule ? input.rulePattern ?? undefined : undefined,
       identityDecision: input.identityDecision ?? null
     });
-  } catch (error) {
-    if (!(input.learnRule && error instanceof AdminReviewBulkSafetyError && error.code === "rule_blocked")) {
-      throw error;
-    }
-
-    return applyManualReviewCorrection({
-      reviewQueueId: input.reviewQueueId,
-      productId: input.productId,
-      categoryId: input.categoryId,
-      subcategoryId: input.subcategoryId,
-      adminUserId: input.adminUserId,
-      learnRule: false,
-      identityDecision: input.identityDecision ?? null
-    });
-  }
+  return applyReviewActionWithOptionalRule(input.learnRule, apply, isRuleBlocked);
 }
 
 async function applySelectedReviewWithOptionalLearning(
@@ -175,14 +162,11 @@ async function applySelectedReviewWithOptionalLearning(
       expectedCount: input.reviewQueueIds.length
     });
 
-  try {
-    return await apply(input.learnRule);
-  } catch (error) {
-    if (!(input.learnRule && error instanceof AdminReviewBulkSafetyError && error.code === "rule_blocked")) {
-      throw error;
-    }
-    return apply(false);
-  }
+  return applyReviewActionWithOptionalRule(input.learnRule, apply, isRuleBlocked);
+}
+
+function isRuleBlocked(error: unknown) {
+  return error instanceof AdminReviewBulkSafetyError && error.code === "rule_blocked";
 }
 
 async function inlineReviewFailure(error: unknown, adminUserId: string, skippedReviewQueueIds?: string[]) {

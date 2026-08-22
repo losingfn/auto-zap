@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import type {
   AdminReviewCategoryOption,
   AdminReviewItem,
   AdminReviewPrimaryData,
   IdentityReviewDecision
 } from "@/features/admin/review";
-import { createIsolatedReviewFormState } from "@/features/admin/review-form-state";
+import {
+  appendTemporarilySkippedReviewId,
+  createIsolatedReviewFormState,
+  shouldApplyReviewActionResponse
+} from "@/features/admin/review-form-state";
 import {
   confirmReviewGroupInlineAction,
   confirmReviewItemInlineAction,
@@ -32,16 +36,21 @@ type Feedback = {
 export function ReviewWorkflow({ initialData }: { initialData: AdminReviewPrimaryData }) {
   const [data, setData] = useState(initialData);
   const [skippedReviewQueueIds, setSkippedReviewQueueIds] = useState<string[]>([]);
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(() => focusFeedback(initialData));
   const [isPending, startTransition] = useTransition();
+  const activeReviewId = useRef<string | null>(initialData.item?.reviewId ?? null);
 
   useEffect(() => {
+    activeReviewId.current = initialData.item?.reviewId ?? null;
     setData(initialData);
     setSkippedReviewQueueIds([]);
-    setFeedback(null);
+    setFeedback(focusFeedback(initialData));
   }, [initialData]);
 
-  const updateData = (next: AdminReviewPrimaryData) => setData(next);
+  const updateData = (next: AdminReviewPrimaryData) => {
+    activeReviewId.current = next.item?.reviewId ?? null;
+    setData(next);
+  };
 
   const confirmItem = (input: {
     item: AdminReviewItem;
@@ -50,6 +59,7 @@ export function ReviewWorkflow({ initialData }: { initialData: AdminReviewPrimar
     learnRule: boolean;
     identityDecision: IdentityReviewDecision | null;
   }) => {
+    const actionReviewId = input.item.reviewId;
     startTransition(async () => {
       const result = await confirmReviewItemInlineAction({
         reviewQueueId: input.item.reviewId,
@@ -61,6 +71,7 @@ export function ReviewWorkflow({ initialData }: { initialData: AdminReviewPrimar
         identityDecision: input.identityDecision,
         skippedReviewQueueIds
       });
+      if (!shouldApplyReviewActionResponse(activeReviewId.current, actionReviewId)) return;
       if (result.ok) {
         updateData(result.data);
         setFeedback({
@@ -86,6 +97,7 @@ export function ReviewWorkflow({ initialData }: { initialData: AdminReviewPrimar
     const group = data.similarGroup;
     if (!group || group.count < 2) return;
     if (!window.confirm(`Будет подтверждено: ${group.count} товаров. Продолжить?`)) return;
+    const actionReviewId = input.item.reviewId;
 
     startTransition(async () => {
       const result = await confirmReviewGroupInlineAction({
@@ -96,6 +108,7 @@ export function ReviewWorkflow({ initialData }: { initialData: AdminReviewPrimar
         rulePattern: input.item.rulePattern,
         skippedReviewQueueIds
       });
+      if (!shouldApplyReviewActionResponse(activeReviewId.current, actionReviewId)) return;
       if (result.ok) {
         updateData(result.data);
         setFeedback({
@@ -114,11 +127,11 @@ export function ReviewWorkflow({ initialData }: { initialData: AdminReviewPrimar
 
   const skipItem = () => {
     if (!data.item) return;
-    const nextSkipped = [...skippedReviewQueueIds, data.item.reviewId].slice(-100);
+    const nextSkipped = appendTemporarilySkippedReviewId(skippedReviewQueueIds, data.item.reviewId);
     setSkippedReviewQueueIds(nextSkipped);
     const prefetchedItem = data.prefetchedItems[0];
     if (prefetchedItem) {
-      setData({
+      updateData({
         ...data,
         item: prefetchedItem,
         prefetchedItems: data.prefetchedItems.slice(1),
@@ -296,7 +309,7 @@ function ReviewItemCard({
             </button>
             {similarCount > 1 ? (
               <button type="button" disabled={isPending || !canConfirm} onClick={() => onConfirmGroup(actionInput)} className={secondaryButtonClassName}>
-                Подтвердить все {similarCount}
+                Подтвердить все найденные {similarCount}
               </button>
             ) : null}
             <button type="button" disabled={isPending} onClick={onSkip} className={secondaryButtonClassName}>Пропустить</button>
@@ -305,6 +318,12 @@ function ReviewItemCard({
       </div>
     </article>
   );
+}
+
+function focusFeedback(data: AdminReviewPrimaryData): Feedback | null {
+  return data.focusItemUnavailable
+    ? { tone: "warning", message: "Этот товар уже обработан или больше не требует проверки." }
+    : null;
 }
 
 function FeedbackNotice({ feedback, onUndo, disabled }: { feedback: Feedback; onUndo: () => void; disabled: boolean }) {

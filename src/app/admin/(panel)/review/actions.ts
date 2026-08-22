@@ -11,10 +11,12 @@ import {
   applyManualReviewCorrection,
   applyReviewGroupCorrection,
   applySelectedReviewCorrections,
+  getAdminReviewPrimaryData,
   normalizeAdminReviewParams,
   publishReviewWorkspace,
   rollbackReviewAction,
-  type AdminReviewActionFilters
+  type AdminReviewActionFilters,
+  type IdentityReviewDecision
 } from "@/features/admin/review";
 import {
   cancelReviewReapplyRun,
@@ -24,6 +26,187 @@ import {
   resumeReviewReapplyRun,
   rollbackReviewReapplyApplyRun
 } from "@/features/admin/review-reapply";
+
+type InlineReviewInput = {
+  reviewQueueId: string;
+  productId: string;
+  categoryId: string;
+  subcategoryId: string;
+  learnRule: boolean;
+  rulePattern?: string | null;
+  identityDecision?: IdentityReviewDecision | null;
+  skippedReviewQueueIds?: string[];
+};
+
+type InlineGroupInput = {
+  reviewQueueIds: string[];
+  categoryId: string;
+  subcategoryId: string;
+  learnRule: boolean;
+  rulePattern?: string | null;
+  skippedReviewQueueIds?: string[];
+};
+
+export async function confirmReviewItemInlineAction(input: InlineReviewInput) {
+  await assertSameOriginReviewAction();
+  const session = await requireAdminSession();
+
+  try {
+    const result = await applyManualReviewWithOptionalLearning({ ...input, adminUserId: session.user.id });
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
+    const data = await getAdminReviewPrimaryData({
+      adminUserId: session.user.id,
+      createWorkspaceIfNeeded: true,
+      skipReviewQueueIds: input.skippedReviewQueueIds
+    });
+    return {
+      ok: true as const,
+      data,
+      ruleWasNotSaved: input.learnRule && !result.learnedRuleId
+    };
+  } catch (error) {
+    return inlineReviewFailure(error, session.user.id, input.skippedReviewQueueIds);
+  }
+}
+
+export async function confirmReviewGroupInlineAction(input: InlineGroupInput) {
+  await assertSameOriginReviewAction();
+  const session = await requireAdminSession();
+  const reviewQueueIds = [...new Set(input.reviewQueueIds.filter(Boolean))];
+
+  try {
+    const result = await applySelectedReviewWithOptionalLearning({
+      ...input,
+      reviewQueueIds,
+      adminUserId: session.user.id
+    });
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
+    const data = await getAdminReviewPrimaryData({
+      adminUserId: session.user.id,
+      createWorkspaceIfNeeded: true,
+      skipReviewQueueIds: input.skippedReviewQueueIds
+    });
+    return {
+      ok: true as const,
+      data,
+      processed: result.processed,
+      ruleWasNotSaved: input.learnRule && !result.learnedRuleId
+    };
+  } catch (error) {
+    return inlineReviewFailure(error, session.user.id, input.skippedReviewQueueIds);
+  }
+}
+
+export async function loadNextReviewItemInlineAction(input: { skippedReviewQueueIds?: string[] } = {}) {
+  await assertSameOriginReviewAction();
+  const session = await requireAdminSession();
+  return getAdminReviewPrimaryData({
+    adminUserId: session.user.id,
+    createWorkspaceIfNeeded: true,
+    skipReviewQueueIds: input.skippedReviewQueueIds
+  });
+}
+
+export async function undoLastReviewWorkspaceInlineAction(input: { skippedReviewQueueIds?: string[] } = {}) {
+  await assertSameOriginReviewAction();
+  const session = await requireAdminSession();
+  try {
+    await rollbackReviewAction({ adminUserId: session.user.id });
+    revalidatePath("/admin/review");
+    revalidatePath("/admin");
+    return {
+      ok: true as const,
+      data: await getAdminReviewPrimaryData({
+        adminUserId: session.user.id,
+        createWorkspaceIfNeeded: true,
+        skipReviewQueueIds: input.skippedReviewQueueIds
+      })
+    };
+  } catch {
+    return { ok: false as const, message: "Не удалось отменить последнее действие. Попробуйте ещё раз." };
+  }
+}
+
+async function applyManualReviewWithOptionalLearning(
+  input: InlineReviewInput & { adminUserId: string }
+) {
+  try {
+    return await applyManualReviewCorrection({
+      reviewQueueId: input.reviewQueueId,
+      productId: input.productId,
+      categoryId: input.categoryId,
+      subcategoryId: input.subcategoryId,
+      adminUserId: input.adminUserId,
+      learnRule: input.learnRule,
+      rulePattern: input.learnRule ? input.rulePattern ?? undefined : undefined,
+      identityDecision: input.identityDecision ?? null
+    });
+  } catch (error) {
+    if (!(input.learnRule && error instanceof AdminReviewBulkSafetyError && error.code === "rule_blocked")) {
+      throw error;
+    }
+
+    return applyManualReviewCorrection({
+      reviewQueueId: input.reviewQueueId,
+      productId: input.productId,
+      categoryId: input.categoryId,
+      subcategoryId: input.subcategoryId,
+      adminUserId: input.adminUserId,
+      learnRule: false,
+      identityDecision: input.identityDecision ?? null
+    });
+  }
+}
+
+async function applySelectedReviewWithOptionalLearning(
+  input: InlineGroupInput & { reviewQueueIds: string[]; adminUserId: string }
+) {
+  const apply = (learnRule: boolean) =>
+    applySelectedReviewCorrections({
+      filters: { scope: "workspace", issue: "all", query: "", reason: "", group: "" },
+      reviewQueueIds: input.reviewQueueIds,
+      categoryId: input.categoryId,
+      subcategoryId: input.subcategoryId,
+      adminUserId: input.adminUserId,
+      learnRule,
+      rulePattern: learnRule ? input.rulePattern ?? undefined : undefined,
+      expectedCount: input.reviewQueueIds.length
+    });
+
+  try {
+    return await apply(input.learnRule);
+  } catch (error) {
+    if (!(input.learnRule && error instanceof AdminReviewBulkSafetyError && error.code === "rule_blocked")) {
+      throw error;
+    }
+    return apply(false);
+  }
+}
+
+async function inlineReviewFailure(error: unknown, adminUserId: string, skippedReviewQueueIds?: string[]) {
+  if (error instanceof AdminReviewBulkSafetyError && error.code === "preview_stale") {
+    return {
+      ok: false as const,
+      stale: true as const,
+      message: "Данные товара изменились. Мы обновили карточку — проверьте её ещё раз.",
+      data: await getAdminReviewPrimaryData({
+        adminUserId,
+        createWorkspaceIfNeeded: true,
+        skipReviewQueueIds: skippedReviewQueueIds
+      })
+    };
+  }
+
+  return {
+    ok: false as const,
+    message:
+      error instanceof AdminReviewBulkSafetyError && error.code === "identity_conflict_requires_manual_resolution"
+        ? "Выберите, является ли это тем же товаром или новой позицией."
+        : "Не удалось сохранить изменение. Попробуйте ещё раз."
+  };
+}
 
 export async function resolveReviewItemAction(formData: FormData) {
   await assertSameOriginReviewAction();

@@ -16,6 +16,9 @@ type AdminReviewPerfMetrics = {
   page_rows_reused?: number;
   page_rows_classified?: number;
   page_rows_cache_miss?: number;
+  prefetched_rows?: number;
+  similar_group_rows?: number;
+  remaining?: number;
 };
 
 type AdminReviewPerfTimer = {
@@ -59,7 +62,10 @@ const metricOrder = [
   "max_ms",
   "page_rows_reused",
   "page_rows_classified",
-  "page_rows_cache_miss"
+  "page_rows_cache_miss",
+  "prefetched_rows",
+  "similar_group_rows",
+  "remaining"
 ] as const;
 
 export function createAdminReviewPerfLogger(): AdminReviewPerfLogger | undefined {

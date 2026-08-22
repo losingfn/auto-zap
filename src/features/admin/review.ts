@@ -797,6 +797,7 @@ export async function getAdminReviewPrimaryData(
         workspaceId: workspace.id,
         categorizationContext,
         targetBySlug,
+        excludeReviewQueueIds: options.skipReviewQueueIds,
         perf,
         classificationStats
       })
@@ -827,6 +828,44 @@ export async function getAdminReviewPrimaryData(
     summary: buildPrimaryReviewSummary(queueStats.total, workspace),
     canUndo: Boolean(workspace.lastActionId),
     focusItemUnavailable
+  };
+}
+
+/**
+ * Loads candidates only for an already prefetched, currently visible card.
+ * It intentionally does not reload primary data or create a workspace.
+ */
+export async function getAdminReviewSimilarGroupData(input: {
+  reviewQueueId: string;
+  skippedReviewQueueIds?: string[];
+}): Promise<{ reviewId: string; similarGroup: AdminReviewSimilarGroup | null }> {
+  const [versionContext, categorizationContext, targetBySlug] = await Promise.all([
+    getReviewVersionContext(),
+    getCategorizationContext(),
+    getTargetBySlugFromDb()
+  ]);
+  const workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null);
+  const rows = await getRowsByReviewIds(
+    [input.reviewQueueId],
+    workspace.id,
+    versionContext.activeVersion?.id ?? null
+  );
+  const row = rows.find((candidate) => candidate.workspaceItemStatus !== "pending" && candidate.workspaceItemStatus !== "excluded");
+  if (!row) {
+    return { reviewId: input.reviewQueueId, similarGroup: null };
+  }
+
+  const item = enrichReviewRow(row, categorizationContext, targetBySlug);
+  return {
+    reviewId: input.reviewQueueId,
+    similarGroup: await getSimilarReviewGroupForPrimary({
+      item,
+      versionContext,
+      workspaceId: workspace.id,
+      categorizationContext,
+      targetBySlug,
+      excludeReviewQueueIds: input.skippedReviewQueueIds
+    })
   };
 }
 
@@ -1992,6 +2031,7 @@ async function getSimilarReviewGroupForPrimary(input: {
   workspaceId: string | null;
   categorizationContext: CategorizationContext;
   targetBySlug: Map<string, CategorizationTarget>;
+  excludeReviewQueueIds?: string[];
   perf?: AdminReviewPerfLogger;
   classificationStats?: ClassificationStats;
 }): Promise<AdminReviewSimilarGroup | null> {
@@ -2004,6 +2044,7 @@ async function getSimilarReviewGroupForPrimary(input: {
     limit: REVIEW_SIMILAR_GROUP_LIMIT,
     query: pattern,
     onlyUnresolved: true,
+    excludeReviewQueueIds: input.excludeReviewQueueIds,
     perf: input.perf,
     stage: "primary_similar_group_rows_sql"
   });

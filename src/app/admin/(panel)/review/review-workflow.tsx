@@ -13,9 +13,14 @@ import {
   shouldApplyReviewActionResponse
 } from "@/features/admin/review-form-state";
 import {
+  advanceToPrefetchedReviewItem,
+  applySimilarGroupToCurrentReviewItem
+} from "@/features/admin/review-prefetch-state";
+import {
   confirmReviewGroupInlineAction,
   confirmReviewItemInlineAction,
   loadNextReviewItemInlineAction,
+  loadReviewSimilarGroupInlineAction,
   publishReviewWorkspaceAction,
   undoLastReviewWorkspaceInlineAction
 } from "./actions";
@@ -37,6 +42,7 @@ export function ReviewWorkflow({ initialData }: { initialData: AdminReviewPrimar
   const [data, setData] = useState(initialData);
   const [skippedReviewQueueIds, setSkippedReviewQueueIds] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<Feedback | null>(() => focusFeedback(initialData));
+  const [similarGroupLoadingReviewId, setSimilarGroupLoadingReviewId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const activeReviewId = useRef<string | null>(initialData.item?.reviewId ?? null);
 
@@ -45,11 +51,29 @@ export function ReviewWorkflow({ initialData }: { initialData: AdminReviewPrimar
     setData(initialData);
     setSkippedReviewQueueIds([]);
     setFeedback(focusFeedback(initialData));
+    setSimilarGroupLoadingReviewId(null);
   }, [initialData]);
 
   const updateData = (next: AdminReviewPrimaryData) => {
     activeReviewId.current = next.item?.reviewId ?? null;
     setData(next);
+    setSimilarGroupLoadingReviewId(null);
+  };
+
+  const loadSimilarGroupForPrefetchedItem = (reviewId: string, nextSkippedReviewQueueIds: string[]) => {
+    setSimilarGroupLoadingReviewId(reviewId);
+    void loadReviewSimilarGroupInlineAction({
+      reviewQueueId: reviewId,
+      skippedReviewQueueIds: nextSkippedReviewQueueIds
+    }).then((result) => {
+      if (!shouldApplyReviewActionResponse(activeReviewId.current, result.reviewId)) return;
+      setData((current) => applySimilarGroupToCurrentReviewItem(current, result.reviewId, result.similarGroup));
+      setSimilarGroupLoadingReviewId((current) => current === result.reviewId ? null : current);
+    }).catch(() => {
+      if (shouldApplyReviewActionResponse(activeReviewId.current, reviewId)) {
+        setSimilarGroupLoadingReviewId((current) => current === reviewId ? null : current);
+      }
+    });
   };
 
   const confirmItem = (input: {
@@ -129,15 +153,11 @@ export function ReviewWorkflow({ initialData }: { initialData: AdminReviewPrimar
     if (!data.item) return;
     const nextSkipped = appendTemporarilySkippedReviewId(skippedReviewQueueIds, data.item.reviewId);
     setSkippedReviewQueueIds(nextSkipped);
-    const prefetchedItem = data.prefetchedItems[0];
-    if (prefetchedItem) {
-      updateData({
-        ...data,
-        item: prefetchedItem,
-        prefetchedItems: data.prefetchedItems.slice(1),
-        similarGroup: null
-      });
+    const prefetched = advanceToPrefetchedReviewItem(data);
+    if (prefetched.kind === "prefetched") {
+      updateData(prefetched.data);
       setFeedback(null);
+      loadSimilarGroupForPrefetchedItem(prefetched.reviewId, nextSkipped);
       return;
     }
     startTransition(async () => {
@@ -169,6 +189,7 @@ export function ReviewWorkflow({ initialData }: { initialData: AdminReviewPrimar
           item={data.item}
           categories={data.categories}
           similarCount={data.similarGroup?.count ?? 1}
+          similarGroupLoading={similarGroupLoadingReviewId === data.item.reviewId}
           isPending={isPending}
           onConfirm={confirmItem}
           onConfirmGroup={confirmSimilarGroup}
@@ -198,6 +219,7 @@ function ReviewItemCard({
   item,
   categories,
   similarCount,
+  similarGroupLoading,
   isPending,
   onConfirm,
   onConfirmGroup,
@@ -206,6 +228,7 @@ function ReviewItemCard({
   item: AdminReviewItem;
   categories: AdminReviewCategoryOption[];
   similarCount: number;
+  similarGroupLoading: boolean;
   isPending: boolean;
   onConfirm: (input: {
     item: AdminReviewItem;
@@ -300,7 +323,9 @@ function ReviewItemCard({
             </span>
           </label>
 
-          {similarCount > 1 ? (
+          {similarGroupLoading ? (
+            <p className="mt-4 text-sm text-[#8FA1B8]" role="status">Подбираем похожие товары…</p>
+          ) : similarCount > 1 ? (
             <p className="mt-4 text-sm font-medium text-[#C8D1DF]">Найдено ещё {similarCount - 1} похожих товаров</p>
           ) : null}
           <div className="mt-5 flex flex-wrap gap-3">

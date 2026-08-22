@@ -13,6 +13,7 @@ import {
   applyReviewGroupCorrection,
   applySelectedReviewCorrections,
   getAdminReviewPrimaryData,
+  getAdminReviewSimilarGroupData,
   normalizeAdminReviewParams,
   publishReviewWorkspace,
   rollbackReviewAction,
@@ -108,6 +109,15 @@ export async function loadNextReviewItemInlineAction(input: { skippedReviewQueue
     createWorkspaceIfNeeded: true,
     skipReviewQueueIds: input.skippedReviewQueueIds
   });
+}
+
+export async function loadReviewSimilarGroupInlineAction(input: {
+  reviewQueueId: string;
+  skippedReviewQueueIds?: string[];
+}) {
+  await assertSameOriginReviewAction();
+  await requireAdminSession();
+  return getAdminReviewSimilarGroupData(input);
 }
 
 export async function undoLastReviewWorkspaceInlineAction(input: { skippedReviewQueueIds?: string[] } = {}) {

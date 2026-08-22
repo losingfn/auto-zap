@@ -5,7 +5,12 @@ import {
   createIsolatedReviewFormState,
   shouldApplyReviewActionResponse
 } from "../src/features/admin/review-form-state";
+import {
+  advanceToPrefetchedReviewItem,
+  applySimilarGroupToCurrentReviewItem
+} from "../src/features/admin/review-prefetch-state";
 import { applyReviewActionWithOptionalRule } from "../src/features/admin/review-rule-fallback";
+import type { AdminReviewItem, AdminReviewPrimaryData, AdminReviewSimilarGroup } from "../src/features/admin/review";
 import {
   buildPrimaryReviewSummary,
   buildReviewPagination,
@@ -71,6 +76,73 @@ async function main() {
     assert.deepEqual(skipped, ["review-air-intake", "review-filter"]);
   });
 
+  await run("skip moves to prefetched B instantly, then applies only B's similar group", () => {
+    const groupA = similarGroup(["review-a", "review-a2"]);
+    const groupB = similarGroup(["review-b", "review-b2", "review-b3"]);
+    const initial = primaryData(item("review-a"), [item("review-b"), item("review-c")], groupA);
+    const skipped = appendTemporarilySkippedReviewId([], "review-a");
+    const advance = advanceToPrefetchedReviewItem(initial);
+
+    assert.equal(advance.kind, "prefetched");
+    if (advance.kind !== "prefetched") throw new Error("Expected prefetched review item");
+    assert.equal(advance.reviewId, "review-b");
+    assert.equal(advance.data.item?.reviewId, "review-b");
+    assert.deepEqual(advance.data.prefetchedItems.map((candidate) => candidate.reviewId), ["review-c"]);
+    assert.equal(advance.data.similarGroup, null);
+    assert.deepEqual(advance.data.summary, initial.summary);
+    assert.deepEqual(skipped, ["review-a"]);
+    assert.deepEqual(
+      createIsolatedReviewFormState({
+        reviewId: "review-b",
+        suggestedCategoryId: null,
+        suggestedSubcategoryId: null,
+        currentCategoryId: null,
+        currentSubcategoryId: null
+      }),
+      {
+        reviewId: "review-b",
+        categoryId: "",
+        subcategoryId: "",
+        learnRule: false,
+        identityDecision: null
+      }
+    );
+
+    const withGroupB = applySimilarGroupToCurrentReviewItem(advance.data, "review-b", groupB);
+    assert.deepEqual(withGroupB.similarGroup, groupB);
+    assert.equal(withGroupB.item?.reviewId, "review-b");
+    assert.equal(withGroupB.prefetchedItems[0]?.reviewId, "review-c");
+    assert.deepEqual(initial.similarGroup, groupA);
+  });
+
+  await run("a missing group stays absent and a stale group response cannot reach C", () => {
+    const initial = primaryData(item("review-a"), [item("review-b"), item("review-c")]);
+    const toB = advanceToPrefetchedReviewItem(initial);
+    assert.equal(toB.kind, "prefetched");
+    if (toB.kind !== "prefetched") throw new Error("Expected B");
+    const withoutGroup = applySimilarGroupToCurrentReviewItem(toB.data, "review-b", null);
+    assert.equal(withoutGroup.similarGroup, null);
+
+    const toC = advanceToPrefetchedReviewItem(withoutGroup);
+    assert.equal(toC.kind, "prefetched");
+    if (toC.kind !== "prefetched") throw new Error("Expected C");
+    const staleBGroup = applySimilarGroupToCurrentReviewItem(
+      toC.data,
+      "review-b",
+      similarGroup(["review-b", "review-b2"])
+    );
+    assert.equal(staleBGroup, toC.data);
+    assert.equal(staleBGroup.item?.reviewId, "review-c");
+    assert.equal(staleBGroup.similarGroup, null);
+    assert.equal(shouldApplyReviewActionResponse("review-c", "review-b"), false);
+  });
+
+  await run("exhausted prefetch preserves data for the existing server fallback", () => {
+    const initial = primaryData(item("review-last"), []);
+    assert.deepEqual(advanceToPrefetchedReviewItem(initial), { kind: "exhausted" });
+    assert.deepEqual(initial.summary, { remaining: 8, reviewed: 2, total: 10 });
+  });
+
   await run("optional rule learning falls back to staging only when safety blocks the rule", async () => {
     const calls: boolean[] = [];
     const result = await applyReviewActionWithOptionalRule(
@@ -133,6 +205,10 @@ async function main() {
   await run("thin integration smoke keeps safety wiring at server boundaries", () => {
     assert.match(workflowSource, /key=\{data\.item\.reviewId\}/);
     assert.match(workflowSource, /shouldApplyReviewActionResponse\(activeReviewId\.current, actionReviewId\)/);
+    assert.match(workflowSource, /advanceToPrefetchedReviewItem\(data\)/);
+    assert.match(workflowSource, /loadReviewSimilarGroupInlineAction/);
+    assert.match(workflowSource, /applySimilarGroupToCurrentReviewItem/);
+    assert.match(workflowSource, /loadNextReviewItemInlineAction\(\{ skippedReviewQueueIds: nextSkipped \}\)/);
     assert.match(workflowSource, /Подтвердить все найденные \{similarCount\}/);
     assert.match(workflowSource, /Запомнить это решение для похожих товаров/);
     assert.doesNotMatch(workflowSource, /Шаблон правила/);
@@ -140,12 +216,37 @@ async function main() {
     assert.match(workflowSource, /Этот товар уже обработан или больше не требует проверки/);
     assert.match(actionsSource, /applyReviewActionWithOptionalRule\(input\.learnRule, apply, isRuleBlocked\)/);
     assert.match(actionsSource, /Данные товара изменились\. Мы обновили карточку/);
+    assert.match(actionsSource, /getAdminReviewSimilarGroupData/);
     assert.match(reviewSource, /eq\(reviewQueue\.catalogVersionId, activeVersionId\)/);
     assert.match(reviewSource, /focusItemUnavailable/);
     assert.match(reviewSource, /getReviewPageWindow\(params\.page, params\.pageSize\)/);
   });
 
   console.log("ok - accountant review workflow regression coverage passed");
+}
+
+function item(reviewId: string) {
+  return { reviewId } as AdminReviewItem;
+}
+
+function similarGroup(reviewQueueIds: string[]): AdminReviewSimilarGroup {
+  return { reviewQueueIds, count: reviewQueueIds.length };
+}
+
+function primaryData(
+  currentItem: AdminReviewItem,
+  prefetchedItems: AdminReviewItem[],
+  similarGroup: AdminReviewSimilarGroup | null = null
+): AdminReviewPrimaryData {
+  return {
+    categories: [],
+    item: currentItem,
+    prefetchedItems,
+    similarGroup,
+    summary: { remaining: 8, reviewed: 2, total: 10 },
+    canUndo: false,
+    focusItemUnavailable: false
+  };
 }
 
 async function run(name: string, test: () => void | Promise<void>) {

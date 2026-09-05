@@ -55,6 +55,36 @@ export function ClockIcon(props: IconProps) {
   );
 }
 
+export function PackageIcon(props: IconProps) {
+  return (
+    <LucideIcon {...props}>
+      <path d="m7.5 4.27 4.5-2.5 4.5 2.5" />
+      <path d="m3.5 6.5 8.5 4.72 8.5-4.72" />
+      <path d="M3.5 6.5v9l8.5 4.73 8.5-4.73v-9" />
+      <path d="M12 11.22V20" />
+    </LucideIcon>
+  );
+}
+
+export function WarehouseIcon(props: IconProps) {
+  return (
+    <LucideIcon {...props}>
+      <path d="m3 10 9-6 9 6v10H3z" />
+      <path d="M7 20v-6h10v6" />
+      <path d="M7 10h.01M11 10h.01M15 10h.01M19 10h.01" />
+    </LucideIcon>
+  );
+}
+
+export function SearchIcon(props: IconProps) {
+  return (
+    <LucideIcon {...props}>
+      <circle cx="11" cy="11" r="6" />
+      <path d="m20 20-4.2-4.2" />
+    </LucideIcon>
+  );
+}
+
 export function CircleCheckIcon(props: IconProps) {
   return (
     <LucideIcon {...props}>

@@ -13,7 +13,10 @@ import {
   ClockIcon,
   MailIcon,
   MapPinIcon,
-  PhoneIcon
+  PackageIcon,
+  PhoneIcon,
+  SearchIcon,
+  WarehouseIcon
 } from "@/components/icons/lucide";
 import { JsonLd } from "@/components/seo/json-ld";
 import { PublicFooter } from "@/components/site/public-footer";
@@ -41,68 +44,65 @@ const aboutFacts = [
   { value: "Заказ", label: "редких деталей" }
 ];
 
+const heroBenefitIcons = [PackageIcon, WarehouseIcon, SearchIcon, ClockIcon];
+
 export default async function Home() {
   const content = await getPublicHomeContent();
   const workStatus = getStoreWorkStatusFromHours(content.workingHours);
   const compactWorkingHours = getCompactWorkingHours(content.workingHoursDisplay);
+  const heroDescription = content.home.hero.text
+    .replace(" Можно приехать сегодня.", "")
+    .replace(/\.$/, "");
+  const heroSubtitle = content.home.hero.subtitle.replace(/\.$/, "");
 
   return (
-    <main className="premium-page min-h-dvh bg-[#111827] text-white">
+    <main className="home-page premium-page min-h-dvh">
       <JsonLd data={buildLocalBusinessJsonLd(content)} />
-      <SiteHeader siteName={content.brand.name} />
+      <SiteHeader siteName="Автозапчасти на Салтыкова-Щедрина" />
 
-      <section className="relative isolate flex min-h-[62svh] items-end overflow-hidden sm:min-h-[94svh]">
-        <picture className="pointer-events-none absolute inset-0">
-          <source media="(max-width: 639px)" srcSet="/assets/store/store-front-mobile.webp" />
+      <section className="home-hero relative isolate overflow-hidden">
+        <div className="home-hero-content-surface pointer-events-none absolute inset-y-0 left-0" />
+        <div className="home-hero-media pointer-events-none absolute inset-x-0 top-0">
           <Image
-            src="/assets/store/facade.webp"
+            src="/assets/store/facade-clean.png"
             alt="Магазин автозапчастей на Салтыкова-Щедрина"
             fill
             priority
             sizes="100vw"
-            className="object-cover object-center"
-            style={{ filter: "contrast(1.2) saturate(1.1) brightness(1.12)" }}
+            className="home-hero-image object-cover"
           />
-        </picture>
-        <div className="pointer-events-none absolute inset-0 bg-[#111827]/[0.24]" />
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(112deg,rgba(17,24,39,0.56)_0%,rgba(17,24,39,0.22)_44%,rgba(37,99,235,0.08)_100%)]" />
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(17,24,39,0)_0%,rgba(17,24,39,0.1)_46%,rgba(17,24,39,0.72)_83%,#111827_100%)]" />
+        </div>
+        <div className="home-hero-overlay pointer-events-none absolute inset-x-0 top-0" />
 
-        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-5 pt-[36svh] sm:px-6 sm:pb-7 sm:pt-[66svh] lg:px-8">
-          <div className="max-w-[720px] rounded-[10px] border border-white/[0.12] bg-[#0B1220]/[0.58] p-4 shadow-[0_28px_100px_rgba(0,0,0,0.38)] backdrop-blur-[2px] sm:p-6 lg:max-w-[760px]">
-            <div className="scroll-reveal inline-flex items-center gap-2.5 rounded-card border border-white/15 bg-white/[0.08] px-3 py-2 text-xs font-semibold text-[#DBEAFE] shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-md sm:gap-3 sm:px-4 sm:text-sm">
-              <span className="h-2 w-2 rounded-full bg-[#2563EB]" />
-              {content.contact.addressCity}, {content.contact.addressStreet}
+        <div className="home-hero-shell relative z-10 mx-auto w-full max-w-7xl px-5 lg:px-12">
+          <div className="home-hero-copy max-w-[640px]">
+            <div className="home-hero-intro">
+              <h1 className="home-hero-title">{content.home.hero.title}</h1>
+              <div className="home-hero-supporting-copy">
+                <p className="home-hero-subtitle">{heroSubtitle}</p>
+                <p className="home-hero-text">{heroDescription}</p>
+              </div>
             </div>
 
-            <h1 className="scroll-reveal mt-4 max-w-3xl text-3xl font-semibold leading-[1.05] sm:mt-5 sm:text-5xl lg:text-6xl">
-              {content.home.hero.title}
-            </h1>
-            <p className="scroll-reveal mt-3 max-w-2xl text-base font-medium leading-6 text-[#E5E7EB] sm:mt-4 sm:text-xl sm:leading-7">
-              {content.home.hero.subtitle}
-            </p>
-            <p className="scroll-reveal mt-2 hidden max-w-2xl text-sm leading-6 text-[#CBD5E1] sm:mt-3 sm:block sm:text-base sm:leading-7">
-              {content.home.hero.text}
-            </p>
-            <div className="scroll-reveal mt-4 sm:mt-6">
+            <div className="home-hero-search-wrap">
               <HomeSearch />
             </div>
-
-            <div className="mt-4 hidden grid-cols-2 gap-2.5 sm:mt-5 sm:grid sm:gap-3 lg:grid-cols-4">
-              {content.home.hero.highlights.map((item, index) => (
-                <div
-                  key={item}
-                  className="scroll-reveal stagger-card rounded-card border border-white/[0.12] bg-[#111827]/[0.72] px-3 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.24)] backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:border-[#2563EB]/70 sm:px-4 sm:py-4"
-                  style={{ "--stagger": `${index * 70}ms` } as CSSProperties}
-                >
-                  <div className="mb-2 h-1 w-8 rounded-full bg-[#2563EB] sm:mb-3 sm:w-9" />
-                  <p className="text-xs font-semibold leading-4 text-white sm:text-base sm:leading-5">
-                    {item}
-                  </p>
-                </div>
-              ))}
-            </div>
           </div>
+
+          <ul className="home-hero-proof">
+            {content.home.hero.highlights.map((item, index) => {
+              const Icon = heroBenefitIcons[index] ?? CircleCheckIcon;
+
+              return (
+                <li key={item} className="home-hero-proof-item">
+                  <span className="home-hero-benefit-icon">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span>{item}</span>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       </section>
 

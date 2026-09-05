@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { publicBrandLogoSrc } from "@/config/public-brand";
 import { PurchaseListNavigationLink } from "@/components/purchase-list/purchase-list-navigation-link";
 
@@ -16,55 +19,77 @@ export function SiteHeader({
 }: {
   siteName: string;
 }) {
-  return (
-    <header className="relative z-20 bg-[#111827] lg:absolute lg:left-0 lg:right-0 lg:top-0 lg:bg-transparent">
-      <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
-        <div className="flex items-center justify-between gap-4">
-          <Link href="/" className="flex min-w-0 items-center gap-3">
-            <Image
-              src={publicBrandLogoSrc}
-              alt=""
-              width={72}
-              height={72}
-              sizes="(min-width: 1024px) 72px, (min-width: 640px) 64px, 56px"
-              priority
-              className="aspect-square h-14 w-14 shrink-0 object-contain drop-shadow-[0_1px_1px_rgba(226,232,240,0.2)] sm:h-16 sm:w-16 lg:h-[72px] lg:w-[72px]"
-            />
-            <span className="min-w-0 max-w-[218px] text-xs font-semibold leading-4 text-white sm:max-w-none sm:text-base sm:leading-5">
-              {siteName}
-            </span>
-          </Link>
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [isFloating, setIsFloating] = useState(false);
+  const [brandPrimary, brandLocation] = siteName.split(" на ");
 
-          <nav className="hidden items-center gap-2 rounded-card border border-white/10 bg-[#111827]/[0.58] p-1 text-sm font-medium text-[#D6DEE9] shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-md lg:flex">
-            {navigationItems.map((item) => (
-              <Link key={item.href} href={item.href} className="tap-target transition hover:text-white">
-                <span className="block whitespace-nowrap rounded-card px-3 py-2 transition hover:bg-white/10">
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+
+    if (!sentinel || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const observer = new IntersectionObserver(([entry]) => {
+      setIsFloating(!entry.isIntersecting);
+    });
+
+    observer.observe(sentinel);
+
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <>
+      <div ref={sentinelRef} aria-hidden="true" className="home-header-sentinel" />
+      <header className={`home-header relative z-20 ${isFloating ? "home-header--floating" : ""}`}>
+        <div className="home-header-shell mx-auto max-w-7xl px-5 lg:px-12">
+          <div className="home-header-primary flex items-center justify-between gap-4">
+            <Link href="/" className="home-header-brand flex min-w-0 items-center gap-3">
+              <Image
+                src={publicBrandLogoSrc}
+                alt=""
+                width={72}
+                height={72}
+                sizes="(min-width: 1024px) 72px, 44px"
+                priority
+                className="home-header-logo aspect-square h-11 w-11 shrink-0 object-contain lg:h-[72px] lg:w-[72px]"
+              />
+              <span className="home-header-name min-w-0 max-w-[218px] text-xs font-semibold leading-4 text-white sm:max-w-none sm:text-sm sm:leading-5">
+                <span>{brandPrimary}</span>
+                {brandLocation ? <><span> </span><span className="home-header-name-location">на {brandLocation}</span></> : null}
+              </span>
+            </Link>
+
+            <nav className="home-header-desktop-nav hidden items-center lg:flex">
+              {navigationItems.map((item) => (
+                <Link key={item.href} href={item.href} className="home-header-desktop-link tap-target">
                   {item.label}
-                </span>
+                </Link>
+              ))}
+              <PurchaseListNavigationLink
+                className="home-header-desktop-link home-header-purchase-link tap-target"
+              />
+            </nav>
+          </div>
+
+          <nav className="home-header-mobile-nav grid grid-cols-3 lg:hidden">
+            {navigationItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="home-header-mobile-link tap-target flex min-h-11 min-w-0 items-center justify-center px-1.5 py-2"
+              >
+                {item.label}
               </Link>
             ))}
             <PurchaseListNavigationLink
-              className="tap-target block whitespace-nowrap rounded-card px-3 py-2 pr-7 transition hover:bg-white/10 hover:text-white"
+              mobileLabel="Список"
+              className="home-header-mobile-link tap-target flex min-h-11 min-w-0 items-center justify-center px-1.5 py-2"
             />
           </nav>
         </div>
-
-        <nav className="mt-3 grid grid-cols-6 gap-1.5 text-[0.72rem] font-medium text-[#D6DEE9] sm:gap-2 sm:text-sm lg:hidden">
-          {navigationItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="tap-target col-span-2 flex min-h-9 min-w-0 items-center justify-center whitespace-nowrap rounded-card border border-white/10 bg-white/[0.06] px-1.5 py-2 leading-5 hover:border-[#2563EB]/60 hover:bg-white/[0.1] hover:text-white sm:px-2.5"
-            >
-              {item.label}
-            </Link>
-          ))}
-          <PurchaseListNavigationLink
-            mobileLabel="Список"
-            className="tap-target col-span-2 flex min-h-9 min-w-0 items-center justify-center whitespace-nowrap rounded-card border border-white/10 bg-white/[0.06] px-1.5 py-2 leading-5 hover:border-[#2563EB]/60 hover:bg-white/[0.1] hover:text-white sm:px-2.5"
-          />
-        </nav>
-      </div>
-    </header>
+      </header>
+    </>
   );
 }

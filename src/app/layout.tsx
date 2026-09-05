@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Golos_Text, Rubik, Unbounded } from "next/font/google";
 import "./globals.css";
 import { PurchaseListProvider } from "@/features/purchase-list/purchase-list-provider";
 import { siteConfig } from "@/config/site";
@@ -8,6 +9,27 @@ const metadataTitle = "Автозапчасти в Талдоме — Салты
 const metadataDescription =
   "Оригинальные и аналоговые автозапчасти в Талдоме. Большой ассортимент, помощь в подборе, честные цены, удобное расположение и реальные отзывы покупателей.";
 const ogImagePath = "/og-image-v3.png";
+
+const unbounded = Unbounded({
+  subsets: ["cyrillic", "latin"],
+  weight: "500",
+  variable: "--font-unbounded",
+  display: "swap"
+});
+
+const golosText = Golos_Text({
+  subsets: ["cyrillic", "latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-golos-text",
+  display: "swap"
+});
+
+const rubik = Rubik({
+  subsets: ["cyrillic", "latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-rubik",
+  display: "swap"
+});
 
 export const viewport: Viewport = {
   themeColor: "#07111F"
@@ -75,7 +97,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru">
+    <html lang="ru" className={`${unbounded.variable} ${golosText.variable} ${rubik.variable}`}>
       <body>
         <PurchaseListProvider>{children}</PurchaseListProvider>
       </body>

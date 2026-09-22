@@ -52,6 +52,7 @@ export default async function CategoryPage({
     <CatalogPageShell
       title={category.name}
       backHref={withCatalogNavigationContext("/catalog", context)}
+      variant="category"
     >
       <JsonLd
         data={buildBreadcrumbList([

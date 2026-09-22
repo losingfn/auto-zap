@@ -106,13 +106,16 @@ export default async function Home() {
         </div>
       </section>
 
-      <section id="catalog" className="section-shell section-soft scroll-mt-28 py-11 sm:scroll-mt-24 sm:py-16 lg:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionIntro
-            eyebrow={content.home.catalog.eyebrow}
-            title={content.home.catalog.title}
-            text=""
-          />
+      <section id="catalog" className="catalog-section section-shell section-soft scroll-mt-28 py-11 sm:scroll-mt-24 sm:py-16 lg:py-20">
+        <div className="catalog-shell mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="catalog-mobile-heading">
+            <SectionIntro
+              eyebrow={content.home.catalog.eyebrow}
+              title={content.home.catalog.title}
+              text=""
+            />
+          </div>
+          <h2 className="catalog-desktop-heading">Каталог товаров</h2>
           <HomeCategoryGrid categories={content.categories} />
         </div>
       </section>

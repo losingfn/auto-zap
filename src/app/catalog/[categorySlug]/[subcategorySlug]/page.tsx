@@ -60,6 +60,7 @@ export default async function SubcategoryPage({
       title={subcategory.name}
       subtitle={`${category.name} → ${subcategory.name}`}
       backHref={withCatalogNavigationContext(`/catalog/${category.slug}`, context)}
+      variant="product-list"
     >
       <JsonLd
         data={buildBreadcrumbList([

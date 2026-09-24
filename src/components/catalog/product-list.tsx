@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronRightIcon } from "@/components/icons/lucide";
 import { PurchaseListProductBadge } from "@/components/purchase-list/purchase-list-product-badge";
 import type { PublicProductListItem, PublicProductPagination } from "@/features/catalog/types";
 import {
@@ -23,11 +24,11 @@ export function ProductList({
 }) {
   const hasSearch = Boolean(searchQuery.trim());
   return (
-    <div>
-      <div className="mb-5 rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.92),rgba(17,24,39,1))] p-4 shadow-[0_20px_70px_rgba(0,0,0,0.22)]">
+    <div className="catalog-product-list">
+      <div className="catalog-product-search-shell mb-5 rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.92),rgba(17,24,39,1))] p-4 shadow-[0_20px_70px_rgba(0,0,0,0.22)]">
         <form
           action={`/catalog/${categorySlug}/${subcategorySlug}`}
-          className="grid gap-3 sm:grid-cols-[1fr_auto]"
+          className="catalog-product-search grid gap-3 sm:grid-cols-[1fr_auto]"
         >
           <label className="sr-only" htmlFor="subcategory-search">
             Поиск в подкатегории
@@ -38,23 +39,23 @@ export function ProductList({
             name="q"
             defaultValue={searchQuery}
             placeholder="Искать в этой подкатегории"
-            className="min-h-12 rounded-card border border-white/10 bg-[#0B1220] px-4 text-base text-white outline-none transition placeholder:text-[#9CA3AF] focus:border-[#2563EB]"
+            className="catalog-product-search-input min-h-12 rounded-card border border-white/10 bg-[#0B1220] px-4 text-base text-white outline-none transition placeholder:text-[#9CA3AF] focus:border-[#2563EB]"
           />
           {navigationContext ? <input type="hidden" name="from" value={navigationContext} /> : null}
-          <button className="tap-target min-h-12 rounded-card bg-[#2563EB] px-5 font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8]">
+          <button className="catalog-product-search-submit tap-target min-h-12 rounded-card bg-[#2563EB] px-5 font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8]">
             Найти
           </button>
         </form>
       </div>
 
-      <div className="mb-4 flex flex-col gap-2 rounded-card border border-white/10 bg-[#111827] p-4 text-sm text-[#CBD5E1] shadow-[0_16px_50px_rgba(0,0,0,0.18)] sm:flex-row sm:items-center sm:justify-between">
-        <p>
+      <div className="catalog-product-results-meta mb-4 flex flex-col gap-2 rounded-card border border-white/10 bg-[#111827] p-4 text-sm text-[#CBD5E1] shadow-[0_16px_50px_rgba(0,0,0,0.18)] sm:flex-row sm:items-center sm:justify-between">
+        <p className="catalog-product-results-count">
           {hasSearch ? "Найдено в подкатегории" : "Найдено товаров"}:{" "}
           <span className="font-semibold text-white">
             {pagination.totalItems.toLocaleString("ru-RU")}
           </span>
         </p>
-        <p>
+        <p className="catalog-product-results-page">
           Страница {pagination.page.toLocaleString("ru-RU")} из{" "}
           {pagination.totalPages.toLocaleString("ru-RU")}
         </p>
@@ -62,7 +63,7 @@ export function ProductList({
 
       {products.length > 0 ? (
         <>
-          <div className="divide-y divide-white/10 overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_24px_80px_rgba(0,0,0,0.24)]">
+          <div className="catalog-product-rows divide-y divide-white/10 overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_24px_80px_rgba(0,0,0,0.24)]">
             {products.map((product) => (
               <Link
                 key={product.id}
@@ -70,14 +71,23 @@ export function ProductList({
                   `/catalog/${categorySlug}/${subcategorySlug}/${product.slug}`,
                   navigationContext
                 )}
-                className="tap-target grid gap-2 p-4 hover:bg-[#2563EB]/10 sm:grid-cols-[1fr_auto]"
+                className="catalog-product-row tap-target grid gap-2 p-4 hover:bg-[#2563EB]/10 sm:grid-cols-[1fr_auto]"
               >
-                <div>
-                  <h2 className="text-base font-semibold leading-6">{product.name}</h2>
-                  <PurchaseListProductBadge productIdentityId={product.productIdentityId} />
+                <div className="catalog-product-row-main">
+                  <h2 className="catalog-product-row-title text-base font-semibold leading-6">
+                    {product.name}
+                  </h2>
+                  <span className="catalog-product-row-badge block">
+                    <PurchaseListProductBadge productIdentityId={product.productIdentityId} />
+                  </span>
                 </div>
-                <div className="text-lg font-semibold text-white">
-                  {product.price.toLocaleString("ru-RU")} ₽
+                <div className="catalog-product-row-utility">
+                  <div className="catalog-product-row-price text-lg font-semibold text-white">
+                    {product.price.toLocaleString("ru-RU")} ₽
+                  </div>
+                  <span className="catalog-product-row-chevron hidden" aria-hidden="true">
+                    <ChevronRightIcon />
+                  </span>
                 </div>
               </Link>
             ))}
@@ -121,7 +131,10 @@ function PaginationControls({
   const baseHref = `/catalog/${categorySlug}/${subcategorySlug}`;
 
   return (
-    <nav className="mt-5 flex flex-wrap items-center gap-2" aria-label="Пагинация товаров">
+    <nav
+      className="catalog-product-pagination mt-5 flex flex-wrap items-center gap-2"
+      aria-label="Пагинация товаров"
+    >
       <PageLink
         href={pageHref(baseHref, pagination.page - 1, searchQuery, navigationContext)}
         disabled={pagination.page <= 1}
@@ -131,7 +144,7 @@ function PaginationControls({
         page === "gap" ? (
           <span
             key={`gap-${index}`}
-            className="flex h-10 min-w-10 items-center justify-center text-[#94A3B8]"
+            className="catalog-product-pagination-gap flex h-10 min-w-10 items-center justify-center text-[#94A3B8]"
           >
             ...
           </span>
@@ -166,7 +179,7 @@ function PageLink({
 }) {
   if (disabled) {
     return (
-      <span className="inline-flex h-10 items-center justify-center rounded-card border border-white/10 px-4 text-sm font-semibold text-[#64748B]">
+      <span className="catalog-product-page-link catalog-product-page-link--disabled inline-flex h-10 items-center justify-center rounded-card border border-white/10 px-4 text-sm font-semibold text-[#64748B]">
         {label}
       </span>
     );
@@ -175,10 +188,11 @@ function PageLink({
   return (
     <Link
       href={href}
+      aria-current={isActive ? "page" : undefined}
       className={[
-        "tap-target inline-flex h-10 items-center justify-center rounded-card border px-4 text-sm font-semibold shadow-[0_12px_34px_rgba(0,0,0,0.18)] hover:-translate-y-0.5",
+        "catalog-product-page-link tap-target inline-flex h-10 items-center justify-center rounded-card border px-4 text-sm font-semibold shadow-[0_12px_34px_rgba(0,0,0,0.18)] hover:-translate-y-0.5",
         isActive
-          ? "border-[#2563EB] bg-[#2563EB] text-white"
+          ? "catalog-product-page-link--active border-[#2563EB] bg-[#2563EB] text-white"
           : "border-white/10 bg-[#111827] text-white hover:border-[#2563EB]/70 hover:bg-[#2563EB]/15"
       ].join(" ")}
     >

@@ -12,13 +12,18 @@ export async function CatalogPageShell({
   title: string;
   subtitle?: string;
   backHref?: string;
-  variant?: "default" | "category";
+  variant?: "default" | "category" | "product-list";
   children: ReactNode;
 }) {
+  const variantClassName =
+    variant === "category"
+      ? "catalog-category-page"
+      : variant === "product-list"
+        ? "catalog-product-list-page"
+        : "";
+
   return (
-    <main
-      className={`premium-page min-h-dvh bg-[#111827] text-white ${variant === "category" ? "catalog-category-page" : ""}`}
-    >
+    <main className={`premium-page min-h-dvh bg-[#111827] text-white ${variantClassName}`}>
       <div className="catalog-page-content px-5 py-8">
         <div className="catalog-page-inner mx-auto max-w-6xl">
           <header className={`catalog-page-header scroll-reveal mb-8 rounded-card border border-white/10 bg-[#111827] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.24)] ${subtitle ? "sm:p-7" : "sm:p-6"}`}>

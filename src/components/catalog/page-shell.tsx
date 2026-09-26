@@ -4,15 +4,17 @@ import { PublicFooter } from "@/components/site/public-footer";
 
 export async function CatalogPageShell({
   title,
+  desktopTitle,
   subtitle,
   backHref,
   variant = "default",
   children
 }: {
   title: string;
+  desktopTitle?: string;
   subtitle?: string;
   backHref?: string;
-  variant?: "default" | "category" | "product-list";
+  variant?: "default" | "category" | "product-list" | "product-detail";
   children: ReactNode;
 }) {
   const variantClassName =
@@ -20,7 +22,9 @@ export async function CatalogPageShell({
       ? "catalog-category-page"
       : variant === "product-list"
         ? "catalog-product-list-page"
-        : "";
+        : variant === "product-detail"
+          ? "catalog-product-detail-page"
+          : "";
 
   return (
     <main className={`premium-page min-h-dvh bg-[#111827] text-white ${variantClassName}`}>
@@ -32,7 +36,14 @@ export async function CatalogPageShell({
                 ← Назад
               </Link>
             ) : null}
-            <h1 className="catalog-page-title text-3xl font-semibold leading-tight sm:text-5xl">{title}</h1>
+            <h1 className="catalog-page-title text-3xl font-semibold leading-tight sm:text-5xl">
+              {desktopTitle ? (
+                <>
+                  <span className="catalog-page-title-default">{title}</span>
+                  <span className="catalog-page-title-desktop hidden">{desktopTitle}</span>
+                </>
+              ) : title}
+            </h1>
             {subtitle ? <p className="catalog-page-subtitle mt-3 max-w-2xl text-[#CBD5E1]">{subtitle}</p> : null}
           </header>
           {children}

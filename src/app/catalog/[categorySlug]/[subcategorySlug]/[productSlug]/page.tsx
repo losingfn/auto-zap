@@ -88,19 +88,27 @@ export default async function ProductPage({
         { name: product.subcategoryName, url: `/catalog/${categorySlug}/${subcategorySlug}` },
         { name: product.name, url: productUrl }
       ];
+  const priceDetails = (
+    <>
+      <p className="catalog-product-detail-price-label text-sm font-semibold uppercase tracking-[0.12em] text-[#93C5FD]">Цена</p>
+      <p className="catalog-product-detail-price-value mt-3 text-3xl font-semibold text-white sm:text-4xl">
+        {product.price.toLocaleString("ru-RU")} ₽
+      </p>
+    </>
+  );
 
   return (
     <CatalogPageShell
       title={product.name}
+      desktopTitle={`${product.categoryName} → ${product.subcategoryName}`}
       subtitle={displayLabel}
       backHref={backHref}
+      variant="product-detail"
     >
       <JsonLd data={buildBreadcrumbList(breadcrumbs)} />
-      <article className="rounded-card border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.24)] sm:p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#93C5FD]">Цена</p>
-        <p className="mt-3 text-3xl font-semibold text-white sm:text-4xl">
-          {product.price.toLocaleString("ru-RU")} ₽
-        </p>
+      <article className="catalog-product-detail-price rounded-card border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.24)] sm:p-8">
+        <h2 className="catalog-product-detail-name hidden lg:block">{product.name}</h2>
+        <div className="catalog-product-detail-price-group contents">{priceDetails}</div>
         <PurchaseListProductAction productIdentityId={product.productIdentityId} />
       </article>
     </CatalogPageShell>

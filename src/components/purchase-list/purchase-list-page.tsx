@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import styles from "./purchase-list-page.module.css";
 import { TrashIcon } from "@/components/icons/lucide";
 import type { PublicPurchaseListProduct } from "@/features/catalog/types";
 import { withCatalogNavigationContext } from "@/features/catalog/navigation-context";
@@ -195,12 +196,12 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
 
   return (
     <>
-      <main className="premium-page flex-1 bg-[#111827] text-white">
-        <section className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-        <Link href="/" className="tap-target inline-flex min-h-10 items-center text-sm text-[#93C5FD] hover:text-white">
+      <main className={`premium-page flex-1 bg-[#111827] text-white ${isReady ? (productIdentityIds.length > 0 ? styles.populated : styles.empty) : ""}`}>
+        <section className={`${styles.content} mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8`}>
+        <Link href="/" className={`${styles.back} tap-target inline-flex min-h-10 items-center text-sm text-[#93C5FD] hover:text-white`}>
           ← На главную
         </Link>
-        <div className="mt-4 rounded-card border border-white/10 bg-[#111827] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.24)] sm:p-7">
+        <div className={`${styles.heading} mt-4 rounded-card border border-white/10 bg-[#111827] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.24)] sm:p-7`}>
           <h1 className="text-3xl font-semibold leading-tight sm:text-5xl">Список покупок</h1>
           {isReady && productIdentityIds.length > 0 ? (
             <p className="mt-3 text-[#CBD5E1]">{formatProductCount(productIdentityIds.length)}</p>
@@ -217,13 +218,13 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
             <EmptyPurchaseList contact={contact} />
           </>
         ) : (
-          <div className="mt-6 space-y-6">
+          <div className={`${styles.body} mt-6 space-y-6`}>
             {loadError ? (
               <div className="rounded-card border border-white/10 bg-[#111827] p-5 text-[#CBD5E1] shadow-[0_18px_60px_rgba(0,0,0,0.2)]">
                 Не удалось обновить список. Попробуйте открыть страницу ещё раз чуть позже.
               </div>
             ) : (
-              <div className="divide-y divide-white/10 overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_24px_80px_rgba(0,0,0,0.24)]">
+              <div className={`${styles.list} divide-y divide-white/10 overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_24px_80px_rgba(0,0,0,0.24)]`}>
                 {productIdentityIds.map((productIdentityId) => (
                   <PurchaseListItem
                     key={productIdentityId}
@@ -239,27 +240,28 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
               type="button"
               ref={clearTriggerButtonRef}
               onClick={openClearDialog}
-              className="tap-target inline-flex min-h-11 items-center rounded-card border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-[#CBD5E1] hover:border-[#93C5FD]/70 hover:bg-white/[0.08] hover:text-white"
+              className={`${styles.clear} tap-target inline-flex min-h-11 items-center rounded-card border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-[#CBD5E1] hover:border-[#93C5FD]/70 hover:bg-white/[0.08] hover:text-white`}
             >
-              Очистить список
+              <TrashIcon className="hidden" />
+              <span>Очистить список</span>
             </button>
 
-            <PurchaseInStoreNotice contact={contact} />
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Link
-                href={withCatalogNavigationContext("/catalog", "purchase-list")}
-                className="tap-target inline-flex min-h-12 items-center justify-center rounded-card border border-[#2563EB]/[0.55] px-5 text-center font-semibold text-white hover:border-[#93C5FD] hover:bg-[#1A2740]"
-              >
-                Продолжить выбор
-              </Link>
-              <a
-                href={`tel:${toTelValue(contact.phone)}`}
-                className="tap-target inline-flex min-h-12 items-center justify-center rounded-card bg-[#2563EB] px-5 text-center font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8]"
-              >
-                Позвонить в магазин
-              </a>
-            </div>
+            <PurchaseInStoreNotice contact={contact}>
+              <div className={`${styles.cta} grid gap-3 sm:grid-cols-2`}>
+                <Link
+                  href={withCatalogNavigationContext("/catalog", "purchase-list")}
+                  className="tap-target inline-flex min-h-12 items-center justify-center rounded-card border border-[#2563EB]/[0.55] px-5 text-center font-semibold text-white hover:border-[#93C5FD] hover:bg-[#1A2740]"
+                >
+                  Продолжить выбор
+                </Link>
+                <a
+                  href={`tel:${toTelValue(contact.phone)}`}
+                  className="tap-target inline-flex min-h-12 items-center justify-center rounded-card bg-[#2563EB] px-5 text-center font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8]"
+                >
+                  Позвонить в магазин
+                </a>
+              </div>
+            </PurchaseInStoreNotice>
           </div>
         )}
         </section>
@@ -360,13 +362,13 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
 
 function EmptyPurchaseList({ contact }: PurchaseListPageProps) {
   return (
-    <div className="mt-6 space-y-6">
-      <div className="rounded-card border border-white/10 bg-[#111827] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.2)] sm:p-6">
-        <p className="text-lg font-semibold text-white">Ваш список пока пуст.</p>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-[#CBD5E1]">
+    <div className={`${styles.emptyBody} mt-6 space-y-6`}>
+      <div className={`${styles.emptyPanel} rounded-card border border-white/10 bg-[#111827] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.2)] sm:p-6`}>
+        <p className={`${styles.emptyTitle} text-lg font-semibold text-white`}>Ваш список пока пуст.</p>
+        <p className={`${styles.emptyDescription} mt-2 max-w-xl text-sm leading-6 text-[#CBD5E1]`}>
           Найдите нужные запчасти в каталоге и сохраните их в список покупок.
         </p>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 sm:max-w-xl">
+        <div className={`${styles.emptyActions} mt-5 grid gap-3 sm:grid-cols-2 sm:max-w-xl`}>
           <Link
             href={withCatalogNavigationContext("/catalog", "purchase-list")}
             className="tap-target inline-flex min-h-12 items-center justify-center rounded-card bg-[#2563EB] px-5 text-center font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8]"
@@ -430,6 +432,7 @@ function PurchaseListItem({
   onRemove: () => void;
 }) {
   const itemClassName = [
+    styles.row,
     "grid gap-4 p-4 transition duration-150 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-5",
     "translate-x-0 opacity-100"
   ].join(" ");
@@ -459,11 +462,11 @@ function PurchaseListItem({
 
   return (
     <div className={itemClassName}>
-      <div className="min-w-0">
+      <div className={`${styles.product} min-w-0`}>
         <h2 className="text-base font-semibold leading-6 text-white">{product.name}</h2>
-        <p className="mt-2 text-lg font-semibold text-white">{product.price.toLocaleString("ru-RU")} ₽</p>
+        <p className={`${styles.price} mt-2 text-lg font-semibold text-white`}>{product.price.toLocaleString("ru-RU")} ₽</p>
       </div>
-      <div className="flex flex-wrap gap-2 sm:justify-end">
+      <div className={`${styles.actions} flex flex-wrap gap-2 sm:justify-end`}>
         <Link
           href={withCatalogNavigationContext(product.url, "purchase-list-direct")}
           className="tap-target inline-flex min-h-10 items-center justify-center rounded-card border border-[#2563EB]/[0.55] px-3 text-sm font-semibold text-white hover:border-[#93C5FD] hover:bg-[#1A2740]"
@@ -489,9 +492,9 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function PurchaseInStoreNotice({ contact }: PurchaseListPageProps) {
+function PurchaseInStoreNotice({ contact, children }: PurchaseListPageProps & { children?: ReactNode }) {
   return (
-    <section aria-labelledby="purchase-in-store-title">
+    <section className={styles.notice} aria-labelledby="purchase-in-store-title">
       <div className="rounded-[20px] bg-[radial-gradient(circle_at_8%_0%,rgba(255,255,255,0.034)_0%,rgba(255,255,255,0.011)_24%,transparent_50%),linear-gradient(105deg,rgba(255,255,255,0.018)_0%,rgba(255,255,255,0.008)_28%,rgba(148,163,184,0.003)_55%,transparent_84%)] p-px sm:rounded-[22px]">
         <div className="overflow-hidden rounded-[19px] bg-[#111827]/[0.72] bg-[radial-gradient(ellipse_at_18%_0%,rgba(255,255,255,0.025),transparent_50%),radial-gradient(ellipse_at_86%_100%,rgba(0,0,0,0.035),transparent_60%),linear-gradient(180deg,rgba(30,41,59,0.075)_0%,rgba(15,23,42,0.045)_100%)] px-[18px] py-5 sm:rounded-[21px] sm:px-5 sm:py-6">
           <h2 id="purchase-in-store-title" className="text-lg font-medium leading-snug text-[#E5E7EB] sm:text-xl">
@@ -511,6 +514,7 @@ function PurchaseInStoreNotice({ contact }: PurchaseListPageProps) {
           </p>
         </div>
       </div>
+      {children}
     </section>
   );
 }

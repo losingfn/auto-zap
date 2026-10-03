@@ -120,34 +120,38 @@ export default async function Home() {
         </div>
       </section>
 
-      <section id="about" className="section-shell section-deep scroll-mt-28 border-t border-white/10 pb-10 pt-12 sm:scroll-mt-24 sm:pb-[52px] sm:pt-16 lg:pb-16 lg:pt-20">
-        <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[0.96fr_1.04fr] lg:items-start lg:px-8">
-          <div className="scroll-reveal">
-            <SectionIntro
-              eyebrow={content.home.about.eyebrow}
-              title={content.home.about.title}
-              text=""
-            />
-            <div className="max-w-2xl text-base font-normal leading-7 text-[#D6DEE9] sm:text-lg sm:leading-8">
+      <section id="about" className="home-about section-shell section-deep scroll-mt-28 border-t border-white/10 pb-10 pt-12 sm:scroll-mt-24 sm:pb-[52px] sm:pt-16 lg:pb-16 lg:pt-20">
+        <div className="home-about-shell mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[0.96fr_1.04fr] lg:items-start lg:px-8">
+          <p className="home-about-desktop-label">{content.home.about.eyebrow}</p>
+          <div className="home-about-copy scroll-reveal">
+            <div className="home-about-mobile-intro">
+              <SectionIntro
+                eyebrow={content.home.about.eyebrow}
+                title={content.home.about.title}
+                text=""
+              />
+            </div>
+            <h2 className="home-about-desktop-title">{content.home.about.title}</h2>
+            <div className="home-about-description max-w-2xl text-base font-normal leading-7 text-[#D6DEE9] sm:text-lg sm:leading-8">
               <p>{content.home.about.intro}</p>
             </div>
-            <div className="mt-7 grid grid-cols-2 gap-3 min-[760px]:grid-cols-4 lg:mt-16 lg:grid-cols-2 xl:grid-cols-4">
+            <div className="home-about-facts mt-7 grid grid-cols-2 gap-3 min-[760px]:grid-cols-4 lg:mt-16 lg:grid-cols-2 xl:grid-cols-4">
               {aboutFacts.map((fact) => (
                 <div
                   key={fact.label}
-                  className="flex min-h-[112px] flex-col justify-between rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.96),rgba(17,24,39,1))] px-4 py-5 shadow-[0_18px_58px_rgba(0,0,0,0.24)]"
+                  className="home-about-fact flex min-h-[112px] flex-col justify-between rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.96),rgba(17,24,39,1))] px-4 py-5 shadow-[0_18px_58px_rgba(0,0,0,0.24)]"
                 >
-                  <p className="whitespace-nowrap text-[clamp(1.28rem,2vw,1.72rem)] font-semibold leading-tight text-white">
+                  <p className="home-about-fact-value whitespace-nowrap text-[clamp(1.28rem,2vw,1.72rem)] font-semibold leading-tight text-white">
                     {fact.value}
                   </p>
-                  <p className="mt-3 text-[0.9rem] font-medium leading-5 text-[#93C5FD]">
+                  <p className="home-about-fact-label mt-3 text-[0.9rem] font-medium leading-5 text-[#93C5FD]">
                     {fact.label}
                   </p>
                 </div>
               ))}
             </div>
           </div>
-          <div className="scroll-reveal grid gap-4 rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.86),rgba(17,24,39,0.96))] p-3 shadow-[0_28px_90px_rgba(0,0,0,0.28)]">
+          <div className="home-about-media scroll-reveal grid gap-4 rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.86),rgba(17,24,39,0.96))] p-3 shadow-[0_28px_90px_rgba(0,0,0,0.28)]">
             <StoreGallery photos={content.storePhotos} />
             <YandexMap
               apiKey={env.YANDEX_MAPS_API_KEY}

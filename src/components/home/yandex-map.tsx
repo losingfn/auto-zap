@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { NavigationIcon } from "@/components/icons/lucide";
 
 declare global {
   interface Window {
@@ -171,7 +172,9 @@ function MapActions({
         rel="noopener noreferrer"
         className="tap-target relative z-10 rounded-card border border-[#2563EB]/[0.55] px-4 py-3 text-center text-sm font-semibold text-white hover:border-[#93C5FD] hover:bg-[#1A2740]"
       >
-        Как добраться
+        <NavigationIcon className="home-about-route-icon h-5 w-5" />
+        <span className="home-about-route-mobile">Как добраться</span>
+        <span className="home-about-route-desktop">Построить маршрут</span>
       </a>
       <a
         href={contact.yandexMapsUrl || YANDEX_ORGANIZATION_URL}

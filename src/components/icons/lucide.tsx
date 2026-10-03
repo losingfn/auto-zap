@@ -29,6 +29,14 @@ export function MapPinIcon(props: IconProps) {
   );
 }
 
+export function NavigationIcon(props: IconProps) {
+  return (
+    <LucideIcon {...props}>
+      <path d="m3 11 19-9-9 19-2.2-8.2L3 11Z" />
+    </LucideIcon>
+  );
+}
+
 export function PhoneIcon(props: IconProps) {
   return (
     <LucideIcon {...props}>

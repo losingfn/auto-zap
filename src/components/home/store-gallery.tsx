@@ -26,46 +26,62 @@ export function StoreGallery({
     ...photos.slice(1, 2)
   ];
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [previousIndex, setPreviousIndex] = useState<number | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const previousButtonRef = useRef<HTMLButtonElement | null>(null);
+  const nextButtonRef = useRef<HTMLButtonElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const restoreFocusRef = useRef(false);
+  const closeTimerRef = useRef<number | null>(null);
   const activePhoto = activeIndex === null ? null : visiblePhotos[activeIndex];
   const isLightboxOpen = activeIndex !== null;
 
   function showPrevious() {
-    setActiveIndex((index) => {
-      if (index === null) {
-        return index;
-      }
-
-      return (index - 1 + visiblePhotos.length) % visiblePhotos.length;
-    });
+    if (activeIndex === null || isClosing) return;
+    setPreviousIndex(activeIndex);
+    setActiveIndex((activeIndex - 1 + visiblePhotos.length) % visiblePhotos.length);
   }
 
   function showNext() {
-    setActiveIndex((index) => {
-      if (index === null) {
-        return index;
-      }
-
-      return (index + 1) % visiblePhotos.length;
-    });
+    if (activeIndex === null || isClosing) return;
+    setPreviousIndex(activeIndex);
+    setActiveIndex((activeIndex + 1) % visiblePhotos.length);
   }
 
   function openLightbox(index: number, trigger: HTMLButtonElement) {
     triggerRef.current = trigger;
+    setPreviousIndex(null);
+    setIsClosing(false);
     setActiveIndex(index);
   }
 
   function closeLightbox() {
+    if (isClosing) return;
     restoreFocusRef.current = true;
-    setActiveIndex(null);
+    setIsClosing(true);
+    const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 16 : 220;
+    closeTimerRef.current = window.setTimeout(() => {
+      setActiveIndex(null);
+      setPreviousIndex(null);
+      setIsClosing(false);
+      closeTimerRef.current = null;
+    }, duration);
   }
 
   useEffect(() => {
     setIsMounted(true);
+    return () => {
+      if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+    };
   }, []);
+
+  useEffect(() => {
+    if (previousIndex === null) return;
+    const timer = window.setTimeout(() => setPreviousIndex(null), 180);
+    return () => window.clearTimeout(timer);
+  }, [activeIndex, previousIndex]);
 
   useEffect(() => {
     if (activeIndex !== null || !restoreFocusRef.current) {
@@ -73,7 +89,7 @@ export function StoreGallery({
     }
 
     restoreFocusRef.current = false;
-    window.requestAnimationFrame(() => triggerRef.current?.focus());
+    window.requestAnimationFrame(() => triggerRef.current?.focus({ preventScroll: true }));
   }, [activeIndex]);
 
   useEffect(() => {
@@ -116,6 +132,12 @@ export function StoreGallery({
         event.preventDefault();
         showNext();
       }
+      if (event.key === "Tab") {
+        const controls = [closeButtonRef.current, previousButtonRef.current, nextButtonRef.current];
+        const current = controls.indexOf(document.activeElement as HTMLButtonElement);
+        event.preventDefault();
+        controls[(current + (event.shiftKey ? 2 : 1) + controls.length) % controls.length]?.focus();
+      }
     }
 
     document.addEventListener("keydown", handleKeyDown);
@@ -123,62 +145,81 @@ export function StoreGallery({
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isLightboxOpen]);
+  }, [activeIndex, isClosing]);
 
   const lightbox = activePhoto ? (
     <div
-      className="fixed inset-0 z-[9999] flex h-[100dvh] min-h-screen w-screen animate-[fade-in_0.22s_ease-out] items-center justify-center bg-[#020617]/85 px-4 py-6 backdrop-blur-[2px]"
+      className={`store-lightbox${isClosing ? " store-lightbox--closing" : ""}`}
       role="dialog"
       aria-modal="true"
-      aria-label={activePhoto.alt}
-      onClick={closeLightbox}
+      aria-label={`Фото ${activeIndex! + 1} из ${visiblePhotos.length}: ${activePhoto.alt}`}
     >
+      <div className="store-lightbox-backdrop" onClick={closeLightbox} aria-hidden="true" />
       <button
         type="button"
         ref={closeButtonRef}
-        className="tap-target fixed right-4 top-4 z-[10001] inline-flex h-11 w-11 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white hover:bg-white/15"
-        onClick={closeLightbox}
+        className="store-lightbox-control store-lightbox-close"
+        onClick={(event) => {
+          event.stopPropagation();
+          closeLightbox();
+        }}
         aria-label="Закрыть"
       >
-        <XIcon className="h-5 w-5" />
+        <XIcon className="h-[19px] w-[19px]" />
       </button>
       <button
         type="button"
-        className="tap-target fixed left-3 top-1/2 z-[10001] inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white hover:bg-white/15 sm:left-4 sm:h-12 sm:w-12"
+        ref={previousButtonRef}
+        className="store-lightbox-control store-lightbox-previous"
         onClick={(event) => {
           event.stopPropagation();
           showPrevious();
         }}
         aria-label="Предыдущее фото"
       >
-        <ChevronLeftIcon className="h-6 w-6" />
+        <ChevronLeftIcon className="h-5 w-5" />
       </button>
       <button
         type="button"
-        className="tap-target fixed right-3 top-1/2 z-[10001] inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-card border border-white/15 bg-white/10 text-white hover:bg-white/15 sm:right-4 sm:h-12 sm:w-12"
+        ref={nextButtonRef}
+        className="store-lightbox-control store-lightbox-next"
         onClick={(event) => {
           event.stopPropagation();
           showNext();
         }}
         aria-label="Следующее фото"
       >
-        <ChevronRightIcon className="h-6 w-6" />
+        <ChevronRightIcon className="h-5 w-5" />
       </button>
-      <figure
-        key={activePhoto.src}
-        className="w-[min(92vw,1100px)] animate-[content-rise_0.24s_ease-out] overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_28px_90px_rgba(0,0,0,0.46)]"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="relative aspect-[4/3] max-h-[84vh] w-full">
-          <Image
-            src={activePhoto.src}
-            alt={activePhoto.alt}
-            fill
-            sizes="100vw"
-            className="object-contain"
-          />
-        </div>
-      </figure>
+      <div className="store-lightbox-stage">
+        <figure className="store-lightbox-figure" onClick={(event) => event.stopPropagation()}>
+          <div className="store-lightbox-photo-wrap">
+            {previousIndex !== null ? (
+              <Image
+                src={visiblePhotos[previousIndex].src}
+                alt=""
+                width={previousIndex === 0 ? 1448 : 960}
+                height={previousIndex === 0 ? 1086 : 1280}
+                sizes="(min-width: 1024px) 84vw, 100vw"
+                className="store-lightbox-photo store-lightbox-photo--previous"
+                aria-hidden="true"
+              />
+            ) : null}
+            <Image
+              key={activePhoto.src}
+              src={activePhoto.src}
+              alt={activePhoto.alt}
+              width={activeIndex === 0 ? 1448 : 960}
+              height={activeIndex === 0 ? 1086 : 1280}
+              sizes="(min-width: 1024px) 84vw, 100vw"
+              className={`store-lightbox-photo store-lightbox-photo--current${previousIndex !== null ? " store-lightbox-photo--switching" : ""}`}
+            />
+          </div>
+          <figcaption className="store-lightbox-counter" aria-live="polite" aria-atomic="true">
+            <span>{String(activeIndex! + 1).padStart(2, "0")}</span> / {String(visiblePhotos.length).padStart(2, "0")}
+          </figcaption>
+        </figure>
+      </div>
     </div>
   ) : null;
 

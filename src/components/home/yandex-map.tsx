@@ -26,6 +26,8 @@ declare global {
 
 const YANDEX_ORGANIZATION_URL = "https://yandex.ru/maps/org/avtomagazin/1112244739/";
 const YANDEX_ROUTE_URL = "https://yandex.ru/maps/10757/taldom/?mode=routes&rtext=~%D0%9C%D0%BE%D1%81%D0%BA%D0%BE%D0%B2%D1%81%D0%BA%D0%B0%D1%8F%20%D0%BE%D0%B1%D0%BB%D0%B0%D1%81%D1%82%D1%8C%2C%20%D0%A2%D0%B0%D0%BB%D0%B4%D0%BE%D0%BC%2C%20%D1%83%D0%BB%D0%B8%D1%86%D0%B0%20%D0%A1%D0%B0%D0%BB%D1%82%D1%8B%D0%BA%D0%BE%D0%B2%D0%B0-%D0%A9%D0%B5%D0%B4%D1%80%D0%B8%D0%BD%D0%B0%2C%2019&rtt=auto";
+// The embedded Yandex map loads Yandex Metrika inside its iframe.
+const YANDEX_MAP_EMBED_ENABLED = false;
 
 interface YandexMapInstance {
   geoObjects: {
@@ -54,7 +56,7 @@ export function YandexMap({
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (!apiKey || !containerRef.current) {
+    if (!YANDEX_MAP_EMBED_ENABLED || !apiKey || !containerRef.current) {
       return;
     }
 
@@ -122,7 +124,18 @@ export function YandexMap({
 
   return (
     <div className="scroll-reveal h-fit overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_28px_90px_rgba(0,0,0,0.32)]">
-      {!apiKey || failed ? (
+      {!YANDEX_MAP_EMBED_ENABLED ? (
+        <div className="flex h-[300px] items-center justify-center px-6 text-center sm:h-[320px]">
+          <a
+            href={contact.yandexMapsUrl || YANDEX_ORGANIZATION_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-card border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:border-white/40"
+          >
+            Открыть карту в Яндекс Картах
+          </a>
+        </div>
+      ) : !apiKey || failed ? (
         <MapEmbed contact={contact} />
       ) : (
         <div ref={containerRef} className="h-[300px] w-full bg-[#111827] sm:h-[320px]" />

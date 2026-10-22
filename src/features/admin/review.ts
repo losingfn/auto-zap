@@ -1,5 +1,5 @@
 import { createHmac, randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, ne, notInArray, or, sql } from "drizzle-orm";
 import { isPublicTaxonomyTarget } from "@/config/public-taxonomy";
 import { db } from "@/db/client";
 import {
@@ -47,6 +47,8 @@ import type { GroupApplyPerfCategory, GroupApplyPerfLogger } from "@/lib/server/
 
 export const REVIEW_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 const REVIEWABLE_PRODUCT_STATUSES = ["needs_review", "invalid"] as const;
+export const REVIEW_PRIMARY_PREFETCH_SIZE = 5;
+export const REVIEW_SIMILAR_GROUP_LIMIT = 50;
 
 type ClassificationStats = {
   calls: number;
@@ -194,6 +196,38 @@ export type AdminReviewGroup = {
     reason: string;
     safeToApply: boolean;
   }>;
+};
+
+export type AdminReviewSimilarGroup = {
+  reviewQueueIds: string[];
+  count: number;
+};
+
+export type AdminReviewPrimaryData = {
+  categories: AdminReviewCategoryOption[];
+  item: AdminReviewItem | null;
+  prefetchedItems: AdminReviewItem[];
+  similarGroup: AdminReviewSimilarGroup | null;
+  summary: {
+    remaining: number;
+    reviewed: number;
+    total: number;
+  };
+  canUndo: boolean;
+  focusItemUnavailable: boolean;
+};
+
+export type AdminReviewListData = {
+  categories: AdminReviewCategoryOption[];
+  items: AdminReviewItem[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    from: number;
+    to: number;
+    pageCount: number;
+  };
 };
 
 export type ReviewWorkspaceChange = {
@@ -450,6 +484,33 @@ export function normalizeAdminReviewParams(input: Partial<Record<string, string 
   };
 }
 
+export function getReviewPageWindow(page: number, pageSize: number) {
+  const safePage = Math.max(1, page);
+  const safePageSize = Math.max(1, pageSize);
+  return { limit: safePageSize, offset: (safePage - 1) * safePageSize };
+}
+
+export function buildReviewPagination(page: number, pageSize: number, total: number) {
+  const { limit, offset } = getReviewPageWindow(page, pageSize);
+  const safeTotal = Math.max(0, total);
+  return {
+    page: Math.max(1, page),
+    pageSize: limit,
+    total: safeTotal,
+    from: safeTotal === 0 ? 0 : offset + 1,
+    to: Math.min(offset + limit, safeTotal),
+    pageCount: Math.max(1, Math.ceil(safeTotal / limit))
+  };
+}
+
+export function buildPrimaryReviewSummary(
+  remaining: number,
+  workspace: Pick<ReviewWorkspaceSummary, "preparedProductCount" | "excludedProductCount">
+) {
+  const reviewed = workspace.preparedProductCount + workspace.excludedProductCount;
+  return { remaining, reviewed, total: remaining + reviewed };
+}
+
 export async function getAdminReviewPageData(
   rawParams: Partial<Record<string, string | string[] | undefined>> = {},
   options: {
@@ -651,6 +712,215 @@ export async function getAdminReviewPageData(
   });
 
   return result;
+}
+
+export async function getAdminReviewPrimaryData(
+  options: {
+    adminUserId?: string;
+    createWorkspaceIfNeeded?: boolean;
+    focusReviewId?: string | null;
+    skipReviewQueueIds?: string[];
+    perf?: AdminReviewPerfLogger;
+  } = {}
+): Promise<AdminReviewPrimaryData> {
+  const perf = options.perf;
+  const timer = perf?.start();
+  const classificationStats = perf
+    ? { calls: 0, totalDurationMs: 0, maxDurationMs: 0 }
+    : undefined;
+  const [versionContext, categoryRows, subcategoryRows, categorizationContext] = await Promise.all([
+    getReviewVersionContext(perf),
+    getActiveCategories(perf),
+    getActiveSubcategories(perf),
+    getCategorizationContext(perf)
+  ]);
+  const categories = buildCategoryOptions(categoryRows, subcategoryRows);
+  const targetBySlug = buildTargetBySlug(categoryRows, subcategoryRows);
+  const categoryById = new Map(categoryRows.map((category) => [category.id, category]));
+  const subcategoryById = new Map(subcategoryRows.map((subcategory) => [subcategory.id, subcategory]));
+  let workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null, perf);
+  let rows = await getWorkspaceReviewRows(versionContext, workspace.id, {
+    limit: REVIEW_PRIMARY_PREFETCH_SIZE,
+    onlyUnresolved: true,
+    excludeReviewQueueIds: options.skipReviewQueueIds,
+    perf,
+    stage: "primary_review_rows_sql"
+  });
+
+  if (options.createWorkspaceIfNeeded && options.adminUserId && !workspace.id && rows.length > 0) {
+    if (perf) {
+      await perf.measure("workspace_create", () =>
+        ensureReviewWorkspace(versionContext.activeVersion?.id ?? null, options.adminUserId!)
+      );
+    } else {
+      await ensureReviewWorkspace(versionContext.activeVersion?.id ?? null, options.adminUserId);
+    }
+    workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null, perf);
+    rows = await getWorkspaceReviewRows(versionContext, workspace.id, {
+      limit: REVIEW_PRIMARY_PREFETCH_SIZE,
+      onlyUnresolved: true,
+      excludeReviewQueueIds: options.skipReviewQueueIds,
+      perf,
+      stage: "primary_review_rows_sql"
+    });
+  }
+
+  let focusItemUnavailable = false;
+  if (options.focusReviewId) {
+    const focusedRows = await getRowsByReviewIds(
+      [options.focusReviewId],
+      workspace.id,
+      versionContext.activeVersion?.id ?? null
+    );
+    const focused = focusedRows.find((row) => row.workspaceItemStatus !== "pending" && row.workspaceItemStatus !== "excluded");
+    if (focused) {
+      rows = [focused, ...rows.filter((row) => row.reviewId !== focused.reviewId)].slice(0, REVIEW_PRIMARY_PREFETCH_SIZE);
+    } else {
+      focusItemUnavailable = true;
+    }
+  }
+
+  const enrichedRows = perf
+    ? perf.measureSync(
+        "primary_review_rows_enrichment",
+        () => rows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug, classificationStats)),
+        (result) => ({ rows: result.length })
+      )
+    : rows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug));
+  const items = enrichedRows.map((row) => mapReviewItem(row, categoryById, subcategoryById));
+  const item = items[0] ?? null;
+  const queueStats = await getReviewQueueStats(versionContext, workspace.id, perf);
+  const similarGroup = item
+    ? await getSimilarReviewGroupForPrimary({
+        item: enrichedRows[0]!,
+        versionContext,
+        workspaceId: workspace.id,
+        categorizationContext,
+        targetBySlug,
+        excludeReviewQueueIds: options.skipReviewQueueIds,
+        perf,
+        classificationStats
+      })
+    : null;
+
+  if (classificationStats) {
+    perf?.log("primary_classification_aggregate", {
+      duration_ms: classificationStats.totalDurationMs,
+      calls: classificationStats.calls,
+      rows: classificationStats.calls,
+      avg_ms: classificationStats.calls > 0 ? classificationStats.totalDurationMs / classificationStats.calls : 0,
+      max_ms: classificationStats.maxDurationMs,
+      total_rules: categorizationContext.rules.length
+    });
+  }
+  perf?.log("get_admin_review_primary_data", {
+    duration_ms: perf.elapsed(timer),
+    prefetched_rows: rows.length,
+    similar_group_rows: similarGroup?.count ?? 0,
+    remaining: queueStats.total
+  });
+
+  return {
+    categories,
+    item,
+    prefetchedItems: items.slice(1),
+    similarGroup,
+    summary: buildPrimaryReviewSummary(queueStats.total, workspace),
+    canUndo: Boolean(workspace.lastActionId),
+    focusItemUnavailable
+  };
+}
+
+/**
+ * Loads candidates only for an already prefetched, currently visible card.
+ * It intentionally does not reload primary data or create a workspace.
+ */
+export async function getAdminReviewSimilarGroupData(input: {
+  reviewQueueId: string;
+  skippedReviewQueueIds?: string[];
+}): Promise<{ reviewId: string; similarGroup: AdminReviewSimilarGroup | null }> {
+  const [versionContext, categorizationContext, targetBySlug] = await Promise.all([
+    getReviewVersionContext(),
+    getCategorizationContext(),
+    getTargetBySlugFromDb()
+  ]);
+  const workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null);
+  const rows = await getRowsByReviewIds(
+    [input.reviewQueueId],
+    workspace.id,
+    versionContext.activeVersion?.id ?? null
+  );
+  const row = rows.find((candidate) => candidate.workspaceItemStatus !== "pending" && candidate.workspaceItemStatus !== "excluded");
+  if (!row) {
+    return { reviewId: input.reviewQueueId, similarGroup: null };
+  }
+
+  const item = enrichReviewRow(row, categorizationContext, targetBySlug);
+  return {
+    reviewId: input.reviewQueueId,
+    similarGroup: await getSimilarReviewGroupForPrimary({
+      item,
+      versionContext,
+      workspaceId: workspace.id,
+      categorizationContext,
+      targetBySlug,
+      excludeReviewQueueIds: input.skippedReviewQueueIds
+    })
+  };
+}
+
+export async function getAdminReviewListData(
+  rawParams: Partial<Record<string, string | string[] | undefined>> = {},
+  options: { adminUserId?: string; createWorkspaceIfNeeded?: boolean; perf?: AdminReviewPerfLogger } = {}
+): Promise<AdminReviewListData> {
+  const perf = options.perf;
+  const params = normalizeAdminReviewParams(rawParams);
+  const [versionContext, categoryRows, subcategoryRows, categorizationContext] = await Promise.all([
+    getReviewVersionContext(perf),
+    getActiveCategories(perf),
+    getActiveSubcategories(perf),
+    getCategorizationContext(perf)
+  ]);
+  const targetBySlug = buildTargetBySlug(categoryRows, subcategoryRows);
+  const categories = buildCategoryOptions(categoryRows, subcategoryRows);
+  const categoryById = new Map(categoryRows.map((category) => [category.id, category]));
+  const subcategoryById = new Map(subcategoryRows.map((subcategory) => [subcategory.id, subcategory]));
+  let workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null, perf);
+  const pageWindow = getReviewPageWindow(params.page, params.pageSize);
+  let rows = await getWorkspaceReviewRows(versionContext, workspace.id, {
+    limit: pageWindow.limit,
+    offset: pageWindow.offset,
+    query: params.query,
+    perf,
+    stage: "list_review_rows_sql"
+  });
+
+  if (options.createWorkspaceIfNeeded && options.adminUserId && !workspace.id && rows.length > 0) {
+    await ensureReviewWorkspace(versionContext.activeVersion?.id ?? null, options.adminUserId);
+    workspace = await getReviewWorkspace(versionContext.activeVersion?.id ?? null, perf);
+    rows = await getWorkspaceReviewRows(versionContext, workspace.id, {
+      limit: pageWindow.limit,
+      offset: pageWindow.offset,
+      query: params.query,
+      perf,
+      stage: "list_review_rows_sql"
+    });
+  }
+
+  const enrichedRows = perf
+    ? perf.measureSync(
+        "list_review_rows_enrichment",
+        () => rows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug)),
+        (result) => ({ rows: result.length })
+      )
+    : rows.map((row) => enrichReviewRow(row, categorizationContext, targetBySlug));
+  const total = await getReviewListCount(versionContext, params.query, perf);
+
+  return {
+    categories,
+    items: enrichedRows.map((row) => mapReviewItem(row, categoryById, subcategoryById)),
+    pagination: buildReviewPagination(params.page, params.pageSize, total)
+  };
 }
 
 export async function getReviewWorkspace(
@@ -1676,6 +1946,9 @@ async function getWorkspaceReviewRows(
   options: {
     limit?: number;
     offset?: number;
+    query?: string;
+    onlyUnresolved?: boolean;
+    excludeReviewQueueIds?: string[];
     perf?: AdminReviewPerfLogger;
     stage?: string;
   } = {}
@@ -1687,6 +1960,15 @@ async function getWorkspaceReviewRows(
   const activeVersionId = versionContext.activeVersion.id;
   const limit = Math.max(1, Math.min(options.limit ?? MAX_ACTION_REVIEW_ROWS, MAX_ACTION_REVIEW_ROWS));
   const offset = Math.max(0, options.offset ?? 0);
+  const query = options.query?.trim();
+  const excludedReviewQueueIds = [...new Set((options.excludeReviewQueueIds ?? []).filter(Boolean))].slice(0, 100);
+  const searchCondition = query
+    ? or(
+        ilike(products.name, `%${query}%`),
+        ilike(products.rawName, `%${query}%`),
+        ilike(products.shopCode, `%${query}%`)
+      )
+    : undefined;
   const rowsTimer = options.perf?.start();
   const rowsQuery = db
     .select({
@@ -1728,7 +2010,10 @@ async function getWorkspaceReviewRows(
       and(
         eq(reviewQueue.status, "open"),
         eq(reviewQueue.catalogVersionId, activeVersionId),
-        inArray(products.status, REVIEWABLE_PRODUCT_STATUSES)
+        inArray(products.status, REVIEWABLE_PRODUCT_STATUSES),
+        searchCondition,
+        options.onlyUnresolved ? sql`${reviewWorkspaceItems.id} is null` : undefined,
+        excludedReviewQueueIds.length > 0 ? notInArray(reviewQueue.id, excludedReviewQueueIds) : undefined
       )
     )
     .orderBy(asc(reviewQueue.createdAt))
@@ -1738,6 +2023,79 @@ async function getWorkspaceReviewRows(
   return options.perf
     ? options.perf.observe(options.stage ?? "review_rows_sql", rowsTimer, rowsQuery, (result) => ({ rows: result.length }))
     : rowsQuery;
+}
+
+async function getSimilarReviewGroupForPrimary(input: {
+  item: EnrichedReviewRow;
+  versionContext: VersionContext;
+  workspaceId: string | null;
+  categorizationContext: CategorizationContext;
+  targetBySlug: Map<string, CategorizationTarget>;
+  excludeReviewQueueIds?: string[];
+  perf?: AdminReviewPerfLogger;
+  classificationStats?: ClassificationStats;
+}): Promise<AdminReviewSimilarGroup | null> {
+  const pattern = input.item.suggestion.rulePattern?.trim();
+  if (!pattern || input.item.suggestion.level === "manual" || !input.item.safeToApply) {
+    return null;
+  }
+
+  const candidateRows = await getWorkspaceReviewRows(input.versionContext, input.workspaceId, {
+    limit: REVIEW_SIMILAR_GROUP_LIMIT,
+    query: pattern,
+    onlyUnresolved: true,
+    excludeReviewQueueIds: input.excludeReviewQueueIds,
+    perf: input.perf,
+    stage: "primary_similar_group_rows_sql"
+  });
+  const enrichedRows = input.perf
+    ? input.perf.measureSync(
+        "primary_similar_group_enrichment",
+        () => candidateRows.map((row) => enrichReviewRow(row, input.categorizationContext, input.targetBySlug, input.classificationStats)),
+        (result) => ({ rows: result.length })
+      )
+    : candidateRows.map((row) => enrichReviewRow(row, input.categorizationContext, input.targetBySlug));
+  const reviewQueueIds = enrichedRows
+    .filter((row) => row.safeToApply && sameTarget(row.suggestion, input.item.suggestion))
+    .map((row) => row.reviewId);
+
+  return reviewQueueIds.length > 1
+    ? { reviewQueueIds, count: reviewQueueIds.length }
+    : null;
+}
+
+async function getReviewListCount(
+  versionContext: VersionContext,
+  query: string,
+  perf?: AdminReviewPerfLogger
+) {
+  if (!versionContext.activeVersion) return 0;
+
+  const normalizedQuery = query.trim();
+  const searchCondition = normalizedQuery
+    ? or(
+        ilike(products.name, `%${normalizedQuery}%`),
+        ilike(products.rawName, `%${normalizedQuery}%`),
+        ilike(products.shopCode, `%${normalizedQuery}%`)
+      )
+    : undefined;
+  const timer = perf?.start();
+  const countQuery = db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(reviewQueue)
+    .innerJoin(products, eq(products.id, reviewQueue.productId))
+    .where(
+      and(
+        eq(reviewQueue.status, "open"),
+        eq(reviewQueue.catalogVersionId, versionContext.activeVersion.id),
+        inArray(products.status, REVIEWABLE_PRODUCT_STATUSES),
+        searchCondition
+      )
+    );
+  const [result] = perf
+    ? await perf.observe("list_review_count", timer, countQuery, (rows) => ({ total: Number(rows[0]?.total ?? 0) }))
+    : await countQuery;
+  return Number(result?.total ?? 0);
 }
 
 async function getReviewQueueStats(
@@ -1839,7 +2197,7 @@ async function getActionRows(
         groupApplyPerf,
         "load_selected_review_items",
         { category: "database", sqlOperations: 1, itemCount: reviewQueueIds.length },
-        () => getRowsByReviewIds(reviewQueueIds, workspace.id)
+        () => getRowsByReviewIds(reviewQueueIds, workspace.id, versionContext.activeVersion?.id ?? null)
       )
     : await measureGroupApplyStage(
         groupApplyPerf,
@@ -1887,8 +2245,12 @@ async function measureGroupApplyStage<T>(
   return perf ? perf.measure(name, options, operation) : operation();
 }
 
-async function getRowsByReviewIds(reviewQueueIds: string[], workspaceId: string | null) {
-  if (reviewQueueIds.length === 0) return [];
+async function getRowsByReviewIds(
+  reviewQueueIds: string[],
+  workspaceId: string | null,
+  activeVersionId: string | null
+) {
+  if (reviewQueueIds.length === 0 || !activeVersionId) return [];
 
   return db
     .select({
@@ -1929,6 +2291,7 @@ async function getRowsByReviewIds(reviewQueueIds: string[], workspaceId: string 
     .where(
       and(
         eq(reviewQueue.status, "open"),
+        eq(reviewQueue.catalogVersionId, activeVersionId),
         inArray(products.status, REVIEWABLE_PRODUCT_STATUSES),
         inArray(reviewQueue.id, reviewQueueIds)
       )

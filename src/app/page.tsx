@@ -56,7 +56,7 @@ export default async function Home() {
   const heroSubtitle = content.home.hero.subtitle.replace(/\.$/, "");
 
   return (
-    <main className="home-page premium-page min-h-dvh">
+    <main data-autozap-analytics-page="true" className="home-page premium-page min-h-dvh">
       <JsonLd data={buildLocalBusinessJsonLd(content)} />
       <SiteHeader siteName="Автозапчасти на Салтыкова-Щедрина" />
 
@@ -166,83 +166,98 @@ export default async function Home() {
 
       <CustomerReviewsSection />
 
-      <section id="vacancies" className="section-shell section-soft scroll-mt-28 py-11 sm:scroll-mt-24 sm:py-16 lg:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionIntro
-            eyebrow={content.home.vacancies.eyebrow}
-            title={content.home.vacancies.title}
-            text={content.home.vacancies.text}
-          />
-          <div className="mx-auto grid max-w-3xl gap-5">
-            {content.vacancies.map((vacancy, index) => (
-              <article
-                key={vacancy.id}
-                className="scroll-reveal stagger-card group flex h-full flex-col overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.96),rgba(17,24,39,1))] shadow-[0_24px_80px_rgba(0,0,0,0.28)] transition duration-300 hover:-translate-y-1.5 hover:border-[#2563EB]/70 hover:shadow-[0_32px_110px_rgba(37,99,235,0.22)]"
-                style={{ "--stagger": `${index * 80}ms` } as CSSProperties}
-              >
-                <div className="relative aspect-[16/8.5] overflow-hidden bg-[#0B1220] sm:aspect-video">
-                  <Image
-                    src="/assets/vacancy/vacancy-employee.webp"
-                    alt="Продавец-консультант в магазине автозапчастей"
-                    fill
-                    sizes="(min-width: 1024px) 720px, 100vw"
-                    className="object-cover object-center transition duration-500 group-hover:scale-[1.03]"
-                  />
-                </div>
-                <div className="flex flex-1 flex-col p-4 sm:p-6">
-                  <h2 className="text-xl font-semibold leading-tight text-white sm:text-3xl">
-                    {vacancy.title}
-                  </h2>
-                  <p className="mt-3 text-sm leading-6 text-[#CBD5E1] sm:mt-4 sm:text-base sm:leading-7">
-                    Если вам интересна работа в сфере автозапчастей и вы хотите стать частью нашей
-                    команды — будем рады познакомиться.
-                  </p>
-                  <ul className="mt-5 grid gap-3 text-sm leading-6 text-[#D6DEE9] sm:mt-6 sm:grid-cols-2 sm:text-base">
-                    {[
-                      "Консультирование покупателей",
-                      "Работа с ассортиментом автозапчастей",
-                      "Обучение в процессе работы",
-                      "Дружный коллектив"
-                    ].map((item) => (
-                      <li key={item} className="flex items-start gap-3">
-                        <CircleCheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-[#93C5FD]" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <a
-                    href="tel:84962063304"
-                    className="mt-5 rounded-card border border-white/10 bg-[#0B1220] p-4 transition duration-300 hover:border-[#2563EB]/60 sm:mt-6"
-                  >
-                    <div className="flex items-start gap-3">
-                      <PhoneIcon className="mt-0.5 h-5 w-5 shrink-0 text-[#93C5FD]" />
-                      <div>
-                        <p className="font-semibold text-white">Подробности по телефону</p>
-                        <p className="mt-1 text-base text-[#CBD5E1]">8 (496) 206-33-04</p>
+      <section id="vacancies" className="home-vacancies-section section-shell section-soft scroll-mt-28 py-11 sm:scroll-mt-24 sm:py-16 lg:py-20">
+        <div className="home-vacancies-shell mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="home-vacancies-panel">
+            <div className="home-vacancies-intro">
+              <SectionIntro
+                eyebrow={content.home.vacancies.eyebrow}
+                title={content.home.vacancies.title}
+                text={content.home.vacancies.text}
+              />
+            </div>
+            <div className="home-vacancies-list mx-auto grid max-w-3xl gap-5">
+              {content.vacancies.map((vacancy, index) => (
+                <article
+                  key={vacancy.id}
+                  className="home-vacancy scroll-reveal stagger-card group flex h-full flex-col overflow-hidden rounded-card border border-white/10 bg-[linear-gradient(145deg,rgba(31,41,55,0.96),rgba(17,24,39,1))] shadow-[0_24px_80px_rgba(0,0,0,0.28)] transition duration-300 hover:-translate-y-1.5 hover:border-[#2563EB]/70 hover:shadow-[0_32px_110px_rgba(37,99,235,0.22)]"
+                  style={{ "--stagger": `${index * 80}ms` } as CSSProperties}
+                >
+                  <div className="home-vacancy-media relative aspect-[16/8.5] overflow-hidden bg-[#0B1220] sm:aspect-video">
+                    <Image
+                      src="/assets/vacancy/vacancy-employee.webp"
+                      alt="Продавец-консультант в магазине автозапчастей"
+                      fill
+                      sizes="(min-width: 1280px) 1px, (min-width: 1024px) 720px, 100vw"
+                      className="object-cover object-center transition duration-500 group-hover:scale-[1.03]"
+                    />
+                  </div>
+                  <div className="home-vacancy-content flex flex-1 flex-col p-4 sm:p-6">
+                    <h3 className="home-vacancy-title text-xl font-semibold leading-tight text-white sm:text-3xl">
+                      {vacancy.title}
+                    </h3>
+                    <p className="home-vacancy-description mt-3 text-sm leading-6 text-[#CBD5E1] sm:mt-4 sm:text-base sm:leading-7">
+                      Если вам интересна работа в сфере автозапчастей и вы хотите стать частью нашей
+                      команды — будем рады познакомиться.
+                    </p>
+                    <ul className="home-vacancy-points mt-5 grid gap-3 text-sm leading-6 text-[#D6DEE9] sm:mt-6 sm:grid-cols-2 sm:text-base">
+                      {[
+                        "Консультирование покупателей",
+                        "Работа с ассортиментом автозапчастей",
+                        "Обучение в процессе работы",
+                        "Дружный коллектив"
+                      ].map((item) => (
+                        <li key={item} className="flex items-start gap-3">
+                          <CircleCheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-[#93C5FD]" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <a
+                      href="tel:84962063304"
+                      className="home-vacancy-contact mt-5 rounded-card border border-white/10 bg-[#0B1220] p-4 transition duration-300 hover:border-[#2563EB]/60 sm:mt-6"
+                    >
+                      <div className="flex items-start gap-3">
+                        <PhoneIcon className="mt-0.5 h-5 w-5 shrink-0 text-[#93C5FD]" />
+                        <div>
+                          <p className="font-semibold text-white">Подробности по телефону</p>
+                          <p className="mt-1 text-base text-[#CBD5E1]">8 (496) 206-33-04</p>
+                        </div>
                       </div>
+                    </a>
+                    <div className="home-vacancy-desktop-contact">
+                      <p>Подробности по телефону</p>
+                      <a
+                        href="tel:84962063304"
+                        className="home-vacancy-phone customer-reviews-action customer-reviews-action-primary"
+                      >
+                        8 (496) 206-33-04
+                      </a>
                     </div>
-                  </a>
-                </div>
-              </article>
-            ))}
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
-      <section id="contacts" className="section-shell section-deep scroll-mt-28 py-11 sm:scroll-mt-24 sm:py-16 lg:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="scroll-reveal rounded-card border border-white/10 bg-[#111827] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.26)] sm:p-6 lg:p-8">
+      <section id="contacts" className="home-contacts-section section-shell section-deep scroll-mt-28 py-11 sm:scroll-mt-24 sm:py-16 lg:py-20">
+        <div className="home-contacts-shell mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="home-contacts-layout scroll-reveal rounded-card border border-white/10 bg-[#111827] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.26)] sm:p-6 lg:p-8">
             <div>
-              <h2 className="text-2xl font-semibold leading-tight text-white sm:text-4xl">
+              <h2 className="home-contacts-title text-2xl font-semibold leading-tight text-white sm:text-4xl">
                 Магазин в Талдоме
               </h2>
-              <dl className="mt-6 grid gap-x-6 gap-y-6 text-[#CBD5E1] sm:grid-cols-2 lg:grid-cols-[1.15fr_0.78fr_1.22fr_0.98fr] lg:items-start">
+              <dl className="home-contacts-grid mt-6 grid gap-x-6 gap-y-6 text-[#CBD5E1] sm:grid-cols-2 lg:grid-cols-[1.15fr_0.78fr_1.22fr_0.98fr] lg:items-start">
                 <ContactItem
+                  className="home-contact-address"
                   icon={<MapPinIcon className="h-5 w-5 text-[#93C5FD]" />}
                   label="Адрес"
                   value={content.contact.address}
                 />
                 <ContactItem
+                  className="home-contact-phone"
                   icon={<PhoneIcon className="h-5 w-5 text-[#93C5FD]" />}
                   label="Телефон"
                   value={content.contact.phone}
@@ -250,32 +265,33 @@ export default async function Home() {
                   valueClassName="whitespace-nowrap text-base sm:text-lg"
                 />
                 <ContactItem
+                  className="home-contact-email"
                   icon={<MailIcon className="h-5 w-5 text-[#93C5FD]" />}
                   label="Email"
                   value={<EmailValue email={content.contact.email} />}
                   href={`mailto:${content.contact.email}`}
                   valueClassName="text-sm sm:text-[0.95rem] lg:whitespace-nowrap xl:text-base"
                 />
-                <div className="grid gap-3">
+                <div className="home-contact-hours grid gap-3">
                   <ContactItem
                     icon={<ClockIcon className="h-5 w-5 text-[#93C5FD]" />}
                     label="Режим работы"
                     value={
-                      <span className="space-y-1">
+                      <span className="home-contact-schedule space-y-1">
                         {compactWorkingHours.map((item) => (
-                          <span key={item.label} className="block whitespace-nowrap">
-                            {item.label}: {item.time}
+                          <span key={item.label} className="home-contact-schedule-row block whitespace-nowrap">
+                            <span>{item.label}</span><span className="home-contact-schedule-colon">: </span><span>{item.time}</span>
                           </span>
                         ))}
                       </span>
                     }
                     valueClassName="text-sm sm:text-base"
                   />
-                  <div className="w-full max-w-[260px] rounded-card border border-white/10 bg-[#0B1220] px-4 py-3 shadow-[0_16px_50px_rgba(0,0,0,0.2)]">
+                  <div className="home-contact-status w-full max-w-[260px] rounded-card border border-white/10 bg-[#0B1220] px-4 py-3 shadow-[0_16px_50px_rgba(0,0,0,0.2)]">
                     <div className="flex items-start gap-3">
                       <span
                         className={[
-                          "mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full",
+                          "home-contact-status-dot mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full",
                           workStatus.isOpen ? "bg-[#22C55E]" : "bg-[#EF4444]"
                         ].join(" ")}
                       />
@@ -286,6 +302,7 @@ export default async function Home() {
                     </div>
                   </div>
                 </div>
+                <div className="home-contacts-separator" aria-hidden="true" />
               </dl>
             </div>
           </div>
@@ -324,12 +341,14 @@ function SectionIntro({
 }
 
 function ContactItem({
+  className = "",
   icon,
   label,
   value,
   href,
   valueClassName = "text-base sm:text-lg"
 }: {
+  className?: string;
   icon: ReactNode;
   label: string;
   value: ReactNode;
@@ -345,7 +364,7 @@ function ContactItem({
   );
 
   return (
-    <div className="min-w-0">
+    <div className={["home-contact-item min-w-0", className].join(" ")}>
       <div className="flex items-start gap-3">
         <span className="mt-1 shrink-0">{icon}</span>
         <div className="min-w-0">

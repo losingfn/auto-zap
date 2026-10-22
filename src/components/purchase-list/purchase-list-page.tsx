@@ -250,13 +250,13 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
               <div className={`${styles.cta} grid gap-3 sm:grid-cols-2`}>
                 <Link
                   href={withCatalogNavigationContext("/catalog", "purchase-list")}
-                  className="tap-target inline-flex min-h-12 items-center justify-center rounded-card border border-[#2563EB]/[0.55] px-5 text-center font-semibold text-white hover:border-[#93C5FD] hover:bg-[#1A2740]"
+                  className={`customer-reviews-action customer-reviews-action-secondary ${styles.secondary} tap-target`}
                 >
                   Продолжить выбор
                 </Link>
                 <a
                   href={`tel:${toTelValue(contact.phone)}`}
-                  className="tap-target inline-flex min-h-12 items-center justify-center rounded-card bg-[#2563EB] px-5 text-center font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8]"
+                  className={`customer-reviews-action customer-reviews-action-primary ${styles.primary} tap-target`}
                 >
                   Позвонить в магазин
                 </a>
@@ -338,7 +338,7 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
                 ref={cancelClearButtonRef}
                 type="button"
                 onClick={closeClearDialog}
-                className="tap-target min-h-11 rounded-card border border-white/10 px-4 font-semibold text-[#CBD5E1] hover:border-[#93C5FD]/70 hover:bg-white/[0.08] hover:text-white"
+                className={`customer-reviews-action customer-reviews-action-secondary ${styles.dialogAction} tap-target`}
               >
                 Отмена
               </button>
@@ -346,7 +346,7 @@ export function PurchaseListPage({ contact }: PurchaseListPageProps) {
                 ref={confirmClearButtonRef}
                 type="button"
                 onClick={confirmClear}
-                className="tap-target min-h-11 rounded-card bg-[#2563EB] px-4 font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8]"
+                className={`customer-reviews-action customer-reviews-action-primary ${styles.dialogAction} tap-target`}
               >
                 Очистить
               </button>
@@ -371,13 +371,13 @@ function EmptyPurchaseList({ contact }: PurchaseListPageProps) {
         <div className={`${styles.emptyActions} mt-5 grid gap-3 sm:grid-cols-2 sm:max-w-xl`}>
           <Link
             href={withCatalogNavigationContext("/catalog", "purchase-list")}
-            className="tap-target inline-flex min-h-12 items-center justify-center rounded-card bg-[#2563EB] px-5 text-center font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8]"
+            className={`customer-reviews-action customer-reviews-action-primary ${styles.primary} tap-target`}
           >
             Открыть каталог
           </Link>
           <Link
             href="/search"
-            className="tap-target inline-flex min-h-12 items-center justify-center rounded-card border border-[#2563EB]/[0.55] px-5 text-center font-semibold text-white hover:border-[#93C5FD] hover:bg-[#1A2740]"
+            className={`customer-reviews-action customer-reviews-action-secondary ${styles.secondary} tap-target`}
           >
             Найти товар
           </Link>
@@ -469,7 +469,7 @@ function PurchaseListItem({
       <div className={`${styles.actions} flex flex-wrap gap-2 sm:justify-end`}>
         <Link
           href={withCatalogNavigationContext(product.url, "purchase-list-direct")}
-          className="tap-target inline-flex min-h-10 items-center justify-center rounded-card border border-[#2563EB]/[0.55] px-3 text-sm font-semibold text-white hover:border-[#93C5FD] hover:bg-[#1A2740]"
+          className={`customer-reviews-action customer-reviews-action-secondary ${styles.secondary} ${styles.rowAction} tap-target`}
         >
           Открыть товар
         </Link>
@@ -484,7 +484,7 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="purchase-list-remove tap-target inline-flex min-h-10 items-center justify-center gap-2 rounded-card border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-[#CBD5E1]"
+      className={`purchase-list-remove ${styles.remove} tap-target inline-flex min-h-11 items-center justify-center gap-2 border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-[#CBD5E1]`}
     >
       <TrashIcon className="h-4 w-4" />
       Удалить

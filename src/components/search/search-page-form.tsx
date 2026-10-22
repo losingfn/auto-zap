@@ -34,11 +34,11 @@ export function SearchPageForm({ initialQuery }: { initialQuery: string }) {
   }
 
   return (
-    <form onSubmit={submitSearch} className="scroll-reveal flex flex-col gap-3 sm:flex-row">
+    <form onSubmit={submitSearch} className="search-page-form scroll-reveal flex flex-col gap-3 sm:flex-row">
       <label htmlFor="search-page-input" className="sr-only">
         Поиск по каталогу
       </label>
-      <div className="relative flex flex-1">
+      <div className="search-page-field relative flex flex-1">
         <input
           ref={inputRef}
           id="search-page-input"
@@ -46,21 +46,21 @@ export function SearchPageForm({ initialQuery }: { initialQuery: string }) {
           name="q"
           value={query}
           placeholder="Название товара или бренд"
-          className="min-h-12 w-full rounded-card border border-white/10 bg-[#111827] px-4 pr-12 text-base shadow-[0_14px_42px_rgba(0,0,0,0.18)] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#2563EB]"
+          className="search-page-input w-full"
           onChange={(event) => setQuery(event.currentTarget.value)}
         />
         {query ? (
           <button
             type="button"
             onClick={clearSearch}
-            className="tap-target absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-card text-[#CBD5E1] hover:bg-white/10 hover:text-white"
+            className="search-page-clear tap-target absolute right-2 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-card text-[#CBD5E1] hover:bg-white/10 hover:text-white"
             aria-label="Очистить поиск"
           >
             <XIcon className="h-4 w-4" />
           </button>
         ) : null}
       </div>
-      <button className="tap-target min-h-12 rounded-card bg-[#2563EB] px-5 font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8]">
+      <button className="search-page-submit customer-reviews-action customer-reviews-action-primary tap-target">
         Найти
       </button>
     </form>

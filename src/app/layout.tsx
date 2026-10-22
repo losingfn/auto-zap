@@ -2,8 +2,14 @@ import type { Metadata, Viewport } from "next";
 import { Golos_Text, Rubik, Unbounded } from "next/font/google";
 import "./globals.css";
 import { PurchaseListProvider } from "@/features/purchase-list/purchase-list-provider";
+import { PrivacyProvider } from "@/features/privacy/privacy-provider";
+import { getPrivacyConfiguration } from "@/config/privacy";
 import { siteConfig } from "@/config/site";
 import { publicAbsoluteUrl } from "@/features/seo/structured-data";
+
+// Consent controls must receive runtime configuration on every direct page load,
+// including legal pages that would otherwise embed build-time settings.
+export const dynamic = "force-dynamic";
 
 const metadataTitle = "Автозапчасти в Талдоме — Салтыкова-Щедрина";
 const metadataDescription =
@@ -99,7 +105,9 @@ export default function RootLayout({
   return (
     <html lang="ru" className={`${unbounded.variable} ${golosText.variable} ${rubik.variable}`}>
       <body>
-        <PurchaseListProvider>{children}</PurchaseListProvider>
+        <PrivacyProvider configuration={getPrivacyConfiguration()}>
+          <PurchaseListProvider>{children}</PurchaseListProvider>
+        </PrivacyProvider>
       </body>
     </html>
   );

@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { ChevronRightIcon } from "@/components/icons/lucide";
-import { PurchaseListProductBadge } from "@/components/purchase-list/purchase-list-product-badge";
+import { ProductRow } from "@/components/catalog/product-row";
 import type { PublicProductListItem, PublicProductPagination } from "@/features/catalog/types";
 import {
   type CatalogNavigationContext,
@@ -65,31 +64,16 @@ export function ProductList({
         <>
           <div className="catalog-product-rows divide-y divide-white/10 overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_24px_80px_rgba(0,0,0,0.24)]">
             {products.map((product) => (
-              <Link
+              <ProductRow
                 key={product.id}
                 href={withCatalogNavigationContext(
                   `/catalog/${categorySlug}/${subcategorySlug}/${product.slug}`,
                   navigationContext
                 )}
-                className="catalog-product-row tap-target grid gap-2 p-4 hover:bg-[#2563EB]/10 sm:grid-cols-[1fr_auto]"
-              >
-                <div className="catalog-product-row-main">
-                  <h2 className="catalog-product-row-title text-base font-semibold leading-6">
-                    {product.name}
-                  </h2>
-                  <span className="catalog-product-row-badge block">
-                    <PurchaseListProductBadge productIdentityId={product.productIdentityId} />
-                  </span>
-                </div>
-                <div className="catalog-product-row-utility">
-                  <div className="catalog-product-row-price text-lg font-semibold text-white">
-                    {product.price.toLocaleString("ru-RU")} ₽
-                  </div>
-                  <span className="catalog-product-row-chevron hidden" aria-hidden="true">
-                    <ChevronRightIcon />
-                  </span>
-                </div>
-              </Link>
+                name={product.name}
+                price={product.price}
+                productIdentityId={product.productIdentityId}
+              />
             ))}
           </div>
 

@@ -1,57 +1,84 @@
 import Image from "next/image";
 import Link from "next/link";
+import { ChevronRightIcon } from "@/components/icons/lucide";
 import { PurchaseListNavigationLink } from "@/components/purchase-list/purchase-list-navigation-link";
 import { publicBrandLogoSrc } from "@/config/public-brand";
 import { getPublicHomeContent, type PublicHomeContent } from "@/features/content/public-home";
+import styles from "./public-footer.module.css";
+import { DesktopFooterBrand } from "./public-footer-brand";
+import { PrivacyPolicyLink } from "./privacy-navigation";
+import { PrivacySettingsTrigger } from "@/features/privacy/privacy-provider";
 
 export async function PublicFooter({ content }: { content?: PublicHomeContent }) {
   const data = content ?? (await getPublicHomeContent());
 
   return (
-    <footer className="border-t border-white/10 bg-[#0B1220] py-7 sm:py-10">
-      <div className="mx-auto grid max-w-7xl gap-6 px-4 text-sm text-[#CBD5E1] sm:gap-8 sm:px-6 lg:grid-cols-[1.2fr_1fr_0.8fr] lg:px-8">
-        <div>
-          <div className="flex items-center gap-3">
-            <Image
-              src={publicBrandLogoSrc}
-              alt=""
-              width={64}
-              height={64}
-              sizes="(min-width: 640px) 64px, 60px"
-              className="aspect-square h-[60px] w-[60px] shrink-0 object-contain drop-shadow-[0_1px_1px_rgba(226,232,240,0.2)] sm:h-16 sm:w-16"
-            />
-            <p className="max-w-sm text-sm font-semibold leading-5 text-white sm:text-base sm:leading-6">
-              {data.brand.name}
+    <footer id="footer" aria-label={data.brand.name} className={`${styles.root} border-t border-white/10 bg-[#0B1220] py-7 sm:py-10`}>
+      <div className={styles.desktop}>
+        <div className={styles.main}>
+          <DesktopFooterBrand className={styles.brand}>
+            <div className={styles.brandHeading}>
+              <Image
+                src={publicBrandLogoSrc}
+                alt=""
+                width={64}
+                height={64}
+                sizes="64px"
+                className={styles.logo}
+              />
+              <p className={styles.brandName}>
+                Автозапчасти<br />на Салтыкова-Щедрина
+              </p>
+            </div>
+          </DesktopFooterBrand>
+          <nav aria-label="Навигация в подвале сайта" className={styles.navigation}>
+            <p className={styles.heading}>Навигация</p>
+            <div className={styles.links}>
+              <Link href="/#catalog" className={`${styles.link} ${styles.navigationLink}`}>
+                Каталог<ChevronRightIcon className={styles.chevron} />
+              </Link>
+              <Link href="/#reviews" className={`${styles.link} ${styles.navigationLink}`}>
+                Отзывы<ChevronRightIcon className={styles.chevron} />
+              </Link>
+              <Link href="/#contacts" className={`${styles.link} ${styles.navigationLink}`}>
+                Контакты<ChevronRightIcon className={styles.chevron} />
+              </Link>
+              <Link href="/#vacancies" className={`${styles.link} ${styles.navigationLink}`}>
+                Вакансии<ChevronRightIcon className={styles.chevron} />
+              </Link>
+              <div className={styles.purchaseRow}>
+                <PurchaseListNavigationLink className={`${styles.link} ${styles.navigationLink} ${styles.purchaseList}`} />
+                <ChevronRightIcon className={styles.chevron} />
+              </div>
+            </div>
+          </nav>
+          <div className={styles.privacy}>
+            <p className={styles.heading}>Конфиденциальность</p>
+            <div className={styles.privacyLinks}>
+              <PrivacyPolicyLink className={`${styles.link} ${styles.privacyRow}`}>
+                <span className={styles.desktopPrivacyText}>Политика обработки персональных данных</span><ChevronRightIcon className={`${styles.chevron} ${styles.trailingChevron}`} />
+                <span className={styles.mobilePrivacyText}>Политика обработки персональных <span className={styles.linkEnding}>данных<ChevronRightIcon className={`${styles.chevron} ${styles.inlineChevron}`} /></span></span>
+              </PrivacyPolicyLink>
+              <PrivacySettingsTrigger className={`${styles.link} ${styles.privacyRow}`}>
+                <span className={styles.desktopPrivacyText}>Настройки конфиденциальности</span><ChevronRightIcon className={`${styles.chevron} ${styles.trailingChevron}`} />
+                <span className={styles.mobilePrivacyText}>Настройки <span className={styles.linkEnding}>конфиденциальности<ChevronRightIcon className={`${styles.chevron} ${styles.inlineChevron}`} /></span></span>
+              </PrivacySettingsTrigger>
+            </div>
+          </div>
+        </div>
+        <div className={styles.utility}>
+          <div className={styles.legal}>
+            <p>
+              <span>© 2026 Автозапчасти на Салтыкова-Щедрина</span>{" "}
+              <span aria-hidden="true">·</span>{" "}
+              <span>ИП Корженков В. Е.</span>{" "}
+              <span aria-hidden="true">·</span>{" "}
+              <span>ИНН 507800025699</span>{" "}
+              <span aria-hidden="true">·</span>{" "}
+              <span>ОГРНИП 304501033700132</span>
             </p>
           </div>
-          <p className="mt-4 max-w-md leading-6 sm:mt-5">{data.contact.address}</p>
-          <p className="mt-3 text-xs text-[#94A3B8] sm:mt-4">© 2026 {data.brand.name}</p>
-          <p className="mt-2 max-w-md text-xs leading-5 text-[#94A3B8]">
-            Автозапчасти для легковых и коммерческих автомобилей.
-          </p>
         </div>
-        <div className="space-y-2">
-          <p className="font-semibold text-white">Контакты</p>
-          <p>{data.contact.phone}</p>
-          <p>{data.contact.email}</p>
-        </div>
-        <nav className="flex flex-col gap-3 font-medium text-white">
-          <Link href="/#catalog" className="tap-target transition hover:text-[#93C5FD]">
-            Каталог
-          </Link>
-          <Link href="/#reviews" className="tap-target transition hover:text-[#93C5FD]">
-            Отзывы
-          </Link>
-          <Link href="/#contacts" className="tap-target transition hover:text-[#93C5FD]">
-            Контакты
-          </Link>
-          <Link href="/#vacancies" className="tap-target transition hover:text-[#93C5FD]">
-            Вакансии
-          </Link>
-          <PurchaseListNavigationLink
-            className="tap-target w-fit pr-6 transition hover:text-[#93C5FD]"
-          />
-        </nav>
       </div>
     </footer>
   );

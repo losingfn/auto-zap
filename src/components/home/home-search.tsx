@@ -4,6 +4,7 @@ import type { FormEvent, KeyboardEvent } from "react";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { XIcon } from "@/components/icons/lucide";
+import { leaveAnalyticsDocument } from "@/features/privacy/analytics";
 
 export function HomeSearch() {
   const router = useRouter();
@@ -17,7 +18,8 @@ export function HomeSearch() {
       return;
     }
 
-    router.push(`/search?q=${encodeURIComponent(normalizedQuery)}`);
+    const href = `/search?q=${encodeURIComponent(normalizedQuery)}`;
+    if (!leaveAnalyticsDocument(href)) router.push(href);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {

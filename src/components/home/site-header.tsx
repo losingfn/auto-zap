@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { publicBrandLogoSrc } from "@/config/public-brand";
 import { PurchaseListNavigationLink } from "@/components/purchase-list/purchase-list-navigation-link";
 
@@ -15,11 +15,17 @@ const navigationItems = [
 ];
 
 export function SiteHeader({
-  siteName
+  siteName,
+  navigationBasePath = ""
 }: {
   siteName: string;
+  navigationBasePath?: string;
 }) {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const nameRef = useRef<HTMLSpanElement | null>(null);
+  const floatingRef = useRef(false);
+  const namePositionsRef = useRef<{ element: HTMLElement; rect: DOMRect }[]>([]);
+  const nameAnimationsRef = useRef<Animation[]>([]);
   const [isFloating, setIsFloating] = useState(false);
   const [brandPrimary, brandLocation] = siteName.split(" на ");
 
@@ -31,13 +37,46 @@ export function SiteHeader({
     }
 
     const observer = new IntersectionObserver(([entry]) => {
-      setIsFloating(!entry.isIntersecting);
+      const floating = !entry.isIntersecting;
+      if (floating === floatingRef.current) return;
+      floatingRef.current = floating;
+      if (window.matchMedia("(min-width: 1024px) and (prefers-reduced-motion: no-preference)").matches) {
+        namePositionsRef.current = Array.from(nameRef.current?.querySelectorAll<HTMLElement>(
+          ":scope > span:first-child, .home-header-name-location"
+        ) ?? []).map((element) => ({ element, rect: element.getBoundingClientRect() }));
+      }
+      setIsFloating(floating);
     });
 
     observer.observe(sentinel);
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      nameAnimationsRef.current.forEach((animation) => animation.cancel());
+    };
   }, []);
+
+  useLayoutEffect(() => {
+    const previous = namePositionsRef.current;
+    namePositionsRef.current = [];
+    nameAnimationsRef.current.forEach((animation) => animation.cancel());
+    // Wrapping is discrete; interpolate the existing text spans' positions instead.
+    nameAnimationsRef.current = previous.map(({ element, rect }) => {
+      const next = element.getBoundingClientRect();
+      const x = rect.x - next.x;
+      const y = rect.y - next.y;
+      const easing = "cubic-bezier(0.22, 1, 0.36, 1)";
+      const frames: Keyframe[] = [{ transform: `translate(${x}px, ${y}px)`, easing }];
+      if (element.classList.contains("home-header-name-location")) {
+        // Move to the second row before sliding left; slide right before joining the first row.
+        frames.push(isFloating
+          ? { offset: 0.3, transform: `translate(${x}px, 0)`, easing }
+          : { offset: 0.75, transform: `translate(${x * 0.03}px, ${y}px)`, easing });
+      }
+      frames.push({ transform: "translate(0, 0)" });
+      return element.animate(frames, { duration: 220 });
+    });
+  }, [isFloating]);
 
   return (
     <>
@@ -55,7 +94,7 @@ export function SiteHeader({
                 priority
                 className="home-header-logo aspect-square h-11 w-11 shrink-0 object-contain lg:h-[72px] lg:w-[72px]"
               />
-              <span className="home-header-name min-w-0 max-w-[218px] text-xs font-semibold leading-4 text-white sm:max-w-none sm:text-sm sm:leading-5">
+              <span ref={nameRef} className="home-header-name min-w-0 max-w-[218px] text-xs font-semibold leading-4 text-white sm:max-w-none sm:text-sm sm:leading-5">
                 <span>{brandPrimary}</span>
                 {brandLocation ? <><span> </span><span className="home-header-name-location">на {brandLocation}</span></> : null}
               </span>
@@ -63,7 +102,7 @@ export function SiteHeader({
 
             <nav className="home-header-desktop-nav hidden items-center lg:flex">
               {navigationItems.map((item) => (
-                <Link key={item.href} href={item.href} className="home-header-desktop-link tap-target">
+                <Link key={item.href} href={`${navigationBasePath}${item.href}`} className="home-header-desktop-link tap-target">
                   {item.label}
                 </Link>
               ))}
@@ -77,7 +116,7 @@ export function SiteHeader({
             {navigationItems.map((item) => (
               <Link
                 key={item.href}
-                href={item.href}
+                href={`${navigationBasePath}${item.href}`}
                 className="home-header-mobile-link tap-target flex min-h-11 min-w-0 items-center justify-center px-1.5 py-2"
               >
                 {item.label}

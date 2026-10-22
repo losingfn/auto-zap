@@ -26,8 +26,11 @@ declare global {
 
 const YANDEX_ORGANIZATION_URL = "https://yandex.ru/maps/org/avtomagazin/1112244739/";
 const YANDEX_ROUTE_URL = "https://yandex.ru/maps/10757/taldom/?mode=routes&rtext=~%D0%9C%D0%BE%D1%81%D0%BA%D0%BE%D0%B2%D1%81%D0%BA%D0%B0%D1%8F%20%D0%BE%D0%B1%D0%BB%D0%B0%D1%81%D1%82%D1%8C%2C%20%D0%A2%D0%B0%D0%BB%D0%B4%D0%BE%D0%BC%2C%20%D1%83%D0%BB%D0%B8%D1%86%D0%B0%20%D0%A1%D0%B0%D0%BB%D1%82%D1%8B%D0%BA%D0%BE%D0%B2%D0%B0-%D0%A9%D0%B5%D0%B4%D1%80%D0%B8%D0%BD%D0%B0%2C%2019&rtt=auto";
+// The map is an independent service; its iframe may load Yandex's own telemetry.
+const YANDEX_MAP_EMBED_ENABLED = true;
 
 interface YandexMapInstance {
+  behaviors: { disable(name: string): void };
   geoObjects: {
     add(object: unknown): void;
   };
@@ -50,16 +53,31 @@ export function YandexMap({
   };
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<YandexMapInstance | null>(null);
   const [failed, setFailed] = useState(false);
+  const [nearby, setNearby] = useState(false);
 
   useEffect(() => {
-    if (!apiKey || !containerRef.current) {
+    // Approved desktop CSS uses display:contents on the wrapper; observe the rendered map slot.
+    const element = wrapperRef.current?.firstElementChild;
+    if (!element) return;
+    if (!("IntersectionObserver" in window)) { setNearby(true); return; }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) { setNearby(true); observer.disconnect(); }
+    }, { rootMargin: "400px" });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!YANDEX_MAP_EMBED_ENABLED || !nearby || !apiKey || !containerRef.current) {
       return;
     }
 
     let cancelled = false;
     setFailed(false);
+    const timeout = window.setTimeout(() => { if (!cancelled && !mapRef.current) setFailed(true); }, 12_000);
     const scriptUrl = `https://api-maps.yandex.ru/2.1/?apikey=${encodeURIComponent(apiKey)}&lang=ru_RU`;
 
     function initMap() {
@@ -88,7 +106,9 @@ export function YandexMap({
           }
         );
         map.geoObjects.add(placemark);
+        map.behaviors.disable("scrollZoom");
         mapRef.current = map;
+        window.clearTimeout(timeout);
       } catch (error) {
         console.error("[yandex-map] failed to initialize", error);
         setFailed(true);
@@ -115,15 +135,27 @@ export function YandexMap({
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
       mapRef.current?.destroy();
       mapRef.current = null;
     };
-  }, [apiKey, contact.addressStreet, contact.latitude, contact.longitude, siteName]);
+  }, [apiKey, nearby, contact.addressStreet, contact.latitude, contact.longitude, siteName]);
 
   return (
-    <div className="scroll-reveal h-fit overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_28px_90px_rgba(0,0,0,0.32)]">
-      {!apiKey || failed ? (
-        <MapEmbed contact={contact} />
+    <div ref={wrapperRef} className="scroll-reveal h-fit overflow-hidden rounded-card border border-white/10 bg-[#111827] shadow-[0_28px_90px_rgba(0,0,0,0.32)]">
+      {!YANDEX_MAP_EMBED_ENABLED ? (
+        <div className="flex h-[300px] items-center justify-center px-6 text-center sm:h-[320px]">
+          <a
+            href={contact.yandexMapsUrl || YANDEX_ORGANIZATION_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-card border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:border-white/40"
+          >
+            Открыть карту в Яндекс Картах
+          </a>
+        </div>
+      ) : !apiKey || failed ? (
+        <MapEmbed contact={contact} nearby={nearby} />
       ) : (
         <div ref={containerRef} className="h-[300px] w-full bg-[#111827] sm:h-[320px]" />
       )}
@@ -133,24 +165,43 @@ export function YandexMap({
 }
 
 function MapEmbed({
-  contact
+  contact, nearby
 }: {
+  nearby: boolean;
   contact: {
     address: string;
     latitude: number;
     longitude: number;
   };
 }) {
+  const [state, setState] = useState<"loading" | "loaded" | "failed">("loading");
+  useEffect(() => {
+    if (!nearby || state !== "loading") return;
+    const timer = window.setTimeout(() => setState("failed"), 15_000);
+    return () => window.clearTimeout(timer);
+  }, [nearby, state]);
   const src = `https://yandex.ru/map-widget/v1/?ll=${contact.longitude}%2C${contact.latitude}&mode=search&text=${encodeURIComponent(contact.address)}&z=16&pt=${contact.longitude},${contact.latitude},pm2blm`;
 
+  if (state === "failed") return (
+    <div className="flex h-[300px] flex-col items-center justify-center gap-4 px-6 text-center sm:h-[320px]">
+      <p className="text-sm text-[#CBD5E1]" role="status">Карта временно недоступна.</p>
+      <a href={YANDEX_ORGANIZATION_URL} target="_blank" rel="noopener noreferrer"
+        className="rounded-card border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:border-white/40">
+        Открыть в Яндекс Картах
+      </a>
+    </div>
+  );
+  if (!nearby) return <div className="h-[300px] w-full bg-[#111827] sm:h-[320px]" />;
   return (
     <iframe
       title="Карта проезда к магазину автозапчастей"
       src={src}
       className="h-[300px] w-full border-0 bg-[#111827] sm:h-[320px]"
       loading="lazy"
-      referrerPolicy="no-referrer-when-downgrade"
+      referrerPolicy="strict-origin-when-cross-origin"
       allowFullScreen
+      onLoad={() => setState("loaded")}
+      onError={() => setState("failed")}
     />
   );
 }

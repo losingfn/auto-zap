@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CategoryGrid } from "@/components/catalog/category-grid";
+import { HomeCategoryGrid } from "@/components/home/home-category-grid";
 import { CatalogPageShell } from "@/components/catalog/page-shell";
 import { JsonLd } from "@/components/seo/json-ld";
 import { getPublicCatalogCategories } from "@/features/catalog/data";
@@ -32,7 +32,9 @@ export default async function CatalogPage({
   return (
     <CatalogPageShell
       title="Каталог"
+      variant="catalog"
       backHref={context === "purchase-list" ? "/spisok-pokupok" : "/"}
+      backLabel={context === "purchase-list" ? "← Назад" : "← На главную"}
     >
       <JsonLd
         data={buildBreadcrumbList([
@@ -40,7 +42,7 @@ export default async function CatalogPage({
           { name: "Каталог", url: "/catalog" }
         ])}
       />
-      <CategoryGrid categories={categories} navigationContext={context} />
+      <HomeCategoryGrid categories={categories} navigationContext={context} />
     </CatalogPageShell>
   );
 }

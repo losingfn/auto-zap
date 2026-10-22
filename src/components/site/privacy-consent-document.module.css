@@ -1,0 +1,10 @@
+/* The policy page supplies layout/type. Literal source markers must not be duplicated by HTML lists. */
+.document .literalList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 350px) {
+  .document h1:first-child { font-size: 28px; }
+}

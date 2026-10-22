@@ -7,6 +7,7 @@ export async function CatalogPageShell({
   desktopTitle,
   subtitle,
   backHref,
+  backLabel = "← Назад",
   variant = "default",
   children
 }: {
@@ -14,7 +15,8 @@ export async function CatalogPageShell({
   desktopTitle?: string;
   subtitle?: string;
   backHref?: string;
-  variant?: "default" | "category" | "product-list" | "product-detail";
+  backLabel?: string;
+  variant?: "default" | "catalog" | "category" | "product-list" | "product-detail";
   children: ReactNode;
 }) {
   const variantClassName =
@@ -24,16 +26,18 @@ export async function CatalogPageShell({
         ? "catalog-product-list-page"
         : variant === "product-detail"
           ? "catalog-product-detail-page"
-          : "";
+          : variant === "catalog"
+            ? "catalog-index-page"
+            : "";
 
   return (
-    <main className={`premium-page min-h-dvh bg-[#111827] text-white ${variantClassName}`}>
+    <main data-autozap-analytics-page={variant !== "product-detail" ? "true" : undefined} className={`premium-page min-h-dvh bg-[#111827] text-white ${variantClassName}`}>
       <div className="catalog-page-content px-5 py-8">
         <div className="catalog-page-inner mx-auto max-w-6xl">
           <header className={`catalog-page-header scroll-reveal mb-8 rounded-card border border-white/10 bg-[#111827] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.24)] ${subtitle ? "sm:p-7" : "sm:p-6"}`}>
             {backHref ? (
               <Link href={backHref} className={`catalog-page-back ${subtitle ? "mb-4" : "mb-3"} inline-block text-sm text-[#93C5FD]`}>
-                ← Назад
+                {backLabel}
               </Link>
             ) : null}
             <h1 className="catalog-page-title text-3xl font-semibold leading-tight sm:text-5xl">

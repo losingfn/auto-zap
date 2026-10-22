@@ -18,6 +18,19 @@ import {
 import { sql } from "drizzle-orm";
 
 export const adminRole = pgEnum("admin_role", ["owner", "manager"]);
+
+export const privacyConsentEvents = pgTable("privacy_consent_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  receiptHash: varchar("receipt_hash", { length: 64 }).notNull(),
+  operationId: uuid("operation_id").notNull().unique(),
+  kind: varchar("kind", { length: 16 }).notNull(),
+  documentVersion: text("document_version"),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true })
+}, (table) => [
+  unique("privacy_consent_events_receipt_hash_kind_key").on(table.receiptHash, table.kind),
+  index("privacy_consent_events_expiry_idx").on(table.expiresAt)
+]);
 export const assetKind = pgEnum("asset_kind", [
   "logo",
   "favicon",

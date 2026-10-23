@@ -58,7 +58,9 @@ export async function privacyNextEnvironment(output: string, reuseBuild = false,
     assert.equal(bindings.length, 1); assert.equal(bindings[0].HostIp, "127.0.0.1");
     const dbPort = Number(bindings[0].HostPort); assert.ok(dbPort > 1024 && dbPort < 65536);
     for (let attempt = 0; attempt < 40; attempt++) {
-      try { docker("exec", container, "pg_isready", "-U", owner, "-d", database); break; } catch { await delay(300); }
+      // The image's temporary init server accepts Unix sockets before the
+      // final TCP server starts. Wait for the transport used by the test.
+      try { docker("exec", container, "pg_isready", "-h", "127.0.0.1", "-U", owner, "-d", database); break; } catch { await delay(300); }
     }
     const url = (user: string, pass: string, dbName = database) => {
       const value = new URL(`postgresql://127.0.0.1:${dbPort}/${dbName}`); value.username = user; value.password = pass; return value.href;

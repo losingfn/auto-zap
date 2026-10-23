@@ -208,6 +208,12 @@ export class PrivacyCoordinator {
         intent = { id: this.platform.id(), grant };
         this.platform.storage.setItem(PRIVACY_INTENT_KEY, JSON.stringify(intent));
         if (!grant) {
+          // A new explicit refusal may retry a previously rejected withdrawal.
+          // Keep its identity; the server must recheck Origin, proof and ACK.
+          // Automatic retries and grants cannot bypass terminal failures.
+          for (const operation of this.operations()) {
+            if (operation.action !== "grant" && operation.blocked) this.storeOperation({ ...operation, blocked: undefined });
+          }
           // Publish off immediately, before waiting for another tab's network operation.
           const pending = previous?.receiptId ? this.withdraw(previous.receiptId, previous.expiresAt,
             previous.pending ?? (previous.decision === "granted" ? "revoke" : "decline"), previous.operationId) : null;

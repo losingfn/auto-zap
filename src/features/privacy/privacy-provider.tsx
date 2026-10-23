@@ -131,12 +131,13 @@ export function PrivacyProvider({ configuration, children }: { configuration: Co
   }, [version, configuration.analyticsReady]);
 
   useEffect(() => {
-    if (hydrated && !legalPage && !choice && !saving.current) {
+    const unconfirmed = !choice || Boolean(choice.pending);
+    if (hydrated && !legalPage && unconfirmed && !saving.current) {
       setModal((value) => value ?? "banner");
-    } else if (choice || legalPage) {
+    } else if (!unconfirmed || legalPage) {
       setModal((value) => value === "banner" ? null : value);
     }
-  }, [hydrated, legalPage, choice]);
+  }, [hydrated, legalPage, choice, busy]);
 
   useEffect(() => {
     if (!choice) return;
@@ -201,7 +202,6 @@ export function PrivacyProvider({ configuration, children }: { configuration: Co
     const sourcePath = window.location.pathname;
     if (!grant) withdrawAnalytics(configuration.counterId);
     setNotice(null);
-    if (!grant && fromBanner) { actual.current.modal = null; setModal(null); }
     const saved = await controller.save(grant);
     if (saved) setDraft(grant);
     if (!saved && fromBanner && controller.snapshot.message && sourcePath === window.location.pathname) {

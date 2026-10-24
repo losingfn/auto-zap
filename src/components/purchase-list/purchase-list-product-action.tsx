@@ -36,7 +36,7 @@ export function PurchaseListProductAction({
       type="button"
       disabled={!isReady}
       onClick={() => addProduct(productIdentityId)}
-      className="tap-target mt-6 inline-flex min-h-12 items-center rounded-card bg-[#2563EB] px-5 font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8] disabled:cursor-wait disabled:opacity-70"
+      className="purchase-list-add-action tap-target mt-6 inline-flex min-h-12 items-center rounded-card bg-[#2563EB] px-5 font-semibold text-white shadow-[0_18px_46px_rgba(37,99,235,0.3)] hover:-translate-y-0.5 hover:bg-[#1D4ED8] disabled:cursor-wait disabled:opacity-70"
     >
       Добавить в список покупок
     </button>

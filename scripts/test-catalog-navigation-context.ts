@@ -5,7 +5,8 @@ import {
   withCatalogNavigationContext
 } from "../src/features/catalog/navigation-context";
 
-run("accepts only fixed internal purchase-list navigation contexts", () => {
+run("accepts only fixed internal navigation contexts", () => {
+  assert.equal(getCatalogNavigationContext("home-catalog"), "home-catalog");
   assert.equal(getCatalogNavigationContext("purchase-list"), "purchase-list");
   assert.equal(getCatalogNavigationContext("purchase-list-direct"), "purchase-list-direct");
   assert.equal(getCatalogNavigationContext("https://example.com"), null);
@@ -23,6 +24,10 @@ run("preserves the context through catalog paths and existing query parameters",
     "/catalog/tormoznaya-sistema/kolodki?q=trw&page=2&from=purchase-list"
   );
   assert.equal(withCatalogNavigationContext("/catalog", null), "/catalog");
+  assert.equal(
+    withCatalogNavigationContext("/catalog/podveska/stoyki/test?page=2", "home-catalog"),
+    "/catalog/podveska/stoyki/test?page=2&from=home-catalog"
+  );
 });
 
 run("catalog pages keep context through every hierarchy link and direct products return to the list", () => {
@@ -41,6 +46,7 @@ run("catalog pages keep context through every hierarchy link and direct products
 
   assert.match(catalogSource, /context === "purchase-list" \? "\/spisok-pokupok" : "\/"/);
   assert.match(categorySource, /withCatalogNavigationContext\("\/catalog", context\)/);
+  assert.match(categorySource, /context === "home-catalog" \? "\/#catalog"/);
   assert.match(subcategorySource, /withCatalogNavigationContext\(`\/catalog\/\$\{category\.slug\}`, context\)/);
   assert.match(productListSource, /navigationContext={navigationContext}/);
   assert.match(productSource, /context === "purchase-list-direct"/);

@@ -1,9 +1,9 @@
-export type CatalogNavigationContext = "purchase-list" | "purchase-list-direct" | null;
+export type CatalogNavigationContext = "home-catalog" | "purchase-list" | "purchase-list-direct" | null;
 
 export function getCatalogNavigationContext(
   value: string | null | undefined
 ): CatalogNavigationContext {
-  if (value === "purchase-list" || value === "purchase-list-direct") {
+  if (value === "home-catalog" || value === "purchase-list" || value === "purchase-list-direct") {
     return value;
   }
 

@@ -51,7 +51,7 @@ export default async function CategoryPage({
   return (
     <CatalogPageShell
       title={category.name}
-      backHref={withCatalogNavigationContext("/catalog", context)}
+      backHref={context === "home-catalog" ? "/#catalog" : withCatalogNavigationContext("/catalog", context)}
       variant="category"
     >
       <JsonLd

@@ -364,7 +364,7 @@ function EmptyPurchaseList({ contact }: PurchaseListPageProps) {
   return (
     <div className={`${styles.emptyBody} mt-6 space-y-6`}>
       <div className={`${styles.emptyPanel} rounded-card border border-white/10 bg-[#111827] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.2)] sm:p-6`}>
-        <p className={`${styles.emptyTitle} text-lg font-semibold text-white`}>Ваш список пока пуст.</p>
+        <p className={`${styles.emptyTitle} text-lg font-semibold text-white`}>Ваш список пока пуст</p>
         <p className={`${styles.emptyDescription} mt-2 max-w-xl text-sm leading-6 text-[#CBD5E1]`}>
           Найдите нужные запчасти в каталоге и сохраните их в список покупок.
         </p>

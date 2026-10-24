@@ -21,7 +21,8 @@ export function useStorePhotoLightbox(
   { allowTouchSwipe = false }: { allowTouchSwipe?: boolean } = {}
 ) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const [previousIndex, setPreviousIndex] = useState<number | null>(null);
+  const [displayedIndex, setDisplayedIndex] = useState<number | null>(null);
+  const [hasSwitched, setHasSwitched] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -31,26 +32,25 @@ export function useStorePhotoLightbox(
   const restoreFocusRef = useRef(false);
   const closeTimerRef = useRef<number | null>(null);
   const touchStartRef = useRef<number | null>(null);
-  const activePhoto = activeIndex === null ? null : photos[activeIndex];
+  const activePhoto = displayedIndex === null ? null : photos[displayedIndex];
   const isLightboxOpen = activeIndex !== null;
 
   function showPrevious() {
     if (activeIndex === null || isClosing) return;
-    setPreviousIndex(activeIndex);
-    setActiveIndex((activeIndex - 1 + photos.length) % photos.length);
+    setActiveIndex((index) => index === null ? null : (index - 1 + photos.length) % photos.length);
   }
 
   function showNext() {
     if (activeIndex === null || isClosing) return;
-    setPreviousIndex(activeIndex);
-    setActiveIndex((activeIndex + 1) % photos.length);
+    setActiveIndex((index) => index === null ? null : (index + 1) % photos.length);
   }
 
   function openLightbox(index: number, trigger: HTMLButtonElement) {
     triggerRef.current = trigger;
-    setPreviousIndex(null);
+    setHasSwitched(false);
     setIsClosing(false);
     setActiveIndex(index);
+    setDisplayedIndex(index);
   }
 
   function closeLightbox() {
@@ -60,7 +60,8 @@ export function useStorePhotoLightbox(
     const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 16 : 220;
     closeTimerRef.current = window.setTimeout(() => {
       setActiveIndex(null);
-      setPreviousIndex(null);
+      setDisplayedIndex(null);
+      setHasSwitched(false);
       setIsClosing(false);
       closeTimerRef.current = null;
     }, duration);
@@ -74,10 +75,20 @@ export function useStorePhotoLightbox(
   }, []);
 
   useEffect(() => {
-    if (previousIndex === null) return;
-    const timer = window.setTimeout(() => setPreviousIndex(null), 180);
-    return () => window.clearTimeout(timer);
-  }, [activeIndex, previousIndex]);
+    if (activeIndex === null || activeIndex === displayedIndex || isClosing) return;
+    let cancelled = false;
+    const image = new window.Image();
+    // Local photos are served unoptimized; decode the exact URL used by Next Image.
+    image.src = photos[activeIndex].src;
+    void image.decode().then(() => {
+      if (cancelled) return;
+      setHasSwitched(true);
+      setDisplayedIndex(activeIndex);
+    }).catch(() => {
+      // Keep the last loaded photo visible if the requested image cannot load.
+    });
+    return () => { cancelled = true; };
+  }, [activeIndex, displayedIndex, isClosing, photos]);
 
   useEffect(() => {
     if (activeIndex !== null || !restoreFocusRef.current) {
@@ -148,7 +159,7 @@ export function useStorePhotoLightbox(
       className={`store-lightbox${isClosing ? " store-lightbox--closing" : ""}`}
       role="dialog"
       aria-modal="true"
-      aria-label={`Фото ${activeIndex! + 1} из ${photos.length}: ${activePhoto.alt}`}
+      aria-label={`Фото ${displayedIndex! + 1} из ${photos.length}: ${activePhoto.alt}`}
       onTouchStart={allowTouchSwipe ? (event) => { touchStartRef.current = event.touches[0]?.clientX ?? null; } : undefined}
       onTouchEnd={allowTouchSwipe ? (event) => {
         if (touchStartRef.current === null) return;
@@ -199,17 +210,6 @@ export function useStorePhotoLightbox(
       <div className="store-lightbox-stage">
         <figure className="store-lightbox-figure" onClick={(event) => event.stopPropagation()}>
           <div className="store-lightbox-photo-wrap">
-            {previousIndex !== null ? (
-              <Image
-                src={photos[previousIndex].src}
-                alt=""
-                width={photos[previousIndex].width}
-                height={photos[previousIndex].height}
-                sizes="(min-width: 1024px) 84vw, 100vw"
-                className="store-lightbox-photo store-lightbox-photo--previous"
-                aria-hidden="true"
-              />
-            ) : null}
             <Image
               key={activePhoto.src}
               src={activePhoto.src}
@@ -217,11 +217,11 @@ export function useStorePhotoLightbox(
               width={activePhoto.width}
               height={activePhoto.height}
               sizes="(min-width: 1024px) 84vw, 100vw"
-              className={`store-lightbox-photo store-lightbox-photo--current${previousIndex !== null ? " store-lightbox-photo--switching" : ""}`}
+              className={`store-lightbox-photo store-lightbox-photo--current${hasSwitched ? " store-lightbox-photo--switching" : ""}`}
             />
           </div>
           <figcaption className="store-lightbox-counter" aria-live="polite" aria-atomic="true">
-            <span>{String(activeIndex! + 1).padStart(2, "0")}</span> / {String(photos.length).padStart(2, "0")}
+            <span>{String(displayedIndex! + 1).padStart(2, "0")}</span> / {String(photos.length).padStart(2, "0")}
           </figcaption>
         </figure>
       </div>

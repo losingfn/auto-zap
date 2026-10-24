@@ -116,7 +116,7 @@ export default async function Home() {
             />
           </div>
           <h2 className="catalog-desktop-heading">Каталог товаров</h2>
-          <HomeCategoryGrid categories={content.categories} />
+          <HomeCategoryGrid categories={content.categories} navigationContext="home-catalog" />
         </div>
       </section>
 

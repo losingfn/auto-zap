@@ -94,13 +94,15 @@ export async function searchProductsWithPostgres({
     );
   }
 
-  const [totalRow] = await db
+  // Public fallback needs one filtered scan: a separate count can exhaust the
+  // public page deadline when publication exclusions reject stale index hits.
+  const [totalRow] = admin ? await db
     .select({ count: sql<number>`count(*)::int` })
     .from(products)
     .innerJoin(categories, eq(categories.id, products.categoryId))
     .innerJoin(subcategories, eq(subcategories.id, products.subcategoryId))
     .innerJoin(catalogVersions, eq(catalogVersions.id, products.catalogVersionId))
-    .where(and(...whereConditions));
+    .where(and(...whereConditions)) : [];
 
   const candidateLimit = admin ? Math.min(Math.max(limit * 5, 50), 250) : SEARCH_MAX_TOTAL_HITS;
   const rows = await db
@@ -117,7 +119,8 @@ export async function searchProductsWithPostgres({
       categoryName: categories.name,
       subcategorySlug: subcategories.slug,
       subcategoryName: subcategories.name,
-      sourceScore: scoreExpression
+      sourceScore: scoreExpression,
+      totalMatches: admin ? sql<number>`0::int` : sql<number>`(count(*) over())::int`
     })
     .from(products)
     .innerJoin(categories, eq(categories.id, products.categoryId))
@@ -153,7 +156,7 @@ export async function searchProductsWithPostgres({
     )
   );
 
-  const total = Number(totalRow?.count ?? 0);
+  const total = Number(admin ? totalRow?.count ?? 0 : rows[0]?.totalMatches ?? 0);
   const rankedHits = rankSearchHits(documents, query, synonyms, sourceScores, !admin);
   const accessibleTotal = admin ? total : getAccessibleTotal(total, SEARCH_MAX_TOTAL_HITS);
 

@@ -15,6 +15,11 @@ purchase-list reads, public search and sitemap are covered. Administrative
 inventory and import source records are retained. Old indexed hits are authorized
 against current public rows; rejected batches use the existing PostgreSQL fallback
 with correct totals. No index operation is required to enable the restriction.
+Recognizable excluded batches go straight to fallback before database hydration;
+accepted indexed batches still require current public rows. Public fallback gets
+rows and their total in one scan using a window count. The public search page
+allows 12 seconds for fallback instead of 6; some queries can remain slower than
+indexed search. Administrative count/pagination behavior is preserved.
 
 ## Validation
 
@@ -33,9 +38,10 @@ draft adapts the same restriction to main's public query paths without including
 unrelated uncommitted user changes. Do not deploy main as a replacement for the
 live source: that could omit existing AvtoVAZ protection and other deployed work.
 
-A separate two-file application patch was prepared against the live baseline:
-the new catalog predicate and its call in publication-policy/public-condition.ts.
-Six relevant baseline file hashes were checked read-only against the live server.
+A separate five-file application patch was prepared against the live baseline:
+the new catalog predicate, its call in publication-policy/public-condition.ts,
+search/documents.ts, search/postgres.ts and app/search/page.tsx.
+Relevant baseline file hashes were checked read-only against the live server.
 The production-baseline candidate also passed isolated public-surface tests with
 a stale search index. Deployment requires a fresh baseline check and explicit
 authorization for the web-process restart. No database migration, data deletion,

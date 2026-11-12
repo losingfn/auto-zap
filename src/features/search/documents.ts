@@ -1,4 +1,4 @@
-import { publicProductExclusionCondition } from "@/features/catalog/public-product-exclusions";
+import { isRestrictedPublicProduct, publicProductExclusionCondition } from "@/features/catalog/public-product-exclusions";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { catalogTaxonomy } from "@/config/catalog-taxonomy";
 import {
@@ -88,6 +88,11 @@ export async function hydrateMissingSearchProductIdentities(
   hits: SearchProductDocument[],
   synonyms: SearchSynonymRecord[] = []
 ): Promise<SearchProductDocument[]> {
+  // Reject an already recognizable stale batch before the database authorization
+  // query. Every batch that can be returned still requires current public rows.
+  if (hits.some(isRestrictedPublicProduct)) {
+    throw new Error("Search batch contains owner-excluded products");
+  }
   const snapshotIds = [...new Set(hits.map((hit) => hit.id))];
   if (!snapshotIds.length) return [];
 

@@ -41,7 +41,8 @@ export default async function SearchPage({
           limit: SEARCH_PAGE_SIZE,
           offset: getSearchOffset(page)
         }),
-        6000
+        // Publication exclusions can route a stale index batch to PostgreSQL.
+        12000
       ).catch((error) => {
         console.error("[public-search] failed", error);
         searchError = true;

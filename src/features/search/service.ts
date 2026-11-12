@@ -168,7 +168,7 @@ async function searchProductsWithMeili(
     return rankedHit;
   });
 
-  const hydratedHits = await hydrateMissingSearchProductIdentities(hits);
+  const hydratedHits = await hydrateMissingSearchProductIdentities(hits, synonyms);
 
   const total = Number(response.estimatedTotalHits ?? hits.length);
   const accessibleTotal = getAccessibleTotal(total, SEARCH_MAX_TOTAL_HITS);

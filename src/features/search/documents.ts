@@ -1,3 +1,4 @@
+import { isRestrictedPublicProduct, publicProductExclusionCondition } from "@/features/catalog/public-product-exclusions";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { catalogTaxonomy } from "@/config/catalog-taxonomy";
 import {
@@ -66,7 +67,8 @@ export async function getSearchDocumentsForCatalogVersion(
         eq(categories.isActive, true),
         eq(subcategories.isActive, true),
         inArray(categories.slug, getPublicCategorySlugs()),
-        publicTaxonomyTargetCondition()
+        publicTaxonomyTargetCondition(),
+        publicProductExclusionCondition()
       )
     )
     .orderBy(asc(products.name));
@@ -83,46 +85,59 @@ export async function getSearchDocumentsForCatalogVersion(
 }
 
 export async function hydrateMissingSearchProductIdentities(
-  hits: SearchProductDocument[]
+  hits: SearchProductDocument[],
+  synonyms: SearchSynonymRecord[] = []
 ): Promise<SearchProductDocument[]> {
-  const snapshotIds = [...new Set(hits.filter((hit) => !hit.productIdentityId).map((hit) => hit.id))];
-  if (snapshotIds.length === 0) {
-    return hits;
+  // Reject an already recognizable stale batch before the database authorization
+  // query. Every batch that can be returned still requires current public rows.
+  if (hits.some(isRestrictedPublicProduct)) {
+    throw new Error("Search batch contains owner-excluded products");
   }
+  const snapshotIds = [...new Set(hits.map((hit) => hit.id))];
+  if (!snapshotIds.length) return [];
 
   const activeCatalogVersionId = await getActiveCatalogVersionId();
-  if (!activeCatalogVersionId) {
-    return hits;
-  }
+  if (!activeCatalogVersionId) throw new Error("No active public catalog");
 
   const rows = await db
     .select({
       id: products.id,
-      productIdentityId: products.productIdentityId
+      catalogVersionId: products.catalogVersionId,
+      productIdentityId: products.productIdentityId,
+      shopCode: products.shopCode,
+      rawName: products.rawName,
+      name: products.name,
+      slug: products.slug,
+      price: products.price,
+      categorySlug: categories.slug,
+      categoryName: categories.name,
+      subcategorySlug: subcategories.slug,
+      subcategoryName: subcategories.name
     })
     .from(products)
     .innerJoin(categories, eq(categories.id, products.categoryId))
     .innerJoin(subcategories, eq(subcategories.id, products.subcategoryId))
-    .where(
-      and(
-        eq(products.catalogVersionId, activeCatalogVersionId),
-        eq(products.status, "active"),
-        eq(categories.isActive, true),
-        eq(subcategories.isActive, true),
-        inArray(products.id, snapshotIds),
-        inArray(categories.slug, getPublicCategorySlugs()),
-        publicTaxonomyTargetCondition()
-      )
-    );
-  const identitiesBySnapshotId = new Map(
-    rows.flatMap((row) => (row.productIdentityId ? [[row.id, row.productIdentityId] as const] : []))
-  );
+    .where(and(
+      inArray(products.id, snapshotIds),
+      eq(products.catalogVersionId, activeCatalogVersionId),
+      eq(products.status, "active"),
+      eq(categories.isActive, true),
+      eq(subcategories.isActive, true),
+      inArray(categories.slug, getPublicCategorySlugs()),
+      publicTaxonomyTargetCondition(),
+      publicProductExclusionCondition()
+    ));
 
-  return hits.map((hit) =>
-    hit.productIdentityId
-      ? hit
-      : { ...hit, productIdentityId: identitiesBySnapshotId.get(hit.id) ?? null }
-  );
+  // Reject the complete batch into the existing PostgreSQL fallback. Filtering
+  // individual hits here would leave stale totals and pagination in the response.
+  if (rows.length !== snapshotIds.length) {
+    throw new Error("Search documents no longer match the public catalog");
+  }
+  const current = new Map(rows.map((row) => [
+    row.id,
+    buildSearchDocument({ ...row, price: Number(row.price) }, synonyms)
+  ]));
+  return hits.map((hit) => current.get(hit.id)!);
 }
 
 function publicTaxonomyTargetCondition() {

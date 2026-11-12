@@ -1,3 +1,4 @@
+import { publicProductExclusionCondition } from "@/features/catalog/public-product-exclusions";
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import {
@@ -266,7 +267,7 @@ export async function getActiveCatalogSitemapRows() {
       .from(products)
       .innerJoin(categories, eq(categories.id, products.categoryId))
       .innerJoin(subcategories, eq(subcategories.id, products.subcategoryId))
-      .where(and(eq(products.catalogVersionId, activeVersion.id), eq(products.status, "active")))
+      .where(and(eq(products.catalogVersionId, activeVersion.id), eq(products.status, "active"), publicProductExclusionCondition()))
   ]);
 
   return {

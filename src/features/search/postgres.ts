@@ -1,3 +1,4 @@
+import { publicProductExclusionCondition } from "@/features/catalog/public-product-exclusions";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   getPublicCategorySlugs,
@@ -85,6 +86,7 @@ export async function searchProductsWithPostgres({
 
   if (!admin) {
     whereConditions.push(
+      publicProductExclusionCondition(),
       eq(categories.isActive, true),
       eq(subcategories.isActive, true),
       inArray(categories.slug, getPublicCategorySlugs()),

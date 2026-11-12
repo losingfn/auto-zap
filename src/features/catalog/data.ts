@@ -1,3 +1,4 @@
+import { publicProductExclusionCondition } from "./public-product-exclusions";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { catalogCategories } from "@/config/categories";
@@ -224,7 +225,8 @@ async function loadPublicCatalogCategories(): Promise<PublicCategory[]> {
         eq(categories.isActive, true),
         eq(subcategories.isActive, true),
         inArray(categories.slug, getPublicCategorySlugs()),
-        publicTaxonomyTargetCondition()
+        publicTaxonomyTargetCondition(),
+        publicProductExclusionCondition()
       )
     )
     .groupBy(categories.id, categories.slug, categories.name, categories.sortOrder)
@@ -472,7 +474,8 @@ export async function getProductDetails(
         eq(products.slug, productSlug),
         eq(categories.isActive, true),
         eq(subcategories.isActive, true),
-        publicTaxonomyTargetCondition()
+        publicTaxonomyTargetCondition(),
+        publicProductExclusionCondition()
       )
     )
     .limit(1);
@@ -538,7 +541,8 @@ export async function getProductsForPurchaseList(
         eq(subcategories.isActive, true),
         inArray(products.productIdentityId, normalizedIds),
         inArray(categories.slug, getPublicCategorySlugs()),
-        publicTaxonomyTargetCondition()
+        publicTaxonomyTargetCondition(),
+        publicProductExclusionCondition()
       )
     );
 
@@ -584,7 +588,8 @@ async function countProducts(activeVersionId: string, subcategoryId?: string) {
     eq(categories.isActive, true),
     eq(subcategories.isActive, true),
     inArray(categories.slug, getPublicCategorySlugs()),
-    publicTaxonomyTargetCondition()
+    publicTaxonomyTargetCondition(),
+    publicProductExclusionCondition()
   ];
 
   if (subcategoryId) {
@@ -612,7 +617,8 @@ async function getProductRows(
     eq(categories.isActive, true),
     eq(subcategories.isActive, true),
     inArray(categories.slug, getPublicCategorySlugs()),
-    publicTaxonomyTargetCondition()
+    publicTaxonomyTargetCondition(),
+    publicProductExclusionCondition()
   ];
 
   if (subcategoryId) {

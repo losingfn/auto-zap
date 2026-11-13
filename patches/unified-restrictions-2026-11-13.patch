@@ -1,0 +1,986 @@
+diff --git a/docs/unified-restrictions.md b/docs/unified-restrictions.md
+new file mode 100644
+index 0000000..83a31fe
+--- /dev/null
++++ b/docs/unified-restrictions.md
+@@ -0,0 +1,68 @@
++# Общая проверка ограниченных товаров
++
++Раздел «Ограниченные товары» использует существующий процесс загрузки Excel,
++анализа и явной публикации. Новых настроек для сотрудника нет.
++
++Правила АвтоВАЗа/LADA объединены с уже выбранными владельцем обозначениями
++ГАЗ/НАЗ, КАМАЗ, Hyundai, Kia, WABCO, BMW, Mitsubishi и Лукойла. Дополнительные
++марки МАЗ, ЗАЗ, ПАЗ, ЛиАЗ и КАвЗ не включались. Старый перечень 21 спорного
++адреса также участвует в общей оценке. Проверяются название, исходное название
++и имеющийся адрес товара. Общие слова и неизвестную совместимость нельзя
++надёжно приписывать производителю без данных о нём.
++
++## Решения владельца
++
++По умолчанию найденные ограничения закрывают публикацию. Владелец может
++подтвердить разрешение одного или выбранных товаров. Сотрудник видит результат
++проверки, но не может изменить решения. Проверка роли остаётся на сервере.
++
++Решение связано с артикулом, постоянной идентичностью, содержимым и основанием
++проверки. Оно переносится в повторный импорт только при безопасном совпадении.
++Неизменённые решения АвтоВАЗа сохраняются при обновлении правил; новые признаки
++ограниченной марки не получают разрешение по старому решению автоматически.
++Устаревшие и конфликтующие запреты остаются закрытыми до проверки владельцем.
++
++## Скорость и актуальность
++
++Новая версия проверки — `restricted-products-1`. Анализ выполняется при подготовке
++каталога и сохраняет результат в существующих полях проверки. Публичный запрос
++проверяет свежесть и разрешение, а не повторяет большой словарь марок на каждом
++товаре. При смене данных, включая адрес, старый результат больше не разрешает
++публикацию. Постоянный кэш публичных разрешений не добавлялся.
++
++На время управляемого обновления поддерживается `avtovaz-2`. Для старого формата
++сохраняется прежнее ограничение выбранных марок. После обновления оценок
++используется общий результат, включая подтверждённые исключения владельца.
++Принимаемые результаты поиска всегда сверяются с текущим публичным каталогом.
++
++Повторные чтения одной карточки для метаданных и страницы объединены через
++`React.cache` в пределах одного запроса. Между запросами решения не сохраняются.
++
++## Проверки
++
++- `pnpm typecheck`, `pnpm test`, `pnpm build`;
++- `pnpm test:restricted-products` — все выбранные группы, границы охвата,
++  21 адрес, исходные названия, решения владельца и повторный анализ;
++- `pnpm test:restricted-products:postgres` — временные PostgreSQL/Meilisearch,
++  переход со старого формата, запрет действий сотруднику, индексируемое разрешение
++  владельца, настоящая повторная загрузка Excel и публикация существующим worker;
++- `pnpm benchmark:restricted-products` — одинаковые запросы списка до и после
++  подготовки общей проверки на 25 000 искусственных товарах.
++
++Тестовые базы и индексы отделены от рабочих данных. Проверен интерфейс владельца
++и сотрудника на компьютере и узком мобильном экране.
++
++## Установка
++
++Миграция схемы не требуется. Для действующего каталога необходимо управляемо
++подготовить оценки по новой версии и поисковый индекс, проверить количества и
++активировать подготовленный результат. Веб-приложение и worker должны работать
++на одной версии кода. Старые черновики потребуется проверить заново; опубликованные
++отчёты не переписываются как будто они первоначально проверялись новыми правилами.
++
++Рабочие данные, индекс и процессы не изменяются автоматически этим patch.
++Операции установки выполняются отдельно после разрешения владельца.
++
++GitHub main отстаёт от действующей исходной базы. Review-пакет содержит patch
++к проверенной установленной версии, без публикации посторонних незакоммиченных
++изменений. Развёртывать main целиком вместо действующего приложения нельзя.
+diff --git a/package.json b/package.json
+index 38b2d00..805e243 100644
+--- a/package.json
++++ b/package.json
+@@ -12,7 +12,7 @@
+     "jobs": "scripts/with-env.sh node --import tsx scripts/background-jobs.ts",
+     "lint": "eslint .",
+     "typecheck": "tsc --noEmit",
+-    "test": "node --import tsx scripts/test-search-pagination.ts && node --import tsx scripts/test-import-automation.ts && node --import tsx scripts/test-import-draft-classification-reuse.ts && node --import tsx scripts/test-import-perf.ts && node --import tsx scripts/test-review-reapply.ts && node --import tsx scripts/test-review-group-apply.ts && node --import tsx scripts/test-review-accountant-ux.ts && node --import tsx scripts/test-background-jobs.ts && node --import tsx scripts/test-import-storage.ts && node --import tsx scripts/test-import-worker-contracts.ts && node --import tsx scripts/test-publication-policy.ts && node --import tsx scripts/test-import-publication-analysis.ts && node --import tsx scripts/test-avtovaz-panel.ts && node --import tsx scripts/test-search-synonym-snapshot.ts",
++    "test": "node --import tsx scripts/test-search-pagination.ts && node --import tsx scripts/test-import-automation.ts && node --import tsx scripts/test-import-draft-classification-reuse.ts && node --import tsx scripts/test-import-perf.ts && node --import tsx scripts/test-review-reapply.ts && node --import tsx scripts/test-review-group-apply.ts && node --import tsx scripts/test-review-accountant-ux.ts && node --import tsx scripts/test-background-jobs.ts && node --import tsx scripts/test-import-storage.ts && node --import tsx scripts/test-import-worker-contracts.ts && node --import tsx scripts/test-publication-policy.ts && node --import tsx scripts/test-import-publication-analysis.ts && node --import tsx scripts/test-avtovaz-panel.ts && node --import tsx scripts/test-search-synonym-snapshot.ts && node --import tsx scripts/test-unified-restrictions.ts",
+     "test:public-catalog-policy": "node --import tsx scripts/test-public-catalog-policy.ts",
+     "test:publication-policy": "node --import tsx scripts/test-publication-policy.ts",
+     "test:publication-policy:postgres": "node --import tsx scripts/test-publication-policy-postgres.ts",
+@@ -61,7 +61,10 @@
+     "test:avtovaz-panel:postgres": "node --import tsx scripts/test-avtovaz-panel-postgres.ts",
+     "benchmark:avtovaz-panel": "node --import tsx scripts/test-avtovaz-panel-postgres.ts --benchmark",
+     "test:final-public-policy": "node --import tsx scripts/test-final-public-policy.ts",
+-    "benchmark:final-policy-search": "node --import tsx scripts/benchmark-final-policy-search.ts"
++    "benchmark:final-policy-search": "node --import tsx scripts/benchmark-final-policy-search.ts",
++    "test:restricted-products": "node --import tsx scripts/test-unified-restrictions.ts",
++    "test:restricted-products:postgres": "node --import tsx scripts/test-unified-restrictions-postgres.ts",
++    "benchmark:restricted-products": "node --import tsx scripts/benchmark-unified-catalog.ts"
+   },
+   "dependencies": {
+     "@node-rs/argon2": "^1.8.0",
+diff --git a/scripts/benchmark-unified-catalog.ts b/scripts/benchmark-unified-catalog.ts
+new file mode 100644
+index 0000000..73ad947
+--- /dev/null
++++ b/scripts/benchmark-unified-catalog.ts
+@@ -0,0 +1,56 @@
++import assert from "node:assert/strict";
++import { mkdir, writeFile } from "node:fs/promises";
++import { createFinalPolicyFixture } from "./helpers/final-public-policy-fixture";
++import { LEGACY_PUBLICATION_POLICY_VERSION } from "../src/features/publication-policy/rules";
++import { ALL_ASSORTMENT_CATEGORY_SLUG, ALL_PRODUCTS_SUBCATEGORY_SLUG } from "../src/config/public-taxonomy";
++
++async function main() {
++  const f = await createFinalPolicyFixture();
++  try {
++    const catalog = await import("../src/features/catalog/data");
++    const { prepareVersionPublicationPolicy } = await import("../src/features/publication-policy/public-assessments");
++    const { admin } = f;
++    const base = (await catalog.getProductsForSubcategory(ALL_ASSORTMENT_CATEGORY_SLUG, ALL_PRODUCTS_SUBCATEGORY_SLUG)).pagination.totalItems;
++    await admin`WITH identities AS (INSERT INTO product_identities(id)
++      SELECT gen_random_uuid() FROM generate_series(1,25000) RETURNING id),
++      numbered AS (SELECT id,row_number() OVER () AS n FROM identities)
++      INSERT INTO products(id,catalog_version_id,product_identity_id,shop_code,name,raw_name,slug,
++        category_id,subcategory_id,search_text,price)
++      SELECT gen_random_uuid(),${f.version},id,'БЧ-'||n,
++        CASE WHEN n%5=0 THEN 'Фара ГАЗ Тест ' ELSE 'Лампа H7 Тест ' END||n,
++        CASE WHEN n%5=0 THEN 'Фара ГАЗ Тест ' ELSE 'Лампа H7 Тест ' END||n,
++        'bench-unified-'||n,${f.category},${f.subcategory},'Тест',100 FROM numbered`;
++    await admin`UPDATE products SET publication_assessment=jsonb_build_object('state','ready',
++      'policyVersion',${LEGACY_PUBLICATION_POLICY_VERSION}::text,'status','ALLOWED',
++      'inputSignature',md5(jsonb_build_array(id,name,raw_name,shop_code,product_identity_id)::text))
++      WHERE slug LIKE 'bench-unified-%'`;
++    // Planner statistics belong only to this disposable test database.
++    await admin`ANALYZE products`;
++    const readings: {mode:string; page:number; ms:number; total:number; rows:number; timedOut:boolean}[] = [];
++    async function measure(mode:string) {
++      for (const page of [1,2,1]) {
++        const start=performance.now();
++        const result=await catalog.getProductsForSubcategory(ALL_ASSORTMENT_CATEGORY_SLUG,ALL_PRODUCTS_SUBCATEGORY_SLUG,{page});
++        readings.push({mode,page,ms:Math.round(performance.now()-start),total:result.pagination.totalItems,
++          rows:result.products.length,timedOut:result.subcategory===null});
++        if(mode==='prepared') {
++          assert.equal(result.pagination.totalItems,base+20000);
++          assert.equal(result.products.length,50);
++        }
++      }
++    }
++    await measure('legacy');
++    await prepareVersionPublicationPolicy(f.version);
++    await measure('prepared');
++    const start=performance.now();
++    assert.ok(await catalog.getProductDetails(f.target.categorySlug,f.target.subcategorySlug,'bench-unified-1'));
++    const detailMs=Math.round(performance.now()-start);
++    const median=(mode:string)=>readings.filter(r=>r.mode===mode).map(r=>r.ms).sort((a,b)=>a-b)[1];
++    const result={syntheticProducts:25000,restrictedProducts:5000,expectedPublic:base+20000,
++      beforeMedianMs:median('legacy'),afterMedianMs:median('prepared'),detailMs,readings};
++    await mkdir('artifacts/unified-restrictions',{recursive:true});
++    await writeFile('artifacts/unified-restrictions/catalog-benchmark.json',JSON.stringify(result,null,2));
++    console.log(JSON.stringify(result));
++  } finally { await f.cleanup(); }
++}
++main().catch(error=>{console.error(error);process.exitCode=1;});
+diff --git a/scripts/publication-policy-operator.ts b/scripts/publication-policy-operator.ts
+index 4c26c32..82723a2 100644
+--- a/scripts/publication-policy-operator.ts
++++ b/scripts/publication-policy-operator.ts
+@@ -1,3 +1,4 @@
++import { PUBLICATION_POLICY_VERSION } from "../src/features/publication-policy/rules";
+ import { pathToFileURL } from "node:url";
+ import { checkCoverage, checkOperatorEnvironment, OperatorError, parseOperatorArgs } from "./helpers/publication-policy-operator";
+ 
+@@ -5,7 +6,7 @@ import { checkCoverage, checkOperatorEnvironment, OperatorError, parseOperatorAr
+ export async function runOperator(args: string[], environment = process.env) {
+   const options = parseOperatorArgs(args);
+   const { command, mode, values } = options;
+-  console.log(JSON.stringify({ operation: command, mode, policyVersion: "avtovaz-2",
++  console.log(JSON.stringify({ operation: command, mode, policyVersion: PUBLICATION_POLICY_VERSION,
+     steps: command === "prepare" ? ["проверки", "запись оценок", "подготовка staging без swap", "сверка покрытия"] :
+       command === "activate" ? ["проверки покрытия и generation", "защищённое включение БД", "swap подготовленного индекса", "проверка индекса"] :
+       command === "disable" ? ["проверки OWNER и версии", "транзакционное enabled=false; индекс не меняется"] :
+diff --git a/scripts/test-avtovaz-panel.ts b/scripts/test-avtovaz-panel.ts
+index 3aa8830..c0e964a 100644
+--- a/scripts/test-avtovaz-panel.ts
++++ b/scripts/test-avtovaz-panel.ts
+@@ -16,10 +16,10 @@ async function main() {
+     items: [], total: 0, page: 1 };
+   const render = (data: AvtovazPanelData, expanded = false) => renderToStaticMarkup(React.createElement(AvtovazFilterPanel, { batchId, initialData: data, initialExpanded: expanded }));
+   await test("default block is compact and list is collapsed", () => {
+-    const html = render(base); assert.match(html, /Товары АвтоВАЗа/); assert.match(html, /aria-expanded="false"/);
++    const html = render(base); assert.match(html, /Ограниченные товары/); assert.match(html, /aria-expanded="false"/);
+     assert.doesNotMatch(html, /role="tablist"|Найти товар|Выбрать страницу/);
+   });
+-  for (const [state, text] of [["not_run", "ещё не выполнялась"], ["running", "Проверяем товары"], ["stale", "Результаты проверки устарели"], ["error", "Не удалось завершить проверку"]] as const) {
++  for (const [state, text] of [["not_run", "ещё не выполнялась"], ["running", "Проверяем ограниченные товары"], ["stale", "Результаты проверки устарели"], ["error", "Не удалось завершить проверку"]] as const) {
+     await test(`${state} has explicit state, no fake counters or list`, () => {
+       const html = render({ ...base, state, counts: null }, true);
+       assert.match(html, new RegExp(text)); assert.doesNotMatch(html, /Будут скрыты|Выбрать страницу/);
+diff --git a/scripts/test-import-publication-analysis.ts b/scripts/test-import-publication-analysis.ts
+index 25b9c6f..f7d61dc 100644
+--- a/scripts/test-import-publication-analysis.ts
++++ b/scripts/test-import-publication-analysis.ts
+@@ -28,7 +28,7 @@ function analyze(rows: PublicationDraftRow[], decisions: CurrentPublicationDecis
+ for (const name of ["Клапан 11182 АвтоВАЗ", "Муфта 2181 ГРАНТА АВТОВАЗ", "Фара ВАЗ 2109", "Коврики LADA Granta", "Бампер передний Калина", "Фара Веста"]) {
+   test(`Excel policy excludes ${name}`, () => assert.equal(analyze([row(name)]).assessments[0].assessment.status, "AUTO_EXCLUDED"));
+ }
+-for (const name of ["Амортизатор 2108", "Бампер задний 2110", "Радиатор 2170", "Фара 2190", "Лампа H7", "Чайка над рекой Ока", "Масло производителя Аура", "Сувенир город Самара"]) {
++for (const name of ["Амортизатор 2108", "Бампер задний 2110", "Радиатор 2170", "Фара 2190", "Лампа H7", "Птица над рекой Ока", "Масло производителя Аура", "Сувенир город Самара"]) {
+   test(`Excel policy allows ${name}`, () => assert.equal(analyze([row(name)]).assessments[0].assessment.status, "ALLOWED"));
+ }
+ for (const name of ["Бампер Искра", "Фара Аура", "Фара Ока", "Коврики Самара"]) {
+diff --git a/scripts/test-unified-restrictions-postgres.ts b/scripts/test-unified-restrictions-postgres.ts
+new file mode 100644
+index 0000000..1be69ae
+--- /dev/null
++++ b/scripts/test-unified-restrictions-postgres.ts
+@@ -0,0 +1,84 @@
++import assert from "node:assert/strict";
++import { randomUUID } from "node:crypto";
++import { spawn } from "node:child_process";
++import { createFinalPolicyFixture } from "./helpers/final-public-policy-fixture";
++import { DISPUTED_GAZ_PRODUCT_SLUGS } from "../src/features/publication-policy/restricted-brands";
++import { LEGACY_PUBLICATION_POLICY_VERSION, PUBLICATION_POLICY_VERSION } from "../src/features/publication-policy/rules";
++import { ALL_ASSORTMENT_CATEGORY_SLUG, ALL_PRODUCTS_SUBCATEGORY_SLUG } from "../src/config/public-taxonomy";
++
++async function main() {
++  const f = await createFinalPolicyFixture();
++  const { admin } = f;
++  try {
++    const catalog = await import("../src/features/catalog/data");
++    const { activatePublicPolicy } = await import("../src/features/publication-policy/public-activation");
++    const imports = await import("../src/features/admin/imports");
++    const { searchProducts } = await import("../src/features/search/service");
++    const { syncSearchIndexForActiveCatalog } = await import("../src/features/search/indexing");
++    const { getActiveCatalogSitemapRows } = await import("../src/features/admin/backups/service");
++    const count = async () => (await catalog.getProductsForSubcategory(ALL_ASSORTMENT_CATEGORY_SLUG, ALL_PRODUCTS_SUBCATEGORY_SLUG)).pagination.totalItems;
++    const base = await count();
++    const labels = ["Фара ГАЗ", "Фара НАЗ", "Фара КАМАЗ", "Фильтр Hyundai", "Фильтр Kia", "Клапан WABCO", "Фара BMW", "Фара Mitsubishi", "Масло Лукойл"];
++    const retained = ["Фара МАЗ", "Фара ЗАЗ", "Фара ПАЗ", "Фара ЛиАЗ", "Фара КАвЗ"];
++    const rows = [
++      ...labels.map((name, i) => ({ name, slug: `unified-${i}` })),
++      ...DISPUTED_GAZ_PRODUCT_SLUGS.map(slug => ({ name: "Деталь ГАЗ", slug })),
++      ...retained.map((name, i) => ({ name, slug: `scope-retained-${i}` }))
++    ].map((row, i) => ({ ...row, id: randomUUID(), catalog_version_id: f.version,
++      product_identity_id: randomUUID(), shop_code: `УН-${i + 1}`, raw_name: `УН-${i + 1} ${row.name}`,
++      category_id: f.category, subcategory_id: f.subcategory, search_text: row.name, price: 100 }));
++    await admin`INSERT INTO product_identities ${admin(rows.map(row => ({ id: row.product_identity_id })), "id")}`;
++    await admin`INSERT INTO products ${admin(rows)}`;
++    await activatePublicPolicy(f.version, f.owner);
++    assert.equal(await count(), base + retained.length);
++    for (const row of rows.slice(0, labels.length + DISPUTED_GAZ_PRODUCT_SLUGS.length)) {
++      assert.equal(await catalog.getProductDetails(f.target.categorySlug, f.target.subcategorySlug, row.slug), null);
++    }
++    assert.equal((await catalog.getProductsForPurchaseList(rows.map(row => row.product_identity_id))).length, retained.length);
++
++    // Model installation over the real previous assessment format, not a blanket
++    // disabled-policy mode: old ALLOWED must still respect the existing brand gate.
++    await admin`UPDATE site_settings SET value=jsonb_set(value,'{policyVersion}',${admin.json(LEGACY_PUBLICATION_POLICY_VERSION)})
++      WHERE key='publication-policy:activation'`;
++    await admin`UPDATE products SET publication_assessment=publication_assessment || jsonb_build_object(
++      'policyVersion',${LEGACY_PUBLICATION_POLICY_VERSION}::text,'status','ALLOWED','state','ready',
++      'inputSignature',md5(jsonb_build_array(id,name,raw_name,shop_code,product_identity_id)::text))
++      WHERE id=ANY(${rows.slice(0,labels.length).map(row=>row.id)}::uuid[])`;
++    assert.equal(await count(), base + retained.length);
++    await activatePublicPolicy(f.version, f.owner);
++
++    await assert.rejects(f.decide(rows[0].id, "allow", f.manager));
++    await f.decide(rows[0].id, "allow");
++    assert.equal(await count(), base + retained.length + 1);
++    assert.ok(await catalog.getProductDetails(f.target.categorySlug, f.target.subcategorySlug, rows[0].slug));
++    await syncSearchIndexForActiveCatalog();
++    const found = await searchProducts({ query: rows[0].name, limit: 50 });
++    assert.equal(found.source, "meilisearch", "Current owner-approved brand documents must not force legacy fallback");
++    assert.ok(found.hits.some(hit => hit.productIdentityId === rows[0].product_identity_id));
++    assert.equal((await getActiveCatalogSitemapRows()).products.length, base + retained.length + 1);
++
++    const run = () => new Promise<void>((resolve, reject) => {
++      const child = spawn(process.execPath, ["--import", "tsx", "scripts/final-policy-worker-child.ts"], { env: process.env, stdio: ["ignore", "pipe", "pipe"] });
++      let error = ""; child.stderr.on("data", chunk => { error += chunk; }); child.stdout.resume();
++      const timer = setTimeout(() => { child.kill("SIGTERM"); reject(new Error("Synthetic worker timed out")); }, 60000);
++      child.once("error", reject); child.once("exit", code => { clearTimeout(timer); code === 0 ? resolve() : reject(new Error(error || `Synthetic worker exited ${code}`)); });
++    });
++    const uploaded = await imports.enqueueAdminImportFromUpload({
++      file: new File([new Uint8Array(f.workbook(101, [...f.seed, ...rows]))], "unified-restrictions.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), adminUserId: f.owner
++    });
++    await run();
++    const [batch] = await admin`SELECT * FROM import_batches WHERE id=${uploaded.importBatchId}`;
++    assert.equal(batch.status, "analyzed");
++    assert.equal(batch.report.publicationAnalysis.policyVersion, PUBLICATION_POLICY_VERSION);
++    assert.equal(batch.report.publicationAnalysis.summary.manuallyAllowed, 2);
++    const publication = await imports.enqueueAdminImportPublish({ importBatchId: uploaded.importBatchId, adminUserId: f.owner });
++    await run();
++    const [job] = await admin`SELECT status FROM background_jobs WHERE id=${publication.backgroundJobId}`;
++    assert.equal(job.status, "succeeded");
++    assert.equal(await count(), base + retained.length + 1);
++    assert.equal((await catalog.getProductsForPurchaseList(rows.map(row => row.product_identity_id))).length, retained.length + 1);
++    assert.equal((await getActiveCatalogSitemapRows()).products.length, base + retained.length + 1);
++    console.log("PASS unified PostgreSQL/Meilisearch: all selected brands, 21 routes, legacy upgrade, owner/staff permissions, indexed owner allowance, real Excel worker reimport/publication, counts, purchase list and sitemap.");
++  } finally { await f.cleanup(); }
++}
++main().catch(error => { console.error(error); process.exitCode = 1; });
+diff --git a/scripts/test-unified-restrictions.ts b/scripts/test-unified-restrictions.ts
+new file mode 100644
+index 0000000..6893a13
+--- /dev/null
++++ b/scripts/test-unified-restrictions.ts
+@@ -0,0 +1,75 @@
++import assert from "node:assert/strict";
++import { createHash, randomUUID } from "node:crypto";
++import { test } from "node:test";
++import { assessAutomaticPublication, assessPublicationProduct, preparePublicationProduct } from "../src/features/publication-policy/assessment";
++import { LEGACY_PUBLICATION_POLICY_VERSION, PUBLICATION_POLICY_VERSION } from "../src/features/publication-policy/rules";
++import { DISPUTED_GAZ_PRODUCT_SLUGS } from "../src/features/publication-policy/restricted-brands";
++import type { CurrentPublicationDecision, PublicationProductInput } from "../src/features/publication-policy/types";
++import { classifyDraftPublicationRows, prepareDraftPublicationRows, type PublicationDraftRow } from "../src/features/import/publication-analysis";
++
++function allowance(input: PublicationProductInput): CurrentPublicationDecision {
++  const prepared = preparePublicationProduct(input);
++  const automatic = assessAutomaticPublication(prepared);
++  return { id: randomUUID(), shopCode: prepared.shopCode, productIdentityId: prepared.productIdentityId,
++    action: "allow", contentFingerprint: prepared.contentFingerprint, basisFingerprint: automatic.basisFingerprint,
++    policyVersion: PUBLICATION_POLICY_VERSION, reason: "Подтверждено владельцем", revision: 1,
++    updatedBy: randomUUID(), updatedAt: new Date() };
++}
++
++for (const name of ["Фара LADA", "Фара ГАЗ-3302", "Ручка Газель", "Фара НАЗ", "Фара КАМАЗ",
++  "Фильтр Hyundai", "Фильтр Kia Rio", "Клапан WABCO", "Фара BMW", "Фара Mitsubishi", "Масло Лукойл"])
++  test(`one import policy and explicit owner allowance: ${name}`, () => {
++    const row = { name, shopCode: "TEST-01", productIdentityId: randomUUID() };
++    assert.equal(assessPublicationProduct(row).status, "AUTO_EXCLUDED");
++    const decision = allowance(row);
++    assert.equal(assessPublicationProduct(row, [decision]).status, "ALLOWED");
++    assert.equal(assessPublicationProduct({ ...row, name: name + " другой товар" }, [decision]).status, "AUTO_EXCLUDED");
++  });
++
++for (const name of ["Трос газа УАЗ", "Фара МАЗ", "Фара ЗАЗ", "Фара ПАЗ", "Фара ЛиАЗ", "Фара КАвЗ", "Газонокосилка"])
++  test(`scope remains as selected by the owner: ${name}`, () => {
++    assert.equal(assessPublicationProduct({ name }).status, "ALLOWED");
++  });
++
++test("all complained routes are included in the shared assessment even after a title change", () => {
++  for (const slug of DISPUTED_GAZ_PRODUCT_SLUGS) {
++    const row = { name: "Переименованная деталь", rawName: "Деталь", slug, shopCode: "TEST-01" };
++    assert.equal(assessPublicationProduct(row).status, "AUTO_EXCLUDED");
++    assert.equal(assessPublicationProduct(row, [allowance(row)]).status, "ALLOWED");
++  }
++});
++
++test("raw source names and routes participate even when the visible title does not", () => {
++  assert.equal(assessPublicationProduct({ name: "Фара", rawName: "Фара Hyundai" }).status, "AUTO_EXCLUDED");
++  assert.equal(assessPublicationProduct({ name: "Фара", slug: "headlight-kia-rio" }).status, "AUTO_EXCLUDED");
++});
++
++test("an unchanged AvtoVAZ owner allowance survives the policy upgrade; new restricted evidence does not", () => {
++  const row = { name: "Фара Веста", shopCode: "TEST-01" };
++  const decision = allowance(row);
++  const automatic = assessAutomaticPublication(preparePublicationProduct(row));
++  decision.policyVersion = LEGACY_PUBLICATION_POLICY_VERSION;
++  decision.basisFingerprint = createHash("sha256").update(JSON.stringify([
++    LEGACY_PUBLICATION_POLICY_VERSION, decision.shopCode, automatic.status, automatic.evidence
++  ])).digest("hex");
++  assert.equal(assessPublicationProduct(row, [decision]).status, "ALLOWED");
++  assert.equal(assessPublicationProduct({ ...row, slug: "headlight-kia" }, [decision]).status, "AUTO_EXCLUDED");
++});
++
++test("each repeated Excel analysis preserves an owner's explicit decision and blocks new restricted rows", () => {
++  const identity = randomUUID();
++  const rows: PublicationDraftRow[] = ["Фара ГАЗ", "Фара LADA", "Фильтр Hyundai", "Лампа H7"].map((name, i) => ({
++    id: randomUUID(), rowNumber: i + 1, name, rawName: name, shopCode: `TEST-${i}`,
++    productIdentityId: i === 0 ? identity : randomUUID(), productId: randomUUID(),
++    validationStatus: "valid", price: "100", eligibleUnderExistingRules: true
++  }));
++  const decision = allowance(rows[0]);
++  for (let run = 0; run < 2; run++) {
++    const { prepared } = prepareDraftPublicationRows(rows);
++    const result = classifyDraftPublicationRows(rows, prepared, [decision], randomUUID());
++    assert.equal(result.summary.excludedTotal, 2);
++    assert.equal(result.summary.manuallyAllowed, 1);
++    assert.equal(result.summary.wouldPublish, 2);
++    assert.equal(result.assessments[0].assessment.manualDecision?.id, decision.id);
++  }
++});
+diff --git a/src/app/admin/(panel)/import/avtovaz-filter-panel.tsx b/src/app/admin/(panel)/import/avtovaz-filter-panel.tsx
+index 44868e3..1f5e43d 100644
+--- a/src/app/admin/(panel)/import/avtovaz-filter-panel.tsx
++++ b/src/app/admin/(panel)/import/avtovaz-filter-panel.tsx
+@@ -96,6 +96,7 @@ export function AvtovazFilterPanel({ batchId, initialData, initialExpanded = fal
+ 
+   async function decide(action: "allow" | "exclude", rows: AvtovazPanelItem[]) {
+     if (busy.current || loading || !data?.canEdit || !rows.length || rows.length > AVTOVAZ_PAGE_SIZE) return;
++    if (action === "allow" && !window.confirm(`Разрешить выбранные товары (${rows.length})? После подтверждения они смогут отображаться на сайте.`)) return;
+     busy.current = true; generation.current++;
+     setWorking("decision"); setError(null); setMessage(null); setFailures([]);
+     try {
+@@ -133,14 +134,14 @@ export function AvtovazFilterPanel({ batchId, initialData, initialExpanded = fal
+ 
+   return (
+     <section aria-labelledby={`${id}-title`} className="min-w-0 rounded-card bg-[#0B1220] p-4 sm:p-5">
+-      <h3 id={`${id}-title`} className="text-lg font-semibold text-white">Товары АвтоВАЗа</h3>
+-      <p className="mt-1 text-sm leading-6 text-[#8FA1B8]">Товары, связанные с АвтоВАЗом</p>
++      <h3 id={`${id}-title`} className="text-lg font-semibold text-white">Ограниченные товары</h3>
++      <p className="mt-1 text-sm leading-6 text-[#8FA1B8]">Автоматическая проверка выбранных марок и моделей</p>
+       <div aria-live="polite" className="mt-5">
+-        {working === "refresh" || data?.state === "running" ? <p role="status" className="text-sm text-[#9DBDFB]">Проверяем товары АвтоВАЗа…</p> : null}
++        {working === "refresh" || data?.state === "running" ? <p role="status" className="text-sm text-[#9DBDFB]">Проверяем ограниченные товары…</p> : null}
+         {!data && loading ? <p role="status" className="text-sm text-[#8FA1B8]">Загружаем результаты проверки…</p> : null}
+-        {data?.state === "not_run" && !pending ? <p className="text-sm text-[#C8D1DF]">Проверка товаров АвтоВАЗа ещё не выполнялась</p> : null}
++        {data?.state === "not_run" && !pending ? <p className="text-sm text-[#C8D1DF]">Проверка ограниченных товаров ещё не выполнялась</p> : null}
+         {data?.state === "stale" && !pending ? <p className="text-sm text-[#FDE68A]">Результаты проверки устарели. Необходимо обновить анализ{data.message ? `. ${data.message}` : ""}</p> : null}
+-        {data?.state === "error" && !pending ? <p role="alert" className="text-sm text-[#FECACA]">{data.message ?? "Не удалось завершить проверку товаров АвтоВАЗа."}</p> : null}
++        {data?.state === "error" && !pending ? <p role="alert" className="text-sm text-[#FECACA]">{data.message ?? "Не удалось завершить проверку ограниченных товаров."}</p> : null}
+         {ready && data.counts ? (
+           <div className="grid grid-cols-2 gap-4">
+             <PanelMetric label="Будут скрыты" value={data.counts.excluded} />
+@@ -165,7 +166,7 @@ export function AvtovazFilterPanel({ batchId, initialData, initialExpanded = fal
+       </div>
+       {expanded && ready ? (
+         <div id={`${id}-list`} className="mt-5 min-w-0" aria-busy={loading || pending}>
+-          <div role="tablist" aria-label="Товары АвтоВАЗа" className="flex gap-4 border-b border-[#243249]">
++          <div role="tablist" aria-label="Ограниченные товары" className="flex gap-4 border-b border-[#243249]">
+             {([['excluded', 'Исключённые'], ['review', 'На проверке']] as const).map(([value, label]) => (
+               <button type="button" role="tab" key={value} id={`${id}-${value}`} aria-selected={tab === value} aria-controls={`${id}-products`} tabIndex={tab === value ? 0 : -1}
+                 disabled={pending} className={`-mb-px inline-flex min-h-11 min-w-0 flex-wrap items-center gap-x-1 border-b-2 py-3 text-left text-sm font-medium transition disabled:opacity-50 motion-reduce:transition-none ${focus} ${tab === value ? "border-white text-white" : "border-transparent text-[#8FA1B8] hover:text-[#C8D1DF]"}`} onClick={() => switchTab(value)}
+@@ -213,7 +214,7 @@ export function AvtovazFilterPanel({ batchId, initialData, initialExpanded = fal
+               </li>)}</ul>
+             ) : <p className="py-5 text-sm text-[#C8D1DF]">{debouncedSearch ? "Ничего не найдено" : tab === "excluded" ? "Исключённых товаров нет" : "Товаров для проверки нет"}</p>}
+           </div>
+-          <nav aria-label="Страницы товаров АвтоВАЗа" className="mt-3 flex items-center justify-center gap-4 border-t border-[#243249] pt-3">
++          <nav aria-label="Страницы ограниченных товаров" className="mt-3 flex items-center justify-center gap-4 border-t border-[#243249] pt-3">
+             <button type="button" aria-label="Предыдущая страница" className={`${quietButton} min-w-10`} disabled={pending || loading || data.page <= 1} onClick={() => setPage(data.page - 1)}><span aria-hidden="true">←</span></button>
+             <p className="text-sm tabular-nums text-[#8FA1B8]">{data.page} из {totalPages}</p>
+             <button type="button" aria-label="Следующая страница" className={`${quietButton} min-w-10`} disabled={pending || loading || data.page >= totalPages} onClick={() => setPage(data.page + 1)}><span aria-hidden="true">→</span></button>
+diff --git a/src/features/catalog/data.ts b/src/features/catalog/data.ts
+index 6b7d8a4..58dc1c5 100644
+--- a/src/features/catalog/data.ts
++++ b/src/features/catalog/data.ts
+@@ -1,3 +1,4 @@
++import { cache } from "react";
+ import { publicProductCondition } from "@/features/publication-policy/public-condition";
+ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+ import { db } from "@/db/client";
+@@ -439,7 +440,7 @@ async function loadProductsForSubcategory({
+   }
+ }
+ 
+-export async function getProductDetails(
++export const getProductDetails = cache(async function getProductDetails(
+   categorySlug: string,
+   subcategorySlug: string,
+   productSlug: string
+@@ -502,7 +503,7 @@ export async function getProductDetails(
+     ...row,
+     price: Number(row.price)
+   };
+-}
++});
+ 
+ export async function getProductsForPurchaseList(
+   productIdentityIds: string[]
+diff --git a/src/features/catalog/public-product-exclusions.ts b/src/features/catalog/public-product-exclusions.ts
+index b60ddb4..0c5ba29 100644
+--- a/src/features/catalog/public-product-exclusions.ts
++++ b/src/features/catalog/public-product-exclusions.ts
+@@ -1,82 +1,8 @@
+ import { sql } from "drizzle-orm";
+ import { products } from "@/db/schema";
+-
+-/** Owner-requested publication restriction; independent of import/manual allowances. */
+-export const PUBLIC_PRODUCT_EXCLUSION_VERSION = "owner-brand-exclusions-2026-11-12";
+-
+-// Keep the exact complained-about routes closed even if their visible titles change.
+-// These are route exclusions, not persistent product identity or inventory changes.
+-export const DISPUTED_GAZ_PRODUCT_SLUGS = [
+-  "dvg-01720-vint-koromysla-gazel-biznes-dv-4216",
+-  "dvg-00143-kran-maslyanogo-radiatora-gaz",
+-  "kz-00109-kozhuh-rulevoy-kolonki-gaz-3302",
+-  "dvg-00711-kollektor-vpusknoy-gaz-53-pauk",
+-  "zh-00174-kozhuh-oblicovki-far-gaz-31105-lev-prav",
+-  "zh-00096-ramka-radiatora-gaz-3302-nov-obr",
+-  "dvg-02214-schup-maslyanyy-gazel-next",
+-  "rdg-00068-zaschelka-zadney-dveri-gaz",
+-  "rdg-00126-karetka-bokovoy-dveri-gaz-2705",
+-  "kg-00030-shponka-kolenvala-gaz",
+-  "zh-00118-krylo-perednee-gaz-53-st-obr",
+-  "eog-00088-predohranitel-gazel",
+-  "dvg-01623-diffuzor-gazel-biznes",
+-  "rdg-00052-zamok-kapota-gazel-next-v-sbore",
+-  "rm-00154-remen-gazel-zmz-1413",
+-  "dvg-01895-kollektor-vypusknoy-gazel-406-dv",
+-  "zh-00053-napravlyayuschaya-dveri-gazel",
+-  "kz-00306-karetka-bokovoy-dveri-gazel-v-sbore-s-p",
+-  "dvg-00399-kolco-raspornoe-r-vala-gaz-24",
+-  "dvg-01273-benzozabornik-gaz-33106-dv-cummins",
+-  "dvg-01248-benzozabornik-gaz-33104-33081-3309"
+-] as const;
+-
+-// Bounded brand/model words, not arbitrary substrings or bare numeric part codes.
+-// NEXT, Business, NN and the standalone letter G are deliberately not signals.
+-const restrictedTerms = [
+-  "[gг][aа][zз]", "[nн][aа][zз]", "газел[а-яё]*", "gazel[a-z]*",
+-  "газон", "газона", "газону", "газоном", "gazon",
+-  "волга", "волги", "волгу", "волге", "volga",
+-  "соболь", "соболя", "соболю", "соболем", "sobol", "sobolj",
+-  "валдай", "валдая", "валдаю", "valday", "valdai", "valdaj",
+-  "баргузин", "баргузина", "barguzin", "садко", "sadko",
+-  "сайбер", "siber", "чайка", "чайки", "chaika", "chayka", "chajka",
+-  "победа", "победы", "pobeda", "ермак", "ермака", "ermak", "yermak",
+-  "вепрь", "вепря", "vepr", "земляк", "zemlyak", "zemljak",
+-  "атаман", "ataman", "трофим", "trofim", "комбат", "kombat", "combat",
+-  "полуторка", "polutorka", "лукойл[а-яё]*", "lukoil[a-z]*", "g[ ._—–-]*part", "gpart", "джи[ ._—–-]*парт",
+-  // Additional makes explicitly selected by the owner on 2026-11-12.
+-  "[kк][aа][mм][aа][zз]", "hyundai", "hundai", "hyunday", "х[еёюу]нд[аэе]й?",
+-  "[kк][iи][aа]", "wabco", "вабко", "вабсо", "[bбв][mм][wв]", "bmwx[1-7]",
+-  "mitsubishi", "mitsubisi", "митсубиси", "митсубиши", "мицубиси", "мицубиши",
+-  // Common make-specific fitment names; not generic NEXT, Business, G or bare numbers.
+-  "solaris", "солярис", "accent", "акцент", "sonata", "соната", "elantra", "элантра",
+-  "getz", "гетц", "гетс", "tucson", "туссан", "туксон", "туксoн",
+-  "santa[ ._—–-]*fe", "санта[ ._—–-]*фе", "creta", "крета", "h[ ._—–-]*1",
+-  "starex", "старекс", "terracan", "терракан", "porter", "портер", "i10", "i20", "i30", "i40",
+-  "rio", "рио", "ceed", "сид", "cerato", "церато", "ceratto", "spectra", "спектра",
+-  "sportage", "спортейдж", "спортаж", "спортедж", "sorento", "соренто", "optima", "оптима",
+-  "picanto", "пиканто", "seltos", "селтос", "soul", "соул", "mohave", "мохаве",
+-  "carnival", "карнивал", "stinger", "стингер", "k5", "k7", "k9",
+-  "lancer", "лансер", "ланцер", "outlander", "аутлендер", "аутлендэр", "pajero", "паджеро",
+-  "montero", "монтеро", "galant", "галант", "carisma", "каризма", "colt", "кольт",
+-  "delica", "делика", "asx", "асх", "rvr", "l200", "l300", "l400"
+-];
+-
+-// This common subset of JS/PostgreSQL ARE syntax is tested against both engines.
+-export const PUBLIC_BRAND_EXCLUSION_PATTERN =
+-  `(^|[^a-zа-яё0-9])(${restrictedTerms.join("|")})([0-9]{1,6})?($|[^a-zа-яё0-9])`;
+-
+-const excludedName = new RegExp(PUBLIC_BRAND_EXCLUSION_PATTERN, "iu");
+-const excludedSlugs: ReadonlySet<string> = new Set(DISPUTED_GAZ_PRODUCT_SLUGS);
+-
+-export function isRestrictedPublicProduct(product: {
+-  name?: string | null;
+-  rawName?: string | null;
+-  slug?: string | null;
+-}) {
+-  return excludedSlugs.has(product.slug ?? "") ||
+-    excludedName.test([product.name, product.rawName, product.slug].filter(Boolean).join(" "));
+-}
++import { DISPUTED_GAZ_PRODUCT_SLUGS, PUBLIC_BRAND_EXCLUSION_PATTERN } from "@/features/publication-policy/restricted-brands";
++export { DISPUTED_GAZ_PRODUCT_SLUGS, PUBLIC_BRAND_EXCLUSION_PATTERN, PUBLIC_PRODUCT_EXCLUSION_VERSION,
++  isRestrictedPublicProduct } from "@/features/publication-policy/restricted-brands";
+ 
+ /** Applied before counts/limit/offset; SELECT-only and independent of feature flags. */
+ export function publicProductExclusionCondition() {
+diff --git a/src/features/import/publication-analysis-repository.ts b/src/features/import/publication-analysis-repository.ts
+index a50ef35..0dec004 100644
+--- a/src/features/import/publication-analysis-repository.ts
++++ b/src/features/import/publication-analysis-repository.ts
+@@ -49,7 +49,7 @@ function source(batch: DraftBatch) {
+ export function inputSql(batch: DraftBatch) {
+   const target = sql.join(getPublicTaxonomyTargets().map(item =>
+     sql`(c.slug = ${item.categorySlug} AND s.slug = ${item.subcategorySlug})`), sql` OR `);
+-  return sql`SELECT r.id, r.row_number AS "rowNumber", COALESCE(p.name, r.parsed_name, '') AS name,
++  return sql`SELECT r.id, r.row_number AS "rowNumber", COALESCE(p.name, r.parsed_name, '') AS name, p.slug,
+     r.raw_name AS "rawName", r.parsed_shop_code AS "shopCode",
+     COALESCE(p.product_identity_id, q.candidate) AS "productIdentityId",
+     p.id AS "productId", r.validation_status AS "validationStatus", r.price::text AS price,
+@@ -57,12 +57,12 @@ export function inputSql(batch: DraftBatch) {
+       AND c.is_active AND s.is_active AND (${target}), false) AS "eligibleUnderExistingRules",
+     r.publication_assessment AS assessment,
+     jsonb_build_array(r.id, r.row_number, r.raw_name, r.parsed_shop_code, r.parsed_name,
+-      r.validation_status, r.price, r.error_messages, p.id, p.name, p.product_identity_id, p.status,
++      r.validation_status, r.price, r.error_messages, p.id, p.name, p.slug, p.product_identity_id, p.status,
+       p.price, p.category_id, p.subcategory_id, c.slug, c.is_active, s.slug, s.is_active, q.candidates) AS input
+     FROM import_rows r
+     -- Fresh batch/version IDs may have no planner statistics yet. Keep the shop-code
+     -- lookup parameterized: a version-only scan per Excel row otherwise becomes quadratic.
+-    LEFT JOIN LATERAL (SELECT id, catalog_version_id, name, product_identity_id, status, price, category_id, subcategory_id
++    LEFT JOIN LATERAL (SELECT id, catalog_version_id, name, slug, product_identity_id, status, price, category_id, subcategory_id
+       FROM products WHERE shop_code = r.parsed_shop_code AND r.validation_status IN ('valid', 'needs_review') OFFSET 0
+     ) p ON p.catalog_version_id = ${batch.catalogVersionId}::uuid
+     LEFT JOIN categories c ON c.id = p.category_id
+@@ -102,7 +102,7 @@ export async function analyzeDraftPublicationInTransaction(
+       const started = performance.now();
+       const before = await inputState(nested, batch, null);
+       const rows = await nested.execute<PublicationDraftRow & Record<string, unknown>>(sql`
+-        SELECT id, "rowNumber", name, "rawName", "shopCode", "productIdentityId", "productId", "validationStatus", price,
++        SELECT id, "rowNumber", name, slug, "rawName", "shopCode", "productIdentityId", "productId", "validationStatus", price,
+           "eligibleUnderExistingRules" FROM (${inputSql(batch)}) i ORDER BY "rowNumber"`);
+       const { prepared } = prepareDraftPublicationRows(rows);
+       const preparedAt = performance.now();
+diff --git a/src/features/import/publication-analysis.ts b/src/features/import/publication-analysis.ts
+index 6236eb4..597aed2 100644
+--- a/src/features/import/publication-analysis.ts
++++ b/src/features/import/publication-analysis.ts
+@@ -12,7 +12,7 @@ const fingerprint = z.string().regex(/^[a-f0-9]{64}$/);
+ export const publicationRowSchema = z.object({
+   runId: z.string().uuid(), status: publicationStatus, automaticStatus: publicationStatus,
+   reasonCode: z.string().nullable(), matchedTerm: z.string().nullable(),
+-  evidence: z.array(z.object({ field: z.enum(["name", "rawName"]), term: z.string(),
++  evidence: z.array(z.object({ field: z.enum(["name", "rawName", "slug"]), term: z.string(),
+     rule: z.enum(["brand", "model", "ambiguous_model"]) })).max(8),
+   manualDecision: z.object({ id: z.string().uuid(), action: z.enum(["allow", "exclude"]), reason: z.string() }).nullable(),
+   conflicts: z.array(z.string()).max(3), eligibleUnderExistingRules: z.boolean(), wouldPublish: z.boolean()
+@@ -45,6 +45,7 @@ export interface PublicationDraftRow {
+   id: string;
+   rowNumber: number;
+   name: string;
++  slug?: string | null;
+   rawName: string | null;
+   shopCode: string | null;
+   productIdentityId: string | null;
+diff --git a/src/features/import/publication-panel-service.ts b/src/features/import/publication-panel-service.ts
+index 3c27668..6db4943 100644
+--- a/src/features/import/publication-panel-service.ts
++++ b/src/features/import/publication-panel-service.ts
+@@ -61,7 +61,7 @@ export async function changeAvtovazDecisions(value: unknown, queryValue: unknown
+     const allowedInThisRequest: ReturnType<typeof preparePublicationProduct>[] = [];
+     const ids = input.items.map(item => item.id);
+     const rows = await tx.execute<PublicationDraftRow & { assessment: unknown } & Record<string, unknown>>(sql`
+-      SELECT id, "rowNumber", name, "rawName", "shopCode", "productIdentityId", "productId", "validationStatus", price,
++      SELECT id, "rowNumber", name, slug, "rawName", "shopCode", "productIdentityId", "productId", "validationStatus", price,
+         "eligibleUnderExistingRules", assessment FROM (${inputSql(batch)}) i WHERE id IN (${sql.join(ids.map(id => sql`${id}::uuid`), sql`, `)})`);
+     const byId = new Map(rows.map(row => [row.id, row]));
+     const result: AvtovazDecisionResult = { successes: [], failures: [], updatedRows: 0 };
+@@ -80,7 +80,7 @@ export async function changeAvtovazDecisions(value: unknown, queryValue: unknown
+           const prepared = preparePublicationProduct(row), automatic = assessAutomaticPublication(prepared);
+           const current = decisions.find(decision => decision.shopCode === prepared.shopCode);
+           const save = parseSavePublicationDecision({ productId: row.productId, action: input.action,
+-            reason: input.action === "allow" ? "Разрешено владельцем при проверке товаров АвтоВАЗа" : "Исключено владельцем при проверке товаров АвтоВАЗа",
++            reason: input.action === "allow" ? "Разрешено владельцем при проверке ограниченных товаров" : "Исключено владельцем при проверке ограниченных товаров",
+             expectedContentFingerprint: automatic.contentFingerprint, expectedBasisFingerprint: automatic.basisFingerprint,
+             expectedPolicyVersion: automatic.policyVersion, expectedDecisionId: current?.id ?? null, expectedRevision: current?.revision ?? null });
+           const saved = await savePublicationDecisionInTransaction(nested, save, actor.id);
+@@ -105,7 +105,7 @@ export async function changeAvtovazDecisions(value: unknown, queryValue: unknown
+     let nextAnalysis = analysis;
+     if (result.successes.length) {
+       const affected = await tx.execute<PublicationDraftRow & { assessment: unknown } & Record<string, unknown>>(sql`
+-        SELECT id, "rowNumber", name, "rawName", "shopCode", "productIdentityId", "productId", "validationStatus", price,
++        SELECT id, "rowNumber", name, slug, "rawName", "shopCode", "productIdentityId", "productId", "validationStatus", price,
+           "eligibleUnderExistingRules", assessment FROM (${inputSql(batch)}) i
+         WHERE "shopCode" IN (${sql.join([...codes].map(code => sql`${code}`), sql`, `)})
+           ${identities.size ? sql`OR "productIdentityId" IN (${sql.join([...identities].map(id => sql`${id}::uuid`), sql`, `)})` : sql``}`);
+diff --git a/src/features/publication-policy/assessment.ts b/src/features/publication-policy/assessment.ts
+index d6903bb..52f9e59 100644
+--- a/src/features/publication-policy/assessment.ts
++++ b/src/features/publication-policy/assessment.ts
+@@ -1,4 +1,6 @@
+ import { createHash } from "node:crypto";
++import { findRestrictedProductEvidence } from "./restricted-brands";
++import { LEGACY_PUBLICATION_POLICY_VERSION } from "./rules";
+ import { normalizeShopCode } from "@/features/import/normalize";
+ import {
+   AMBIGUOUS_MODELS, AUTOMOTIVE_PARTS, BRAND_TERMS, GEOGRAPHIC_CONTEXT,
+@@ -41,6 +43,7 @@ export function preparePublicationProduct(input: PublicationProductInput): Prepa
+   if (normalizedRawName !== name) names.push({ field: "rawName", name: normalizedRawName });
+   return {
+     shopCode,
++    slug: input.slug ?? null,
+     productIdentityId: input.productIdentityId?.toLowerCase() ?? null,
+     contentFingerprint: fingerprint(["publication-content-1", name, normalizedRawName]),
+     fields: names.map(({ field, name: text }) => ({ field, tokens: text.match(/[\p{L}\p{N}]+/gu) ?? [] }))
+@@ -93,6 +96,9 @@ function collectEvidence(product: PreparedPublicationProduct): PublicationEviden
+       }
+     }
+   }
++  const names = Object.fromEntries(product.fields.map(({ field, tokens }) => [field, tokens.join(" ")]));
++  const restricted = findRestrictedProductEvidence({ ...names, slug: product.slug });
++  if (restricted) evidence.push(restricted);
+   return evidence;
+ }
+ 
+@@ -168,7 +174,9 @@ export function assessPreparedPublicationDetails(
+     decision.shopCode === product.shopCode &&
+     decision.contentFingerprint === product.contentFingerprint &&
+     (decision.action === "exclude" || (
+-      decision.policyVersion === PUBLICATION_POLICY_VERSION && decision.basisFingerprint === automatic.basisFingerprint
++      (decision.policyVersion === PUBLICATION_POLICY_VERSION && decision.basisFingerprint === automatic.basisFingerprint) ||
++      (decision.policyVersion === LEGACY_PUBLICATION_POLICY_VERSION && decision.basisFingerprint ===
++        fingerprint([LEGACY_PUBLICATION_POLICY_VERSION, product.shopCode, automatic.status, automatic.evidence]))
+     ))
+   );
+   const conflicts = [...candidates.values()].flatMap((decision) => {
+diff --git a/src/features/publication-policy/public-assessments.ts b/src/features/publication-policy/public-assessments.ts
+index bd4a434..59930bd 100644
+--- a/src/features/publication-policy/public-assessments.ts
++++ b/src/features/publication-policy/public-assessments.ts
+@@ -9,6 +9,8 @@ import { findPublicationDecisions } from "./repository";
+ import { isPublicPolicyConfigured, PUBLIC_POLICY_SETTING, PUBLIC_SEARCH_SETTING, PublicPolicyError } from "./public-config";
+ import { freshProductPolicyCondition, productPolicyInputSignature, publicProductCondition } from "./public-condition";
+ 
++import { LEGACY_PUBLICATION_POLICY_VERSION } from "./rules";
++
+ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+ export interface PublicationGeneration { catalogVersionId: string; generation: string; policyVersion: string }
+ export interface PublicationCoverage {
+@@ -28,7 +30,7 @@ export async function isPublicPolicyEnabled(database: Pick<typeof db, "select">
+   const [row] = await database.select({ value: siteSettings.value }).from(siteSettings).where(eq(siteSettings.key, PUBLIC_POLICY_SETTING));
+   if (!row) return false;
+   const state = z.object({ enabled: z.boolean(), formatVersion: z.literal(1), policyVersion: z.string() }).safeParse(row.value);
+-  if (!state.success || (state.data.enabled && state.data.policyVersion !== PUBLICATION_POLICY_VERSION)) {
++  if (!state.success || (state.data.enabled && ![PUBLICATION_POLICY_VERSION, LEGACY_PUBLICATION_POLICY_VERSION].includes(state.data.policyVersion))) {
+     throw new PublicPolicyError("not_ready", "Публичная проверка товаров требует обновления. Выполните подготовку актуальной политики.");
+   }
+   return state.data.enabled;
+@@ -36,8 +38,8 @@ export async function isPublicPolicyEnabled(database: Pick<typeof db, "select">
+ 
+ export async function getPublicationGeneration(catalogVersionId: string, database: Pick<typeof db, "select"> = db): Promise<PublicationGeneration> {
+   const [version] = await database.select({ policy: catalogVersions.publicationPolicy }).from(catalogVersions).where(eq(catalogVersions.id, catalogVersionId));
+-  const parsed = z.object({ generation: z.string().uuid(), policyVersion: z.literal(PUBLICATION_POLICY_VERSION) }).safeParse(version?.policy);
+-  if (!parsed.success) throw new PublicPolicyError("not_ready", "Эта версия каталога ещё не проверена по актуальной политике АвтоВАЗа.");
++  const parsed = z.object({ generation: z.string().uuid(), policyVersion: z.enum([PUBLICATION_POLICY_VERSION, LEGACY_PUBLICATION_POLICY_VERSION]) }).safeParse(version?.policy);
++  if (!parsed.success) throw new PublicPolicyError("not_ready", "Эта версия каталога ещё не проверена по актуальной правилам ограничения товаров.");
+   return { catalogVersionId, ...parsed.data };
+ }
+ 
+@@ -61,7 +63,7 @@ export async function getPublicationCoverage(tx: Tx, catalogVersionId: string):
+   return result;
+ }
+ 
+-async function assessRows(tx: Tx, rows: Array<{ id: string; name: string; rawName: string; shopCode: string; productIdentityId: string | null; inputSignature: string }>) {
++async function assessRows(tx: Tx, rows: Array<{ id: string; name: string; slug: string; rawName: string; shopCode: string; productIdentityId: string | null; inputSignature: string }>) {
+   const prepared = rows.map(preparePublicationProduct);
+   const decisions = await findPublicationDecisions(prepared, tx);
+   const index = indexPublicationDecisions(decisions);
+@@ -88,7 +90,7 @@ export async function prepareVersionPublicationPolicy(catalogVersionId: string)
+     if (!version) throw new PublicPolicyError("not_ready","Версия каталога не найдена.");
+     let updated = 0;
+     for (;;) {
+-      const rows = await tx.select({ id:products.id,name:products.name,rawName:products.rawName,shopCode:products.shopCode,
++      const rows = await tx.select({ id:products.id,name:products.name,slug:products.slug,rawName:products.rawName,shopCode:products.shopCode,
+         productIdentityId:products.productIdentityId,inputSignature:sql<string>`${productPolicyInputSignature()}`
+       }).from(products).where(and(eq(products.catalogVersionId,catalogVersionId),sql`NOT COALESCE(${freshProductPolicyCondition()},false)`))
+         .orderBy(products.id).limit(500);
+@@ -111,7 +113,7 @@ export async function prepareVersionPublicationPolicy(catalogVersionId: string)
+ export async function refreshPublicAssessmentsForKeys(tx: Tx, keys: { shopCode: string; productIdentityId: string | null }[]) {
+   if (!await isPublicPolicyEnabled(tx)) return;
+   const codes=[...new Set(keys.map(k=>k.shopCode))],ids=[...new Set(keys.flatMap(k=>k.productIdentityId?[k.productIdentityId]:[]))];
+-  const rows = await tx.select({id:products.id,name:products.name,rawName:products.rawName,shopCode:products.shopCode,
++  const rows = await tx.select({id:products.id,name:products.name,slug:products.slug,rawName:products.rawName,shopCode:products.shopCode,
+     productIdentityId:products.productIdentityId,inputSignature:sql<string>`${productPolicyInputSignature()}`
+   }).from(products).where(and(sql`${products.publicationAssessment} IS NOT NULL`,or(
+     codes.length?or(inArray(products.shopCode,codes),inArray(sql<string>`${products.publicationAssessment}->>'shopCode'`,codes)):undefined,ids.length?inArray(products.productIdentityId,ids):undefined)));
+@@ -126,7 +128,7 @@ export async function assertVersionPublicationReady(tx: Tx, catalogVersionId: st
+   }
+   const coverage = await getPublicationCoverage(tx,catalogVersionId);
+   if (coverage.total !== coverage.fresh) throw new PublicPolicyError("not_ready","Перед публикацией требуется завершённая актуальная проверка всех товаров.");
+-  if (coverage.confirmedBanConflicts) throw new PublicPolicyError("conflict","Есть конфликт с подтверждённым исключением АвтоВАЗа. Требуется проверка владельца.");
++  if (coverage.confirmedBanConflicts) throw new PublicPolicyError("conflict","Есть конфликт с подтверждённым исключением товара. Требуется проверка владельца.");
+   return {...actual,coverage};
+ }
+ 
+diff --git a/src/features/publication-policy/public-condition.ts b/src/features/publication-policy/public-condition.ts
+index da4673e..b9f7930 100644
+--- a/src/features/publication-policy/public-condition.ts
++++ b/src/features/publication-policy/public-condition.ts
+@@ -2,36 +2,48 @@ import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
+ import { getPublicCategorySlugs, getPublicTaxonomyTargets } from "@/config/public-taxonomy";
+ import { categories, products, subcategories } from "@/db/schema";
+ import { publicProductExclusionCondition } from "@/features/catalog/public-product-exclusions";
+-import { PUBLICATION_POLICY_VERSION } from "./assessment";
++import { PUBLICATION_POLICY_VERSION, LEGACY_PUBLICATION_POLICY_VERSION } from "./rules";
+ import { isPublicPolicyConfigured, PUBLIC_POLICY_SETTING } from "./public-config";
+ 
+-export function productPolicyInputSignature() {
+-  return sql`md5(jsonb_build_array(${products.id}, ${products.name}, ${products.rawName},
+-    ${products.shopCode}, ${products.productIdentityId})::text)`;
++export function productPolicyInputSignature(legacy = false) {
++  const fields = [products.id, products.name, products.rawName, products.shopCode, products.productIdentityId].map(field => sql`${field}`);
++  if (!legacy) fields.push(sql`${products.slug}`);
++  return sql`md5(jsonb_build_array(${sql.join(fields, sql`, `)})::text)`;
+ }
+ 
+-/** Source freshness is checked in SQL; the decision trigger marks affected rows stale atomically. */
+-export function freshProductPolicyCondition() {
++/** Stored decisions are valid only for the current values, including the route. */
++export function freshProductPolicyCondition(version = PUBLICATION_POLICY_VERSION) {
+   return sql<boolean>`(${products.publicationAssessment}->>'state' = 'ready'
+-    AND ${products.publicationAssessment}->>'policyVersion' = ${PUBLICATION_POLICY_VERSION}
+-    AND ${products.publicationAssessment}->>'inputSignature' = ${productPolicyInputSignature()})`;
++    AND ${products.publicationAssessment}->>'policyVersion' = ${version}
++    AND ${products.publicationAssessment}->>'inputSignature' = ${productPolicyInputSignature(version === LEGACY_PUBLICATION_POLICY_VERSION)})`;
+ }
+ 
+ export function productPolicyCondition(force = false): SQL<boolean> {
+-  if (!force && !isPublicPolicyConfigured()) return sql<boolean>`true`;
++  const legacyExclusion = publicProductExclusionCondition();
++  if (!force && !isPublicPolicyConfigured()) return legacyExclusion;
+   const allowed = sql<boolean>`(${freshProductPolicyCondition()}
+     AND ${products.publicationAssessment}->>'status' = 'ALLOWED'
+     AND ${products.productIdentityId} IS NOT NULL)`;
+-  if (force) return allowed;
+-  // Resolve activation once per statement. Keeping the product predicate outside
+-  // this subquery avoids a correlated settings lookup and excessive PostgreSQL JIT.
++  if (force) return sql<boolean>`COALESCE(${allowed}, false)`;
++  // Resolve activation once. Until a managed upgrade completes, the previous
++  // assessment format still enforces both AvtoVAZ and the existing brand gate.
+   const enforcement = sql`COALESCE((SELECT CASE
+     WHEN value->'enabled' = 'false'::jsonb AND value->>'formatVersion' = '1' THEN 0
+-    WHEN value->'enabled' = 'true'::jsonb AND value->>'policyVersion' = ${PUBLICATION_POLICY_VERSION}
++    WHEN value->'enabled' = 'true'::jsonb
++      AND value->>'policyVersion' IN (${PUBLICATION_POLICY_VERSION}, ${LEGACY_PUBLICATION_POLICY_VERSION})
+       AND value->>'formatVersion' = '1' THEN 1
+     ELSE -1 END FROM site_settings WHERE key = ${PUBLIC_POLICY_SETTING}), 0)`;
+-  // Absent state means not activated; malformed existing state fails closed.
+-  return sql<boolean>`CASE ${enforcement} WHEN 0 THEN true WHEN 1 THEN COALESCE(${allowed},false) ELSE false END`;
++  const prepared = sql<boolean>`CASE ${products.publicationAssessment}->>'policyVersion'
++    WHEN ${PUBLICATION_POLICY_VERSION} THEN COALESCE(${allowed}, false)
++    WHEN ${LEGACY_PUBLICATION_POLICY_VERSION} THEN COALESCE((
++      ${freshProductPolicyCondition(LEGACY_PUBLICATION_POLICY_VERSION)}
++      AND ${products.publicationAssessment}->>'status' = 'ALLOWED'
++      AND ${products.productIdentityId} IS NOT NULL AND ${legacyExclusion}), false)
++    ELSE false END`;
++  // New assessments already include all restricted makes and owner exceptions.
++  // CASE keeps the expensive legacy regexp out of the per-row prepared path.
++  return sql<boolean>`CASE ${enforcement} WHEN 0 THEN ${legacyExclusion}
++    WHEN 1 THEN ${prepared} ELSE false END`;
+ }
+ 
+ /** Outer queries join these canonical table names. Version scope is only for index preparation. */
+@@ -43,7 +55,7 @@ export function publicProductCondition(options: { versionId?: string; forcePolic
+       (SELECT id FROM catalog_versions WHERE status = 'active' ORDER BY published_at DESC, created_at DESC LIMIT 1)`,
+     eq(products.status, "active"), eq(categories.isActive, true), eq(subcategories.isActive, true),
+     eq(subcategories.categoryId, categories.id), inArray(categories.slug, getPublicCategorySlugs()),
+-    sql`(${targets})`, publicProductExclusionCondition(),
++    sql`(${targets})`,
+     options.legacyOnly ? sql`true` : productPolicyCondition(options.forcePolicy)
+   )!;
+ }
+diff --git a/src/features/publication-policy/repository.ts b/src/features/publication-policy/repository.ts
+index 0376850..039ed88 100644
+--- a/src/features/publication-policy/repository.ts
++++ b/src/features/publication-policy/repository.ts
+@@ -45,7 +45,7 @@ export async function savePublicationDecisionInTransaction(
+   await lockPublicPolicyWrites(tx);
+   await assertCurrentOwner(tx, actorId);
+   const [product] = await tx.select({
+-    name: products.name, rawName: products.rawName, shopCode: products.shopCode,
++    name: products.name, slug: products.slug, rawName: products.rawName, shopCode: products.shopCode,
+     productIdentityId: products.productIdentityId
+   }).from(products).where(eq(products.id, input.productId)).for("share").limit(1);
+   if (!product) throw new PublicationDecisionError("changed_product", "Товар не найден. Обновите данные.");
+diff --git a/src/features/publication-policy/restricted-brands.ts b/src/features/publication-policy/restricted-brands.ts
+new file mode 100644
+index 0000000..40e07ff
+--- /dev/null
++++ b/src/features/publication-policy/restricted-brands.ts
+@@ -0,0 +1,86 @@
++/** Owner-requested publication restriction; shared by import assessment, owner decisions and legacy public protection. */
++export const PUBLIC_PRODUCT_EXCLUSION_VERSION = "owner-brand-exclusions-2026-11-12";
++
++// Keep the exact complained-about routes closed even if their visible titles change.
++// These are route exclusions, not persistent product identity or inventory changes.
++export const DISPUTED_GAZ_PRODUCT_SLUGS = [
++  "dvg-01720-vint-koromysla-gazel-biznes-dv-4216",
++  "dvg-00143-kran-maslyanogo-radiatora-gaz",
++  "kz-00109-kozhuh-rulevoy-kolonki-gaz-3302",
++  "dvg-00711-kollektor-vpusknoy-gaz-53-pauk",
++  "zh-00174-kozhuh-oblicovki-far-gaz-31105-lev-prav",
++  "zh-00096-ramka-radiatora-gaz-3302-nov-obr",
++  "dvg-02214-schup-maslyanyy-gazel-next",
++  "rdg-00068-zaschelka-zadney-dveri-gaz",
++  "rdg-00126-karetka-bokovoy-dveri-gaz-2705",
++  "kg-00030-shponka-kolenvala-gaz",
++  "zh-00118-krylo-perednee-gaz-53-st-obr",
++  "eog-00088-predohranitel-gazel",
++  "dvg-01623-diffuzor-gazel-biznes",
++  "rdg-00052-zamok-kapota-gazel-next-v-sbore",
++  "rm-00154-remen-gazel-zmz-1413",
++  "dvg-01895-kollektor-vypusknoy-gazel-406-dv",
++  "zh-00053-napravlyayuschaya-dveri-gazel",
++  "kz-00306-karetka-bokovoy-dveri-gazel-v-sbore-s-p",
++  "dvg-00399-kolco-raspornoe-r-vala-gaz-24",
++  "dvg-01273-benzozabornik-gaz-33106-dv-cummins",
++  "dvg-01248-benzozabornik-gaz-33104-33081-3309"
++] as const;
++
++// Bounded brand/model words, not arbitrary substrings or bare numeric part codes.
++// NEXT, Business, NN and the standalone letter G are deliberately not signals.
++const restrictedTerms = [
++  "[gг][aа][zз]", "[nн][aа][zз]", "газел[а-яё]*", "gazel[a-z]*",
++  "газон", "газона", "газону", "газоном", "gazon",
++  "волга", "волги", "волгу", "волге", "volga",
++  "соболь", "соболя", "соболю", "соболем", "sobol", "sobolj",
++  "валдай", "валдая", "валдаю", "valday", "valdai", "valdaj",
++  "баргузин", "баргузина", "barguzin", "садко", "sadko",
++  "сайбер", "siber", "чайка", "чайки", "chaika", "chayka", "chajka",
++  "победа", "победы", "pobeda", "ермак", "ермака", "ermak", "yermak",
++  "вепрь", "вепря", "vepr", "земляк", "zemlyak", "zemljak",
++  "атаман", "ataman", "трофим", "trofim", "комбат", "kombat", "combat",
++  "полуторка", "polutorka", "лукойл[а-яё]*", "lukoil[a-z]*", "g[ ._—–-]*part", "gpart", "джи[ ._—–-]*парт",
++  // Additional makes explicitly selected by the owner on 2026-11-12.
++  "[kк][aа][mм][aа][zз]", "hyundai", "hundai", "hyunday", "х[еёюу]нд[аэе]й?",
++  "[kк][iи][aа]", "wabco", "вабко", "вабсо", "[bбв][mм][wв]", "bmwx[1-7]",
++  "mitsubishi", "mitsubisi", "митсубиси", "митсубиши", "мицубиси", "мицубиши",
++  // Common make-specific fitment names; not generic NEXT, Business, G or bare numbers.
++  "solaris", "солярис", "accent", "акцент", "sonata", "соната", "elantra", "элантра",
++  "getz", "гетц", "гетс", "tucson", "туссан", "туксон", "туксoн",
++  "santa[ ._—–-]*fe", "санта[ ._—–-]*фе", "creta", "крета", "h[ ._—–-]*1",
++  "starex", "старекс", "terracan", "терракан", "porter", "портер", "i10", "i20", "i30", "i40",
++  "rio", "рио", "ceed", "сид", "cerato", "церато", "ceratto", "spectra", "спектра",
++  "sportage", "спортейдж", "спортаж", "спортедж", "sorento", "соренто", "optima", "оптима",
++  "picanto", "пиканто", "seltos", "селтос", "soul", "соул", "mohave", "мохаве",
++  "carnival", "карнивал", "stinger", "стингер", "k5", "k7", "k9",
++  "lancer", "лансер", "ланцер", "outlander", "аутлендер", "аутлендэр", "pajero", "паджеро",
++  "montero", "монтеро", "galant", "галант", "carisma", "каризма", "colt", "кольт",
++  "delica", "делика", "asx", "асх", "rvr", "l200", "l300", "l400"
++];
++
++// This common subset of JS/PostgreSQL ARE syntax is tested against both engines.
++export const PUBLIC_BRAND_EXCLUSION_PATTERN =
++  `(^|[^a-zа-яё0-9])(${restrictedTerms.join("|")})([0-9]{1,6})?($|[^a-zа-яё0-9])`;
++
++const excludedName = new RegExp(PUBLIC_BRAND_EXCLUSION_PATTERN, "iu");
++const excludedSlugs: ReadonlySet<string> = new Set(DISPUTED_GAZ_PRODUCT_SLUGS);
++
++export function isRestrictedPublicProduct(product: {
++  name?: string | null;
++  rawName?: string | null;
++  slug?: string | null;
++}) {
++  return excludedSlugs.has(product.slug ?? "") ||
++    excludedName.test([product.name, product.rawName, product.slug].filter(Boolean).join(" "));
++}
++
++export function findRestrictedProductEvidence(product: { name?: string | null; rawName?: string | null; slug?: string | null }) {
++  if (excludedSlugs.has(product.slug ?? "")) return { field: "slug" as const, term: "Страница из обращения", rule: "brand" as const };
++  for (const field of ["name", "rawName", "slug"] as const) {
++    const match = excludedName.exec(product[field] ?? "");
++    if (match) return { field, term: match[2], rule: "brand" as const };
++  }
++  const match = excludedName.exec([product.name, product.rawName, product.slug].filter(Boolean).join(" "));
++  return match ? { field: "name" as const, term: match[2], rule: "brand" as const } : null;
++}
+diff --git a/src/features/publication-policy/rules.ts b/src/features/publication-policy/rules.ts
+index f0bffbc..d804131 100644
+--- a/src/features/publication-policy/rules.ts
++++ b/src/features/publication-policy/rules.ts
+@@ -1,5 +1,6 @@
+ /** Version also invalidates a manual allowance when the reviewed rules change. */
+-export const PUBLICATION_POLICY_VERSION = "avtovaz-2";
++export const LEGACY_PUBLICATION_POLICY_VERSION = "avtovaz-2";
++export const PUBLICATION_POLICY_VERSION = "restricted-products-1";
+ 
+ export const BRAND_TERMS: ReadonlyMap<string, string> = new Map([
+   ["автоваз", "АвтоВАЗ"], ["avtovaz", "AVTOVAZ"],
+diff --git a/src/features/publication-policy/types.ts b/src/features/publication-policy/types.ts
+index f46b610..ed3b6ac 100644
+--- a/src/features/publication-policy/types.ts
++++ b/src/features/publication-policy/types.ts
+@@ -10,13 +10,14 @@ export type PublicationReasonCode =
+ 
+ export interface PublicationProductInput {
+   name: string;
++  slug?: string | null;
+   rawName?: string | null;
+   shopCode?: string | null;
+   productIdentityId?: string | null;
+ }
+ 
+ export interface PublicationEvidence {
+-  field: "name" | "rawName";
++  field: "name" | "rawName" | "slug";
+   term: string;
+   rule: "brand" | "model" | "ambiguous_model";
+ }
+@@ -48,6 +49,7 @@ export interface CurrentPublicationDecision {
+ }
+ 
+ export interface PreparedPublicationProduct {
++  slug?: string | null;
+   shopCode: string;
+   productIdentityId: string | null;
+   fields: readonly {
+diff --git a/src/features/search/documents.ts b/src/features/search/documents.ts
+index 8ccdeb0..955d9f1 100644
+--- a/src/features/search/documents.ts
++++ b/src/features/search/documents.ts
+@@ -1,4 +1,5 @@
+ import { publicProductCondition } from "@/features/publication-policy/public-condition";
++import { PUBLICATION_POLICY_VERSION } from "@/features/publication-policy/rules";
+ import { isRestrictedPublicProduct } from "@/features/catalog/public-product-exclusions";
+ import { and, asc, desc, eq, inArray } from "drizzle-orm";
+ import { catalogTaxonomy } from "@/config/catalog-taxonomy";
+@@ -90,7 +91,7 @@ export async function hydrateMissingSearchProductIdentities(
+ ): Promise<SearchProductDocument[]> {
+   // Reject an already recognizable stale batch before the database authorization
+   // query. Every batch that can be returned still requires current public rows.
+-  if (hits.some(isRestrictedPublicProduct)) {
++  if (hits.some(hit => hit.publicationPolicyVersion !== PUBLICATION_POLICY_VERSION && isRestrictedPublicProduct(hit))) {
+     throw new Error("Search batch contains owner-excluded products");
+   }
+   const snapshotIds = [...new Set(hits.map(hit => hit.id))];

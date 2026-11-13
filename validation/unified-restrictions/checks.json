@@ -1,0 +1,11 @@
+{
+  "policyVersion": "restricted-products-1",
+  "typecheck": "passed",
+  "unitSuite": "passed",
+  "linuxBuild": "passed",
+  "existingIsolatedIntegrationChecks": 31,
+  "newUnifiedExcelAndWorkerIntegration": "passed",
+  "ownerConfirmationAndCancellation": "passed",
+  "staffCannotOverride": "passed",
+  "responsiveOverflow": "none at tested widths"
+}

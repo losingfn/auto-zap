@@ -1,0 +1,58 @@
+{
+  "syntheticProducts": 25000,
+  "restrictedProducts": 5000,
+  "expectedPublic": 20066,
+  "beforeMedianMs": 1091,
+  "afterMedianMs": 106,
+  "detailMs": 7,
+  "readings": [
+    {
+      "mode": "legacy",
+      "page": 1,
+      "ms": 1071,
+      "total": 20066,
+      "rows": 50,
+      "timedOut": false
+    },
+    {
+      "mode": "legacy",
+      "page": 2,
+      "ms": 1093,
+      "total": 20066,
+      "rows": 50,
+      "timedOut": false
+    },
+    {
+      "mode": "legacy",
+      "page": 1,
+      "ms": 1091,
+      "total": 20066,
+      "rows": 50,
+      "timedOut": false
+    },
+    {
+      "mode": "prepared",
+      "page": 1,
+      "ms": 107,
+      "total": 20066,
+      "rows": 50,
+      "timedOut": false
+    },
+    {
+      "mode": "prepared",
+      "page": 2,
+      "ms": 104,
+      "total": 20066,
+      "rows": 50,
+      "timedOut": false
+    },
+    {
+      "mode": "prepared",
+      "page": 1,
+      "ms": 106,
+      "total": 20066,
+      "rows": 50,
+      "timedOut": false
+    }
+  ]
+}

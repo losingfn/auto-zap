@@ -7,6 +7,5 @@
   "newUnifiedExcelAndWorkerIntegration": "passed",
   "ownerConfirmationAndCancellation": "passed",
   "staffCannotOverride": "passed",
-  "responsiveOverflow": "none at tested widths",
-  "productionApplied": false
+  "responsiveOverflow": "none at tested widths"
 }
